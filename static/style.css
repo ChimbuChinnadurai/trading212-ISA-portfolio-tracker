@@ -58,27 +58,39 @@ html[data-theme="light"] {
 
 /* Light Mode Section Highlights */
 html[data-theme="light"] #ov1 {
-  background: #f0f7ff;
+  /* background: #f0f7ff; */
+  background: #ffffff;
   border: 1px solid #cce3ff;
   border-left: 4px solid #3b82f6;
 }
 
 html[data-theme="light"] #ov2 {
-  background: #faf5ff;
+  /* background: #faf5ff; */
+  background: #ffffff;
   border: 1px solid #f3e8ff;
   border-left: 4px solid #8b5cf6;
 }
 
 html[data-theme="light"] .ov-card-combined {
-  background: #f0fdfa;
+  /* background: #f0fdfa; */
+  background: #ffffff;
   border: 1px solid #ccfbf1;
   border-left: 4px solid #14b8a6;
 }
 
 html[data-theme="light"] .ov-card-fg {
-  background: #f1eff1;
+  /* background: #f9eff2; */
+  background: #ffffff;
   border: 1px solid #d9b6dd;
   border-left: 4px solid #ef7aa9;
+}
+
+html[data-theme="light"] .ov-card-heatmap {
+  /* background: #f0f8f1f4; */
+  background: #ffffff;
+  background: #ffffff;
+  border: 1px solid hwb(111 57% 2% / 0.678);
+  border-left: 4px solid #25b433f4;
 }
 
 
@@ -130,7 +142,7 @@ html[data-theme="light"] .news-item:hover {
 }
 
 html[data-theme="light"] .activity-dot-buy {
-  background: #3b82f6;
+  background: #10b981;
 }
 
 html[data-theme="light"] .activity-dot-sell {
@@ -701,12 +713,12 @@ body {
 .dashboard {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 16px 20px;
+  padding: 12px 20px;
   width: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-height: 0;
 }
 
@@ -759,6 +771,65 @@ body {
 .panel-subtitle {
   font-size: 0.72rem;
   color: var(--text-muted);
+}
+
+/* ─── Refresh Countdown Clock ────────────────────────────────────────────── */
+.rc-label-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.refresh-clock {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.refresh-clock:hover {
+  opacity: 1;
+}
+
+.rc-svg {
+  display: block;
+  overflow: visible;
+}
+
+.rc-track {
+  fill: none;
+  stroke: var(--border-bright);
+  stroke-width: 2;
+}
+
+.rc-arc {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.85s linear;
+}
+
+/* Arc colour per section (fill set inline on text in JS) */
+#rc-heatmap .rc-arc {
+  stroke: #06b6d4;
+}
+
+#rc-fg .rc-arc {
+  stroke: #8b5cf6;
+}
+
+#rc-news .rc-arc {
+  stroke: #f59e0b;
+}
+
+.rc-text {
+  font-size: 6.5px;
+  font-weight: 800;
+  text-anchor: middle;
+  font-family: inherit;
+  pointer-events: none;
+  /* dy="0.35em" handles vertical centering in SVG — no dominant-baseline needed */
 }
 
 .panel-badge {
@@ -1394,44 +1465,46 @@ th.sort-desc .sort-icon::before {
   font-size: 0.82rem;
 }
 
-/* ─── Portfolio Heatmap ──────────────────────────────────────────────────── */
-.widget-heatmap {
+/* ─── Portfolio Heatmap (overview-grid card) ─────────────────────────────── */
+.ov-card-heatmap {
   border-top: 4px solid #06b6d4;
   box-shadow: 0 4px 20px rgba(6, 182, 212, 0.08);
+  grid-column: span 2;
+  cursor: default;
+  min-height: 190px;
 }
-.widget-heatmap:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
+
+@media (max-width: 900px) {
+  .ov-card-heatmap {
+    grid-column: span 1;
+  }
 }
-html[data-theme="light"] .widget-heatmap {
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-top: 4px solid #06b6d4;
-}
-html[data-glass="true"] .widget-heatmap {
-  box-shadow: 0 4px 20px rgba(6, 182, 212, 0.2) !important;
+
+.ov-card-heatmap:hover {
+  border-color: #06b6d4;
 }
 
 .heatmap-container {
   flex: 1;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 6px;
   padding: 8px;
+  overflow-y: auto;
+  align-content: start;
   min-height: 0;
-  position: relative;
 }
 
 .hm-skel {
-  width: 100%;
-  height: 100%;
+  grid-column: 1 / -1;
+  height: 140px;
   background: var(--bg-hover);
   border-radius: 8px;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
 .hm-cell {
-  position: absolute;
-  border-radius: 5px;
+  border-radius: 6px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1439,22 +1512,14 @@ html[data-glass="true"] .widget-heatmap {
   overflow: hidden;
   cursor: default;
   box-sizing: border-box;
-  transition: filter 0.15s, z-index 0s;
-  padding: 4px;
-}
-.hm-cell:hover {
-  filter: brightness(1.25);
-  z-index: 10;
+  transition: filter 0.15s;
+  padding: 6px 4px;
+  height: 72px;
+  gap: 2px;
 }
 
-.hm-logo {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  object-fit: contain;
-  margin-bottom: 3px;
-  background: rgba(255,255,255,0.08);
-  flex-shrink: 0;
+.hm-cell:hover {
+  filter: brightness(1.25);
 }
 
 .hm-ticker {
@@ -1470,10 +1535,19 @@ html[data-glass="true"] .widget-heatmap {
   text-overflow: ellipsis;
 }
 
-.hm-pct {
+.hm-price {
   font-size: 10px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.hm-pct {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
   text-align: center;
   line-height: 1.2;
   white-space: nowrap;
@@ -1829,6 +1903,50 @@ html[data-glass="true"][data-theme="light"] .s-card {
   }
 }
 
+/* ─── Responsive: landing page layout ───────────────────────────────────── */
+@media (max-width: 1300px) {
+  .landing-page {
+    grid-template-columns: 1fr 260px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .landing-page {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+
+  .dashboard-news {
+    display: none;
+  }
+
+  .overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .home-widgets {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ov-card-heatmap {
+    grid-column: span 1;
+  }
+
+  .home-widgets {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .widget-panel {
+    height: 300px;
+  }
+}
+
 /* ─── P&L thermometer cell ───────────────────────────────────────────────── */
 .pnl-cell {
   display: inline-flex;
@@ -2147,21 +2265,21 @@ html[data-glass="true"][data-theme="light"] .s-card {
 /* ─── Landing Page & Overview Cards ───────────────────────────────────────── */
 .overview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
   margin-top: 8px;
 }
 
 .ov-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 16px 20px;
+  border-radius: 14px;
+  padding: 8px 12px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   position: relative;
   overflow: hidden;
   min-width: 0;
@@ -2194,7 +2312,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .ov-label {
   font-weight: 700;
-  font-size: 1.1rem;
+  font-size: 0.95rem;
   color: var(--text-muted);
 }
 
@@ -2225,8 +2343,8 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .ov-spark {
   flex-shrink: 0;
-  width: 140px;
-  height: 54px;
+  width: 100px;
+  height: 36px;
   border-radius: 8px;
   cursor: crosshair;
 }
@@ -2262,7 +2380,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
 }
 
 .ov-main-val {
-  font-size: 1.75rem;
+  font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.02em;
 }
@@ -2276,11 +2394,11 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .ov-returns {
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 0.85rem;
 }
 
 .ov-pct {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -2303,17 +2421,16 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .ov-mini-stats {
   border-top: 1px solid var(--border);
-  padding-top: 10px;
+  padding-top: 5px;
   display: flex;
-  flex-direction: column;
-  gap: 7px;
+  flex-direction: row;
+  gap: 16px;
 }
 
 .ov-mini-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .ov-mini-label {
@@ -2382,8 +2499,8 @@ html[data-glass="true"][data-theme="light"] .s-card {
 }
 
 #fg-gauge {
-  width: 160px;
-  height: 86px;
+  width: 130px;
+  height: 70px;
   display: block;
 }
 
@@ -2538,9 +2655,37 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .home-widgets {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 16px;
-  margin-top: 24px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+/* ─── Landing page two-column layout (content + news sidebar) ─────────────── */
+.landing-page {
+  display: grid !important;
+  flex-direction: unset;
+  grid-template-columns: 1fr 300px;
+  grid-template-rows: 1fr;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.dashboard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-news {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.dashboard-news .widget-news {
+  flex: 1;
+  height: 100%;
 }
 
 /* Dash Row (Portfolio cards row) */
@@ -2548,11 +2693,16 @@ html[data-glass="true"][data-theme="light"] .s-card {
   flex-shrink: 0;
 }
 
+/* Dashboard body fills remaining height in fixed layout */
+.fixed-layout .dashboard-body {
+  flex: 1;
+  min-height: 0;
+}
+
 /* Home Widgets Grid - Dashboard specific */
 .fixed-layout .home-widgets {
   flex: 1;
   min-height: 0;
-  margin-top: 16px;
 }
 
 .widget-panel {
@@ -2562,7 +2712,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: 400px;
+  height: 340px;
   /* Default height for scrolling pages */
   min-height: 0;
   overflow: hidden;
@@ -4366,7 +4516,9 @@ html[data-theme="light"] .rating-strong-sell {
 }
 
 /* ─── Market Pill Tooltip ─────────────────────────────────────────────────── */
-.mkt-pill { cursor: pointer; }
+.mkt-pill {
+  cursor: pointer;
+}
 
 .mkt-tt {
   position: absolute;
@@ -4467,8 +4619,15 @@ html[data-theme="light"] .rating-strong-sell {
 }
 
 /* ─── Stock 48h Sparklines (portfolio table) ─────────────────────────────── */
-.th-center { text-align: center; }
-.td-center  { text-align: center; vertical-align: middle; }
+.th-center {
+  text-align: center;
+}
+
+.td-center {
+  text-align: center;
+  vertical-align: middle;
+}
+
 .stock-spark {
   display: block;
   width: 80px;

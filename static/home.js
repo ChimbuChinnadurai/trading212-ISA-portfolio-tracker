@@ -223,8 +223,70 @@ function esc(s) {
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+/* ─── Refresh Countdown Clocks ───────────────────────────────────────────── */
+
+const _clocks = {};
+
+function _initClock(el) {
+    const totalSecs = parseInt(el.dataset.refreshSecs, 10);
+    const showMins  = totalSecs >= 120;
+    const R = 8, CX = 10, CY = 10;
+    const circ = +(2 * Math.PI * R).toFixed(3);
+    const accentMap = { 'rc-heatmap': '#06b6d4', 'rc-fg': '#8b5cf6', 'rc-news': '#f59e0b' };
+    const accent = accentMap[el.id] || '#94a3b8';
+
+    el.innerHTML =
+        `<svg class="rc-svg" viewBox="0 0 20 20" width="20" height="20">` +
+        `<circle class="rc-track" cx="${CX}" cy="${CY}" r="${R}"/>` +
+        `<circle class="rc-arc"   cx="${CX}" cy="${CY}" r="${R}"` +
+        ` stroke-dasharray="${circ}" stroke-dashoffset="0"` +
+        ` transform="rotate(-90 ${CX} ${CY})"/>` +
+        `<text class="rc-text" x="${CX}" y="${CY}" dy="0.35em"` +
+        ` fill="${accent}" stroke="none"></text>` +
+        `</svg>`;
+
+    const arc  = el.querySelector('.rc-arc');
+    const text = el.querySelector('.rc-text');
+    let remaining = totalSecs;
+
+    function _label() {
+        return showMins ? Math.ceil(remaining / 60) : remaining;
+    }
+
+    function tick() {
+        remaining = Math.max(0, remaining - 1);
+        if (remaining <= 0) remaining = totalSecs;
+        arc.style.strokeDashoffset = (circ * (1 - remaining / totalSecs)).toFixed(3);
+        text.textContent = _label();
+    }
+
+    arc.style.strokeDashoffset = '0';
+    text.textContent = _label();
+    const timer = setInterval(tick, 1000);
+
+    return {
+        reset() {
+            remaining = totalSecs;
+            arc.style.strokeDashoffset = '0';
+            text.textContent = _label();
+        },
+        destroy() { clearInterval(timer); }
+    };
+}
+
+function initRefreshClocks() {
+    document.querySelectorAll('.refresh-clock[data-refresh-secs]').forEach(el => {
+        _clocks[el.id] = _initClock(el);
+    });
+}
+
+function resetClock(id) {
+    if (_clocks[id]) _clocks[id].reset();
+}
+
 // Initial load
 document.addEventListener('DOMContentLoaded', () => {
+    initRefreshClocks();
     loadHomeData();
     loadHomeWidgets();
     loadSparklines();
@@ -236,6 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(loadMarketStatus, 60000);
     setInterval(loadMarketIndicators, 1800000);
     setInterval(loadStockTicker, 60000);
+    setInterval(loadMarketNews, 300000);
     setInterval(() => { if (_mktStatusData) _renderMarketStatus(_mktStatusData); }, 1000);
 });
 
@@ -251,6 +314,7 @@ async function loadStockTicker() {
         if (json.status === 'ok' && json.data.length > 0) {
             _tickerData = json.data;
             _renderHeatmap(_tickerData);
+            resetClock('rc-heatmap');
             if (_tickerRetryTimer) { clearTimeout(_tickerRetryTimer); _tickerRetryTimer = null; }
         } else if (!_tickerData) {
             // Portfolio cache may still be warming up — retry in 5 s
@@ -336,8 +400,6 @@ function _computeTreemap(items, W, H) {
     return rects;
 }
 
-let _hmResizeObs = null;
-
 function _renderHeatmap(items) {
     const container = document.getElementById('heatmapContainer');
     if (!container) return;
@@ -345,51 +407,29 @@ function _renderHeatmap(items) {
     const valid = items.filter(d => d.price != null && (d.current_value || 0) > 0);
     if (!valid.length) return;
 
-    // Observe resize to re-render (idempotent)
-    if (!_hmResizeObs) {
-        _hmResizeObs = new ResizeObserver(() => {
-            if (_tickerData) _renderHeatmap(_tickerData);
-        });
-        _hmResizeObs.observe(container);
-    }
+    // Sort: highest absolute movement first (biggest movers, up or down)
+    valid.sort((a, b) => Math.abs(b.change_pct ?? 0) - Math.abs(a.change_pct ?? 0));
 
-    const W = container.clientWidth;
-    const H = container.clientHeight;
-    if (W < 10 || H < 10) return;
+    const _currencySymbol = { USD:'$', GBP:'£', GBp:'p', GBX:'p', EUR:'€', CAD:'CA$', AUD:'A$', JPY:'¥', CHF:'Fr' };
 
-    const rects = _computeTreemap(
-        valid.map(d => ({ ...d, value: d.current_value })),
-        W, H
-    );
-
-    const GAP = 2;
-    const cells = rects.map(r => {
-        const d   = r.item;
-        const pct = d.change_pct ?? 0;
-        const up  = pct >= 0;
-        const bg  = _heatColor(pct);
-        const sign = (up && pct !== 0) ? '+' : '';
+    const cells = valid.map(d => {
+        const pct    = d.change_pct ?? 0;
+        const up     = pct >= 0;
+        const bg     = _heatColor(pct);
+        const sign   = (up && pct !== 0) ? '+' : '';
         const pctStr = `${sign}${pct.toFixed(2)}%`;
+        const sym    = _currencySymbol[d.currency] ?? '';
+        const price  = d.price != null ? `${sym}${d.price.toFixed(2)}` : '';
         const title  = `${d.company_name}\n${d.ticker}  ${pctStr}`;
 
-        const cw = r.w - GAP;
-        const ch = r.h - GAP;
-        const showLogo   = ch >= 62 && cw >= 56;
-        const showTicker = cw >= 38 && ch >= 26;
-        const showPct    = cw >= 38 && ch >= 42;
-
-        let inner = '';
-        if (showLogo)   inner += `<img class="hm-logo" src="https://assets.parqet.com/logos/symbol/${encodeURIComponent(d.ticker)}" onerror="this.style.display='none'" alt="">`;
-        if (showTicker) inner += `<span class="hm-ticker">${esc(d.ticker)}</span>`;
-        if (showPct)    inner += `<span class="hm-pct">${up ? '▲' : '▼'} ${pctStr}</span>`;
-
-        return `<div class="hm-cell" title="${title}" style="` +
-            `left:${r.x.toFixed(1)}px;top:${r.y.toFixed(1)}px;` +
-            `width:${cw.toFixed(1)}px;height:${ch.toFixed(1)}px;` +
-            `background:${bg}">${inner}</div>`;
+        return `<div class="hm-cell" title="${title}" style="background:${bg}">` +
+            `<span class="hm-ticker">${esc(d.ticker)}</span>` +
+            `<span class="hm-price">${price}</span>` +
+            `<span class="hm-pct">${up ? '▲' : '▼'} ${pctStr}</span>` +
+            `</div>`;
     }).join('');
 
-    container.innerHTML = `<div style="position:relative;width:${W}px;height:${H}px">${cells}</div>`;
+    container.innerHTML = cells;
 }
 
 /* ─── Sparkline charts ───────────────────────────────────────────────────── */
@@ -1327,6 +1367,7 @@ async function loadFearGreed() {
         const fg = json.fear_and_greed;
         if (!fg) return;
         _renderFearGreed(fg);
+        resetClock('rc-fg');
     } catch (err) {
         console.warn('Fear & Greed fetch failed:', err);
     }
@@ -1458,6 +1499,7 @@ async function loadMarketNews() {
         const json = await res.json();
         if (json.status === 'ok') {
             _renderMarketNews(json.data);
+            resetClock('rc-news');
         }
     } catch (err) {
         const el = document.getElementById('newsList');

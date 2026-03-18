@@ -156,6 +156,7 @@
 
     <main class="main">
       <div class="dashboard landing-page">
+        <div class="dashboard-body">
         <div class="summary-row">
           <div class="summary-row-header">
             <h2 class="summary-title">Overview</h2>
@@ -261,12 +262,28 @@
               </div>
             </div>
 
+            <!-- Portfolio Heatmap -->
+            <div class="ov-card ov-card-heatmap">
+              <div class="ov-header">
+                <span class="ov-label">Heatmap</span>
+                <span class="rc-label-wrap">
+                  <span style="font-size:0.75rem;color:var(--text-muted)">Today's change</span>
+                  <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="60"></span>
+                </span>
+              </div>
+              <div id="heatmapContainer" class="heatmap-container">
+                <div class="hm-skel"></div>
+              </div>
+            </div>
+
             <!-- Fear & Greed Index -->
             <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()">
               <div class="ov-header">
                 <span class="ov-label">Fear &amp; Greed Index</span>
-                <span class="fg-meta">CNN · <span id="fg-updated">—</span> · <span class="fg-panel-hint">Click for
-                    details</span></span>
+                <span class="rc-label-wrap">
+                  <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
+                  <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span>
+                </span>
               </div>
               <div class="fg-body">
                 <div class="fg-gauge-wrap">
@@ -304,6 +321,7 @@
                 </div>
               </div>
             </div>
+
           </div> <!-- close overview-grid -->
         </div> <!-- close summary-row -->
 
@@ -449,22 +467,17 @@
             </div>
           </section>
 
-          <!-- Portfolio Heatmap -->
-          <section class="widget-panel widget-heatmap">
-            <div class="panel-header">
-              <h3 class="panel-title">Portfolio Heatmap</h3>
-              <span class="panel-subtitle">Today's change · 60s</span>
-            </div>
-            <div id="heatmapContainer" class="heatmap-container">
-              <div class="hm-skel"></div>
-            </div>
-          </section>
+        </div> <!-- close home-widgets -->
+        </div> <!-- close dashboard-body -->
 
-          <!-- Market News -->
+        <aside class="dashboard-news">
           <section class="widget-panel widget-news">
             <div class="panel-header">
               <h3 class="panel-title">Market News</h3>
-              <span class="panel-subtitle">General · Refresh 5m</span>
+              <span class="rc-label-wrap">
+                <span class="panel-subtitle">General</span>
+                <span id="rc-news" class="refresh-clock" data-refresh-secs="300"></span>
+              </span>
             </div>
             <div id="newsList" class="activity-list-home">
               <div class="skel-news-item">
@@ -493,8 +506,7 @@
               </div>
             </div>
           </section>
-        </div> <!-- close home-widgets -->
-
+        </aside>
 
       </div> <!-- close dashboard -->
     </main>
