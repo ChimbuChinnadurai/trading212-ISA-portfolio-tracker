@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>T212 Terminal</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0c10;--bg2:#111318;--bg3:#1a1d24;--bd:#2a2d35;--g:#00c853;--r:#ff3d57;--b:#4fc3f7;--y:#ffd54f;--t:#e0e4ef;--m:#6b7280;--a:#3d7eff}
+body{background:var(--bg);color:var(--t);font-family:'SF Mono',monospace;font-size:12px;overflow:hidden;height:100vh;display:flex;flex-direction:column}
+.up{color:var(--g)}.dn{color:var(--r)}
+
+/* Header */
+.hdr{background:var(--bg2);border-bottom:1px solid var(--bd);padding:7px 14px;display:flex;align-items:center;gap:20px;flex-shrink:0}
+.logo{color:var(--b);font-size:13px;font-weight:bold;letter-spacing:2px;white-space:nowrap}
+.logo small{color:var(--m);font-size:9px;margin-left:6px;letter-spacing:1px}
+.hs{display:flex;flex-direction:column;min-width:70px}
+.hs .lb{color:var(--m);font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.hs .v{font-size:13px;font-weight:bold}
+.hs .s{font-size:9px;color:var(--m)}
+.sep{width:1px;height:30px;background:var(--bd)}
+.sp{flex:1}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--g);animation:p 1.5s infinite}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3}}
+.mbadge{background:#ff3d5722;color:var(--r);border:1px solid var(--r);padding:2px 7px;border-radius:3px;font-size:9px;letter-spacing:1px}
+.mbadge.open{background:#00c85322;color:var(--g);border-color:var(--g)}
+.rbtn{background:var(--bg3);border:1px solid var(--bd);color:var(--m);padding:3px 9px;border-radius:3px;cursor:pointer;font-size:9px;font-family:inherit;text-decoration:none}
+.rbtn:hover{color:var(--t);border-color:var(--a)}
+
+/* Ticker */
+.ticker{background:#0d1117;border-bottom:1px solid var(--bd);height:20px;overflow:hidden;display:flex;align-items:center;flex-shrink:0}
+.ti{display:flex;gap:24px;animation:sc 50s linear infinite;white-space:nowrap;padding:0 16px;font-size:10px}
+.ti span{color:var(--m)}.ti b{color:var(--t)}
+@keyframes sc{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* Grid */
+.main{flex:1;display:grid;grid-template-columns:270px 1fr 250px;overflow:hidden}
+.col{border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
+.col:last-child{border-right:none}
+.ph{padding:6px 11px;font-size:9px;letter-spacing:1.5px;color:var(--m);text-transform:uppercase;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.badge{background:var(--a);color:#fff;padding:1px 5px;border-radius:8px;font-size:9px}
+
+/* Holdings table */
+.scroll{overflow-y:auto;flex:1}
+.scroll::-webkit-scrollbar{width:3px}
+.scroll::-webkit-scrollbar-thumb{background:var(--bd)}
+table{width:100%;border-collapse:collapse}
+th{color:var(--m);font-size:9px;letter-spacing:.8px;padding:4px 9px;text-align:right;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg2)}
+th:first-child{text-align:left}
+td{padding:4px 9px;text-align:right;border-bottom:1px solid #1a1d2440;font-size:10px}
+td:first-child{text-align:left;color:var(--b);font-weight:bold;font-size:10px}
+td.cn{color:var(--m);font-size:9px;font-weight:normal}
+tr:hover{background:#1a1d2460}
+
+/* Center */
+.chart-wrap{flex:1;padding:10px;min-height:0}
+.chart-wrap canvas{max-height:100%!important}
+.bottom{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--bd);height:175px;flex-shrink:0}
+.bp{display:flex;flex-direction:column;border-right:1px solid var(--bd)}
+.bp:last-child{border-right:none}
+.alloc-inner{flex:1;display:flex;align-items:center;padding:8px;gap:10px}
+.leg{display:flex;flex-direction:column;gap:3px;font-size:10px;overflow:hidden}
+.li{display:flex;align-items:center;gap:5px;overflow:hidden}
+.ld{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bd);flex:1}
+.mc{background:var(--bg2);padding:8px 10px;display:flex;flex-direction:column;justify-content:center}
+.mc .ml{color:var(--m);font-size:8px;letter-spacing:.8px;text-transform:uppercase}
+.mc .mv{font-size:15px;font-weight:bold;margin-top:1px}
+.mc .ms{font-size:8px;color:var(--m)}
+
+/* Right: position cards */
+.right{flex:1;overflow-y:auto}
+.right::-webkit-scrollbar{width:3px}
+.right::-webkit-scrollbar-thumb{background:var(--bd)}
+.pc{padding:8px 10px;border-bottom:1px solid var(--bd)}
+.pc .pr{display:flex;justify-content:space-between;margin-bottom:3px;font-size:10px}
+.pc .pt{color:var(--b);font-weight:bold}
+.pc .pn{color:var(--m);font-size:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+.bw{background:var(--bg3);height:3px;border-radius:2px;overflow:hidden}
+.bb{height:100%;border-radius:2px;transition:width .5s}
+.pd{display:flex;justify-content:space-between;margin-top:3px;color:var(--m);font-size:9px}
+
+/* News */
+.news{background:#0d1117;border-top:1px solid var(--bd);height:20px;overflow:hidden;display:flex;align-items:center;flex-shrink:0;font-size:10px}
+.ni{display:flex;gap:36px;animation:sc 70s linear infinite;white-space:nowrap;padding:0 16px;color:var(--m)}
+.ni .tag{color:var(--y);font-weight:bold}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">T212<small>TERMINAL</small></div>
+  <div class="sep"></div>
+  <div class="hs"><div class="lb">Portfolio</div><div class="v" id="hv">—</div><div class="s">GBP</div></div>
+  <div class="hs"><div class="lb">Invested</div><div class="v" id="hi">—</div><div class="s" id="hf">—</div></div>
+  <div class="hs"><div class="lb">P&L</div><div class="v" id="hp">—</div><div class="s" id="hpp">—</div></div>
+  <div class="hs"><div class="lb">Dividends</div><div class="v" id="hd">—</div><div class="s">received</div></div>
+  <div class="sp"></div>
+  <div style="display:flex;align-items:center;gap:5px"><div class="dot"></div><span style="color:var(--m);font-size:9px" id="upd">—</span></div>
+  <div class="mbadge" id="mkt">MARKET CLOSED</div>
+  <a class="rbtn" href="/" style="margin-left:4px">← DASHBOARD</a>
+  <button class="rbtn" onclick="load()">↻ REFRESH</button>
+  <button class="rbtn" style="border-color:var(--r);color:var(--r);opacity:0.6" onclick="clearCache()">⚠ CLEAR CACHE</button>
+</div>
+
+<div class="ticker"><div class="ti" id="tape">Loading...</div></div>
+
+<div class="main">
+  <!-- Holdings -->
+  <div class="col">
+    <div class="ph">Holdings <span class="badge" id="cnt">0</span></div>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>TICKER</th><th>VALUE</th><th>P&L</th><th>P&L%</th><th>WT%</th></tr></thead>
+        <tbody id="tb"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Center -->
+  <div class="col">
+    <div class="ph">Portfolio Value History <span style="color:var(--m);font-size:9px">48H</span></div>
+    <div class="chart-wrap"><canvas id="hchart"></canvas></div>
+    <div class="bottom">
+      <div class="bp">
+        <div class="ph" style="font-size:8px">Allocation</div>
+        <div class="alloc-inner">
+          <canvas id="ac" width="100" height="100" style="flex-shrink:0"></canvas>
+          <div class="leg" id="aleg"></div>
+        </div>
+      </div>
+      <div class="bp">
+        <div class="ph" style="font-size:8px">Metrics</div>
+        <div class="mgrid">
+          <div class="mc"><div class="ml">Total</div><div class="mv" id="mt">—</div><div class="ms">portfolio</div></div>
+          <div class="mc"><div class="ml">Returns</div><div class="mv" id="mr">—</div><div class="ms" id="mrs">—</div></div>
+          <div class="mc"><div class="ml">Dividends</div><div class="mv" id="md">—</div><div class="ms">all time</div></div>
+          <div class="mc"><div class="ml">Positions</div><div class="mv" id="mp">—</div><div class="ms">holdings</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: position cards -->
+  <div class="col">
+    <div class="ph" style="position:sticky;top:0;background:var(--bg2);z-index:1">Positions</div>
+    <div class="right" id="cards"></div>
+  </div>
+</div>
+
+<div class="news">
+  <div class="ni" id="news">
+    <span><span class="tag">T212</span> Terminal active — refreshes every 60s</span>
+    <span><span class="tag">TIP</span> Open T212 to execute trades</span>
+    <span><span class="tag">ISA</span> All values in GBP</span>
+  </div>
+</div>
+
+<script>
+const P=['#3d7eff','#4fc3f7','#00c853','#ffd54f','#ff6b6b','#ab47bc','#26a69a','#ef5350','#7e57c2','#29b6f6','#66bb6a','#ffa726','#78909c','#ec407a'];
+let HC=null, AC=null;
+
+const f=(n,d=2)=>n==null?'—':(+n).toLocaleString('en-GB',{minimumFractionDigits:d,maximumFractionDigits:d});
+const s=(n)=>+n>=0?'+':'';
+const c=(n)=>+n>=0?'up':'dn';
+const set=(id,h)=>{const e=document.getElementById(id);if(e)e.innerHTML=h};
+
+async function load(){
+  try {
+    const [ov, port, hist] = await Promise.all([
+      fetch('/api/overview').then(r=>r.json()),
+      fetch('/api/pcombined/portfolio').then(r=>r.json()),
+      fetch('/api/pcombined/history').then(r=>r.json()),
+    ]);
+
+    const rows = port.data || [];
+    const comb = ov.data?.combined || {};
+    const total = comb.value || 0;
+    const invested = rows.reduce((s,r)=>s+r.invested,0);
+    const ppl = comb.returns || 0;
+    const pct = comb.returns_pct || 0;
+    const divs = rows.reduce((s,r)=>s+r.dividends,0);
+
+    // Header
+    set('hv', `£${f(total)}`);
+    set('hi', `£${f(invested)}`);
+    set('hf', `PAI: £${f(comb.pai||0,0)}/yr`);
+    set('hp', `<span class="${c(ppl)}">£${s(ppl)}${f(ppl)}</span>`);
+    set('hpp', `<span class="${c(pct)}">${s(pct)}${f(pct)}%</span>`);
+    set('hd', `£${f(divs,0)}`);
+    set('upd', new Date().toLocaleTimeString('en-GB'));
+
+    // Market status
+    const h=new Date().getUTCHours(), open=h>=8&&h<16;
+    const mb=document.getElementById('mkt');
+    mb.textContent=open?'MARKET OPEN':'MARKET CLOSED';
+    mb.className='mbadge'+(open?' open':'');
+
+    set('cnt', rows.length);
+
+    // Holdings table
+    document.getElementById('tb').innerHTML = rows.map(r=>`
+      <tr>
+        <td>${r.ticker}<br><span class="cn">${(r.company_name||'').slice(0,14)}</span></td>
+        <td>£${f(r.current_value)}</td>
+        <td class="${c(r.total_returns)}">${s(r.total_returns)}£${f(r.total_returns)}</td>
+        <td class="${c(r.returns_pct)}">${s(r.returns_pct)}${f(r.returns_pct)}%</td>
+        <td>${f(r.weight||r.current_value/total*100,1)}%</td>
+      </tr>`).join('');
+
+    // Ticker tape
+    const tape = rows.map(r=>`<span><b>${r.ticker}</b> £${f(r.current_value)} <span class="${c(r.returns_pct)}">${s(r.returns_pct)}${f(r.returns_pct)}%</span></span>`).join('');
+    const t=document.getElementById('tape');
+    t.innerHTML=tape+tape;
+
+    // History chart
+    const snapshots = hist.data||[];
+    if(HC) HC.destroy();
+    HC = new Chart(document.getElementById('hchart'),{
+      type:'line',
+      data:{
+        labels:snapshots.map(s=>new Date(s.ts*1000).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})),
+        datasets:[{
+          data:snapshots.map(s=>s.value),
+          borderColor:'#3d7eff',backgroundColor:'#3d7eff18',fill:true,
+          tension:.4,pointRadius:0,borderWidth:1.5
+        }]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`£${f(c.raw)}`}}},
+        scales:{
+          x:{ticks:{color:'#6b7280',font:{size:9},maxTicksLimit:8},grid:{color:'#2a2d3520'}},
+          y:{ticks:{color:'#6b7280',font:{size:9},callback:v=>`£${f(v,0)}`},grid:{color:'#2a2d3520'}}
+        }
+      }
+    });
+
+    // Allocation donut
+    const vals=rows.map(r=>r.current_value);
+    document.getElementById('aleg').innerHTML = rows.slice(0,7).map((r,i)=>`
+      <div class="li"><div class="ld" style="background:${P[i%P.length]}"></div>
+      <span style="color:var(--m);overflow:hidden;text-overflow:ellipsis">${r.ticker}</span>
+      <span style="margin-left:auto;padding-left:6px">${f(r.current_value/total*100,1)}%</span></div>
+    `).join('')+(rows.length>7?`<div style="color:var(--m);font-size:8px;margin-top:2px">+${rows.length-7} more</div>`:'');
+
+    if(AC) AC.destroy();
+    AC=new Chart(document.getElementById('ac'),{
+      type:'doughnut',
+      data:{labels:rows.map(r=>r.ticker),datasets:[{data:vals,backgroundColor:P.slice(0,rows.length),borderWidth:1,borderColor:'#0a0c10'}]},
+      options:{cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.label}: ${f(c.raw/total*100,1)}%`}}}}
+    });
+
+    // Metrics
+    set('mt',`£${f(total,0)}`);
+    set('mr',`<span class="${c(ppl)}">£${s(ppl)}${f(ppl,0)}</span>`);
+    set('mrs',`<span class="${c(pct)}">${s(pct)}${f(pct)}%</span>`);
+    set('md',`£${f(divs,0)}`);
+    set('mp',rows.length);
+
+    // Position cards
+    const maxV=Math.max(...vals);
+    document.getElementById('cards').innerHTML = rows.map((r,i)=>`
+      <div class="pc">
+        <div class="pr">
+          <span class="pt">${r.ticker}</span>
+          <span class="pn">${(r.company_name||'').slice(0,22)}</span>
+        </div>
+        <div class="pr" style="margin-bottom:3px">
+          <span>£${f(r.current_value)}</span>
+          <span class="${c(r.total_returns)}">${s(r.total_returns)}£${f(r.total_returns)}</span>
+        </div>
+        <div class="bw"><div class="bb" style="width:${maxV>0?r.current_value/maxV*100:0}%;background:${P[i%P.length]}"></div></div>
+        <div class="pd">
+          <span>Qty: ${f(r.quantity, r.quantity%1===0?0:4)}</span>
+          <span>Avg: £${f(r.avg_price)}</span>
+          <span class="${c(r.returns_pct)}">${s(r.returns_pct)}${f(r.returns_pct)}%</span>
+        </div>
+      </div>`).join('');
+
+    // News with holdings info
+    const newsItems = [
+      `<span><span class="tag">T212</span> Terminal active — refreshes every 60s</span>`,
+      ...rows.slice(0,5).map(r=>`<span><span class="tag">${r.ticker}</span> ${r.sector||'—'} · £${f(r.current_value)} · <span class="${c(r.returns_pct)}">${s(r.returns_pct)}${f(r.returns_pct)}%</span></span>`),
+      `<span><span class="tag">DIV</span> Total dividends received: £${f(divs,2)}</span>`,
+      `<span><span class="tag">PAI</span> Projected annual income: £${f(comb.pai||0,2)}/yr</span>`,
+    ];
+    const ni=newsItems.join('');
+    document.getElementById('news').innerHTML=ni+ni;
+
+  } catch(e) {
+    console.error(e);
+    document.title='T212 Terminal — Error';
+  }
+}
+
+async function clearCache() {
+  if (!confirm('Are you sure you want to clear ALL cached data? This will reset all snapshots and portfolio history.')) return;
+  try {
+    const res = await fetch('/api/admin/clear-cache');
+    const json = await res.json();
+    if (json.status === 'ok') {
+      alert('Cache cleared successfully. Refreshing...');
+      load();
+    } else {
+      alert('Error: ' + json.message);
+    }
+  } catch (err) {
+    alert('Clear cache failed: ' + err);
+  }
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

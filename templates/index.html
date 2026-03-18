@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading212 Portfolio Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    /* Critical inline CSS — prevents FOUC while style.css loads */
+    :root {
+      --bg: #080d18;
+      --bg-card: #0f1629;
+      --bg-row-alt: #131d35;
+      --bg-hover: #1a2846;
+      --border: #1e2d4a;
+      --accent: #3b82f6;
+      --text-primary: #e2e8f0;
+      --text-secondary: #7c8fad;
+      --radius: 12px
+    }
+
+    html[data-theme="light"] {
+      --bg: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-row-alt: #f1f5f9;
+      --bg-hover: #f0f9ff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #475569
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    html,
+    body {
+      height: 100%
+    }
+
+    body {
+      background: var(--bg);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .08), transparent);
+      color: var(--text-primary);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh
+    }
+
+    html[data-theme="light"] body {
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .06), transparent)
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100%
+    }
+
+    .fixed-layout.app {
+      height: 100%;
+      overflow: hidden
+    }
+
+    .header {
+      background: rgba(15, 22, 41, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100
+    }
+
+    html[data-theme="light"] .header {
+      background: rgba(255, 255, 255, .88)
+    }
+
+    .ov-card,
+    .widget-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius)
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app fixed-layout">
+
+    <header class="header">
+      <div class="header-inner">
+        <div class="brand">
+          <div class="logo-wrap">
+            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="9" fill="url(#lg)" />
+              <defs>
+                <linearGradient id="lg" x1="0" y1="0" x2="32" y2="32">
+                  <stop offset="0%" stop-color="#3b82f6" />
+                  <stop offset="100%" stop-color="#8b5cf6" />
+                </linearGradient>
+              </defs>
+              <path d="M7 22 L11 14 L15 18 L19 10 L25 16" stroke="white" stroke-width="2.5" stroke-linecap="round"
+                stroke-linejoin="round" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title">Portfolio Tracker</h1>
+            <p class="brand-sub">Trading212 Shares ISA</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <!-- <div class="env-badge">
+            <span class="env-dot"></span>LIVE
+          </div> -->
+          <!-- <a class="env-badge" href="/terminal" style="margin-left:4px">Terminal</a> -->
+          <div class="currency-toggle">
+            <button class="currency-btn" data-currency="GBP" onclick="setCurrency('GBP')">GBP</button>
+            <button class="currency-btn" data-currency="USD" onclick="setCurrency('USD')">USD</button>
+          </div>
+          <div class="mkt-status-wrap">
+            <div id="mkt-nasdaq" class="mkt-pill mkt-closed"></div>
+            <div id="mkt-lse" class="mkt-pill mkt-closed"></div>
+          </div>
+          <!-- <button class="btn btn-theme" id="glassToggle" onclick="toggleGlassMode()" title="Toggle glassy look">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12a10 10 0 1 0 20 0 10 10 0 1 0-20 0z"></path>
+              <path d="M12 2a10 10 0 1 0 10 10"></path>
+              <path d="M12 22a10 10 0 1 0-10-10"></path>
+            </svg>
+          </button> -->
+          <button class="btn btn-refresh" id="refreshBtn" onclick="loadHomeData(true)">
+            <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd"
+                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
+                clip-rule="evenodd" />
+            </svg>
+            Refresh
+          </button>
+          <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+            <svg id="themeIcon" class="btn-icon" viewBox="0 0 20 20" fill="currentColor"
+              style="width:16px;height:16px"></svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Dividend warning bar -->
+    <div id="divWarning" class="div-warning" style="display:none"></div>
+
+    <main class="main">
+      <div class="dashboard landing-page">
+        <div class="summary-row">
+          <div class="summary-row-header">
+            <h2 class="summary-title">Overview</h2>
+          </div>
+
+          <div class="overview-grid">
+            <!-- Portfolio 1 -->
+            <div class="ov-card" id="ov1" onclick="window.location.href='/portfolio/1'">
+              <div class="ov-header">
+                <span class="ov-label">{{ names['1'] }}</span>
+                <span class="ov-link">View Details →</span>
+              </div>
+              <div class="ov-body">
+                <div class="ov-stats">
+                  <div class="ov-main-val" id="p1-value">£0.00</div>
+                  <div class="ov-subline">
+                    <span class="ov-returns" id="p1-returns">+£0.00</span>
+                    <span class="ov-pct" id="p1-pct">(0.00%)</span>
+                  </div>
+                  <div class="ov-24h" id="p1-24h" style="display:none"></div>
+                </div>
+                <canvas class="ov-spark" id="p1-spark" width="320" height="128"></canvas>
+              </div>
+              <div class="ov-mini-stats">
+                <div class="ov-mini-row">
+                  <span class="ov-mini-label">Invested</span>
+                  <span class="ov-mini-val" id="p1-invested">—</span>
+                </div>
+                <div class="ov-mini-row">
+                  <span class="ov-mini-label">Proj Div. Income</span>
+                  <span class="ov-mini-val" id="p1-pai">—</span>
+                </div>
+                <!-- <div class="ov-mini-row">
+                  <span class="ov-mini-label">Positions</span>
+                  <span class="ov-mini-val" id="p1-positions">—</span>
+                </div> -->
+              </div>
+            </div>
+
+            <!-- Portfolio 2 -->
+            <div class="ov-card" id="ov2" onclick="window.location.href='/portfolio/2'">
+              <div class="ov-header">
+                <span class="ov-label">{{ names['2'] }}</span>
+                <span class="ov-link">View Details →</span>
+              </div>
+              <div class="ov-body" id="p2-body" style="filter: grayscale(1); opacity: 0.6;">
+                <div class="ov-stats">
+                  <div class="ov-main-val" id="p2-value">£0.00</div>
+                  <div class="ov-subline">
+                    <span class="ov-returns" id="p2-returns">+£0.00</span>
+                    <span class="ov-pct" id="p2-pct">(0.00%)</span>
+                  </div>
+                  <div class="ov-24h" id="p2-24h" style="display:none"></div>
+                </div>
+                <canvas class="ov-spark" id="p2-spark" width="320" height="128"></canvas>
+              </div>
+              <div class="ov-mini-stats" id="p2-mini" style="opacity:0.5">
+                <div class="ov-mini-row">
+                  <span class="ov-mini-label">Invested</span>
+                  <span class="ov-mini-val" id="p2-invested">—</span>
+                </div>
+                <div class="ov-mini-row">
+                  <span class="ov-mini-label">Proj Div. Income</span>
+                  <span class="ov-mini-val" id="p2-pai">—</span>
+                </div>
+                <!-- <div class="ov-mini-row">
+                  <span class="ov-mini-label">Positions</span>
+                  <span class="ov-mini-val" id="p2-positions">—</span>
+                </div> -->
+              </div>
+            </div>
+
+            <!-- Combined -->
+            <div class="ov-card ov-card-combined" onclick="window.location.href='/portfolio/combined'">
+              <div class="ov-header">
+                <span class="ov-label">Combined</span>
+                <span class="ov-link">View Consolidated Details →</span>
+              </div>
+              <div class="ov-body">
+                <div class="ov-stats">
+                  <div class="ov-main-val" id="c-value">£0.00</div>
+                  <div class="ov-subline">
+                    <span class="ov-returns" id="c-returns">+£0.00</span>
+                    <span class="ov-pct" id="c-pct">(0.00%)</span>
+                  </div>
+                  <div class="ov-24h" id="c-24h" style="display:none"></div>
+                </div>
+                <canvas class="ov-spark" id="pc-spark" width="320" height="128"></canvas>
+              </div>
+              <div class="ov-mini-stats">
+                <div class="ov-mini-row">
+                  <span class="ov-mini-label">Invested</span>
+                  <span class="ov-mini-val" id="c-invested">—</span>
+                </div>
+                <div class="ov-mini-row">
+                  <span class="ov-mini-label">Proj Div. Income</span>
+                  <span class="ov-mini-val" id="c-pai">—</span>
+                </div>
+                <!-- <div class="ov-mini-row">
+                  <span class="ov-mini-label">Positions</span>
+                  <span class="ov-mini-val" id="c-positions">—</span>
+                </div> -->
+              </div>
+            </div>
+
+            <!-- Fear & Greed Index -->
+            <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()">
+              <div class="ov-header">
+                <span class="ov-label">Fear &amp; Greed Index</span>
+                <span class="fg-meta">CNN · <span id="fg-updated">—</span> · <span class="fg-panel-hint">Click for
+                    details</span></span>
+              </div>
+              <div class="fg-body">
+                <div class="fg-gauge-wrap">
+                  <canvas id="fg-gauge"></canvas>
+                  <div class="fg-score-wrap">
+                    <span class="fg-score" id="fg-score">—</span>
+                    <span class="fg-rating" id="fg-rating">Loading…</span>
+                  </div>
+                </div>
+                <div class="fg-history" id="fg-history">
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:55%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:50%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:55%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:50%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div> <!-- close overview-grid -->
+        </div> <!-- close summary-row -->
+
+        <div class="home-widgets">
+          <!-- Recent Activity -->
+          <section class="widget-panel widget-activity">
+            <div class="panel-header">
+              <h3 class="panel-title">Unified Recent Activity</h3>
+              <div class="panel-badge" id="activityBadge" style="display:none">0</div>
+            </div>
+            <div id="activityList" class="activity-list-home">
+              <div class="skel-item">
+                <div class="skel skel-dot"></div>
+                <div class="skel-body">
+                  <div class="skel skel-line" style="width:55%"></div>
+                  <div class="skel skel-line" style="width:35%"></div>
+                </div>
+                <div class="skel skel-amount"></div>
+              </div>
+              <div class="skel-item">
+                <div class="skel skel-dot"></div>
+                <div class="skel-body">
+                  <div class="skel skel-line" style="width:65%"></div>
+                  <div class="skel skel-line" style="width:40%"></div>
+                </div>
+                <div class="skel skel-amount"></div>
+              </div>
+              <div class="skel-item">
+                <div class="skel skel-dot"></div>
+                <div class="skel-body">
+                  <div class="skel skel-line" style="width:50%"></div>
+                  <div class="skel skel-line" style="width:30%"></div>
+                </div>
+                <div class="skel skel-amount"></div>
+              </div>
+              <div class="skel-item">
+                <div class="skel skel-dot"></div>
+                <div class="skel-body">
+                  <div class="skel skel-line" style="width:60%"></div>
+                  <div class="skel skel-line" style="width:38%"></div>
+                </div>
+                <div class="skel skel-amount"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Top Performers -->
+          <section class="widget-panel widget-performers">
+            <div class="panel-header">
+              <h3 class="panel-title">Top Performers</h3>
+            </div>
+            <div id="performerList" class="activity-list-home">
+              <div class="skel-item">
+                <div class="skel skel-dot"></div>
+                <div class="skel-body">
+                  <div class="skel skel-line" style="width:60%"></div>
+                  <div class="skel skel-line" style="width:40%"></div>
+                </div>
+                <div class="skel skel-amount"></div>
+              </div>
+              <div class="skel-item">
+                <div class="skel skel-dot"></div>
+                <div class="skel-body">
+                  <div class="skel skel-line" style="width:50%"></div>
+                  <div class="skel skel-line" style="width:35%"></div>
+                </div>
+                <div class="skel skel-amount"></div>
+              </div>
+              <div class="skel-item">
+                <div class="skel skel-dot"></div>
+                <div class="skel-body">
+                  <div class="skel skel-line" style="width:70%"></div>
+                  <div class="skel skel-line" style="width:45%"></div>
+                </div>
+                <div class="skel skel-amount"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Dividend Calendar -->
+          <section class="widget-panel widget-dividends">
+            <div class="panel-header">
+              <h3 class="panel-title">Dividend Calendar</h3>
+              <span class="panel-subtitle">US stocks · upcoming</span>
+            </div>
+            <div id="divCalendarList" class="activity-list-home">
+              <div class="skel-card">
+                <div class="skel-card-header">
+                  <div class="skel skel-line" style="width:30%"></div>
+                  <div class="skel skel-amount"></div>
+                </div>
+                <div class="skel-card-row">
+                  <div class="skel skel-line" style="width:45%"></div>
+                  <div class="skel skel-line" style="width:45%"></div>
+                </div>
+              </div>
+              <div class="skel-card">
+                <div class="skel-card-header">
+                  <div class="skel skel-line" style="width:35%"></div>
+                  <div class="skel skel-amount"></div>
+                </div>
+                <div class="skel-card-row">
+                  <div class="skel skel-line" style="width:45%"></div>
+                  <div class="skel skel-line" style="width:45%"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Upcoming Earnings -->
+          <section class="widget-panel widget-earnings">
+            <div class="panel-header">
+              <h3 class="panel-title">Upcoming Earnings</h3>
+              <span class="panel-subtitle">Next 6 months</span>
+            </div>
+            <div id="earningsList" class="activity-list-home">
+              <div class="skel-card">
+                <div class="skel-card-header">
+                  <div class="skel skel-line" style="width:30%"></div>
+                  <div class="skel skel-amount"></div>
+                </div>
+                <div class="skel-card-row">
+                  <div class="skel skel-line" style="width:25%"></div>
+                  <div class="skel skel-line" style="width:20%"></div>
+                </div>
+                <div class="skel-card-row">
+                  <div class="skel skel-line" style="width:70%"></div>
+                </div>
+              </div>
+              <div class="skel-card">
+                <div class="skel-card-header">
+                  <div class="skel skel-line" style="width:35%"></div>
+                  <div class="skel skel-amount"></div>
+                </div>
+                <div class="skel-card-row">
+                  <div class="skel skel-line" style="width:25%"></div>
+                  <div class="skel skel-line" style="width:20%"></div>
+                </div>
+                <div class="skel-card-row">
+                  <div class="skel skel-line" style="width:65%"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Portfolio Heatmap -->
+          <section class="widget-panel widget-heatmap">
+            <div class="panel-header">
+              <h3 class="panel-title">Portfolio Heatmap</h3>
+              <span class="panel-subtitle">Today's change · 60s</span>
+            </div>
+            <div id="heatmapContainer" class="heatmap-container">
+              <div class="hm-skel"></div>
+            </div>
+          </section>
+
+          <!-- Market News -->
+          <section class="widget-panel widget-news">
+            <div class="panel-header">
+              <h3 class="panel-title">Market News</h3>
+              <span class="panel-subtitle">General · Refresh 5m</span>
+            </div>
+            <div id="newsList" class="activity-list-home">
+              <div class="skel-news-item">
+                <div class="skel skel-news-img"></div>
+                <div class="skel-news-body">
+                  <div class="skel skel-line" style="width:40%"></div>
+                  <div class="skel skel-line" style="width:90%"></div>
+                  <div class="skel skel-line" style="width:75%"></div>
+                </div>
+              </div>
+              <div class="skel-news-item">
+                <div class="skel skel-news-img"></div>
+                <div class="skel-news-body">
+                  <div class="skel skel-line" style="width:35%"></div>
+                  <div class="skel skel-line" style="width:85%"></div>
+                  <div class="skel skel-line" style="width:60%"></div>
+                </div>
+              </div>
+              <div class="skel-news-item">
+                <div class="skel skel-news-img"></div>
+                <div class="skel-news-body">
+                  <div class="skel skel-line" style="width:45%"></div>
+                  <div class="skel skel-line" style="width:80%"></div>
+                  <div class="skel skel-line" style="width:70%"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div> <!-- close home-widgets -->
+
+
+      </div> <!-- close dashboard -->
+    </main>
+
+    <footer class="footer">
+      <div class="footer-item">
+        <span id="cacheBanner" class="cache-badge-footer" style="display:none"></span>
+      </div>
+      <!-- <div class="footer-item">
+        Data as of: <span id="lastUpdated">—</span>
+      </div> -->
+      <!-- <span class="footer-sep">·</span>
+      <div class="footer-item" id="freshnessInfo" style="display:none"></div>
+      <span class="footer-sep">·</span> -->
+      <!-- <div class="footer-item">
+        Trading212 API · All values in GBP
+      </div> -->
+    </footer>
+  </div>
+
+  <script>
+    const PORTFOLIO_NAMES = {{ names | tojson }};
+  </script>
+  <script src="/static/currency.js"></script>
+  <script src="/static/home.js"></script>
+
+  <!-- Fear & Greed detail panel -->
+  <div id="fgPanelBackdrop" class="side-panel-backdrop" onclick="closeFGPanel()"></div>
+  <div id="fgPanel" class="side-panel">
+    <div class="side-panel-header">
+      <div class="sp-brand">
+        <div class="sp-logo-wrap" style="font-size:1.3rem">📊</div>
+        <div>
+          <div class="sp-company-name">Market Indicators</div>
+          <div class="sp-ticker">S&amp;P 500 &amp; VIX · Yahoo Finance</div>
+        </div>
+      </div>
+      <button class="sp-close-btn" onclick="closeFGPanel()">✕</button>
+    </div>
+    <div class="side-panel-content" id="fgPanelContent">
+      <div class="activity-loading">
+        <div class="table-loading-spinner"></div>
+      </div>
+    </div>
+  </div>
+</body>
+
+</html>
