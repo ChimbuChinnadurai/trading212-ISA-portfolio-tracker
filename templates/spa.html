@@ -233,12 +233,12 @@
       <!-- Topbar -->
       <header class="topbar">
         <div class="topbar-left">
-          <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" title="Menu">
+          <!-- <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" title="Menu">
             <span class="material-symbols-outlined" style="font-size:20px;line-height:1">menu</span>
-          </button>
-          <div class="topbar-breadcrumb">
+          </button> -->
+          <!-- <div class="topbar-breadcrumb">
             <span class="topbar-title" id="breadcrumbText">Overview</span>
-          </div>
+          </div> -->
           <!-- Pid switcher — shown on portfolio/* and stocks/* routes -->
           <div class="pid-switcher" id="pidSwitcher" style="display:none">
             <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
@@ -530,23 +530,12 @@
               <p class="state-text">Fetching portfolio data…</p>
             </div>
             <div class="state-container" id="stateError" style="display:none">
-              <div class="state-icon error-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </div>
+              <span class="material-symbols-outlined state-icon error-icon">error_outline</span>
               <p class="state-text" id="errorText">An error occurred.</p>
               <button class="btn btn-refresh" onclick="loadPortfolio()">Try again</button>
             </div>
             <div class="state-container" id="stateEmpty" style="display:none">
-              <div class="state-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M3 3h18v4H3zM3 10h18v11H3z" />
-                  <path d="M8 10v11M16 10v11" />
-                </svg>
-              </div>
+              <span class="material-symbols-outlined state-icon">inbox</span>
               <p class="state-text">No open positions found.</p>
             </div>
 
@@ -564,10 +553,7 @@
                   <div class="s-card s-card-blue">
                     <div class="s-card-top">
                       <div class="s-card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                          <rect x="2" y="3" width="20" height="14" rx="2" />
-                          <path d="M8 21h8M12 17v4" />
-                        </svg>
+                        <span class="material-symbols-outlined">account_balance_wallet</span>
                       </div>
                       <span class="s-card-label">Portfolio Value</span>
                     </div>
@@ -581,10 +567,7 @@
                   <div class="s-card s-card-dynamic" id="returnsCard">
                     <div class="s-card-top">
                       <div class="s-card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                          <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
-                          <polyline points="16 7 22 7 22 13" />
-                        </svg>
+                        <span class="material-symbols-outlined">trending_up</span>
                       </div>
                       <span class="s-card-label">Returns</span>
                     </div>
@@ -604,10 +587,7 @@
                   <div class="s-card s-card-teal">
                     <div class="s-card-top">
                       <div class="s-card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                          <line x1="12" y1="1" x2="12" y2="23" />
-                          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                        </svg>
+                        <span class="material-symbols-outlined">payments</span>
                       </div>
                       <span class="s-card-label">Dividends Received</span>
                     </div>
@@ -621,9 +601,7 @@
                   <div class="s-card s-card-purple" id="cardPAI" onclick="openPaiDetails()" style="cursor:pointer">
                     <div class="s-card-top">
                       <div class="s-card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                        </svg>
+                        <span class="material-symbols-outlined">savings</span>
                       </div>
                       <span class="s-card-label">Projected Annual Income</span>
                     </div>
@@ -637,9 +615,7 @@
                     style="cursor:pointer">
                     <div class="s-card-top">
                       <div class="s-card-icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                        </svg>
+                        <span class="material-symbols-outlined">hub</span>
                       </div>
                       <span class="s-card-label">Diversification Score</span>
                     </div>
@@ -670,11 +646,7 @@
 
                   <!-- Stale banner -->
                   <div id="staleBanner" class="stale-banner" style="display:none">
-                    <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;flex-shrink:0">
-                      <path fill-rule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                        clip-rule="evenodd" />
-                    </svg>
+                    <span class="material-symbols-outlined" style="font-size:14px;flex-shrink:0;line-height:1;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
                     <span id="staleBannerText">Data is over 5 minutes old.</span>
                     <a href="#" onclick="loadPortfolio(true); return false;">Refresh now</a>
                     <button class="stale-close" onclick="document.getElementById('staleBanner').style.display='none'"
@@ -735,13 +707,7 @@
               <p class="state-text">Fetching holdings…</p>
             </div>
             <div class="state-container" id="stocksStateError" style="display:none">
-              <div class="state-icon error-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </div>
+              <span class="material-symbols-outlined state-icon error-icon">error_outline</span>
               <p class="state-text" id="stocksErrorText">An error occurred.</p>
               <button class="btn btn-refresh" onclick="loadStocksView()">Try again</button>
             </div>
@@ -758,11 +724,7 @@
               <div class="table-toolbar">
                 <div class="toolbar-left">
                   <div class="search-wrap">
-                    <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd"
-                        d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                        clip-rule="evenodd" />
-                    </svg>
+                    <span class="material-symbols-outlined search-icon">search</span>
                     <input class="search-input" id="searchInput" type="text" placeholder="Search company or ticker…"
                       oninput="filterTable()" />
                   </div>
@@ -770,11 +732,7 @@
                 <div class="toolbar-right">
                   <span class="row-count" id="rowCount"></span>
                   <button class="btn btn-csv" onclick="exportCSV()">
-                    <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
-                      <path fill-rule="evenodd"
-                        d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
-                        clip-rule="evenodd" />
-                    </svg>
+                    <span class="material-symbols-outlined btn-icon">download</span>
                     Export CSV
                   </button>
                 </div>
