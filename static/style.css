@@ -7,6 +7,10 @@
   padding: 0;
 }
 
+html * {
+  font-family: 'JetBrains Mono';
+}
+
 :root {
   /* ── Apex Finance · Light Theme (default) ─────────────────────────────── */
   --bg: #f7f9fb;
@@ -158,6 +162,23 @@ html[data-theme="dark"] body {
   background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .08), transparent);
 }
 
+/* ─── Dark mode: sidebar & topbar borders ──────────────────────────────────── */
+html[data-theme="dark"] .sidebar {
+  border-right: 1px solid var(--border);
+}
+
+html[data-theme="dark"] .sidebar-brand {
+  border-bottom: 1px solid var(--border);
+}
+
+html[data-theme="dark"] .topbar {
+  background: rgba(15, 22, 41, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: none;
+  border-bottom: 1px solid var(--border);
+}
+
 /* ─── Dark mode: restore borders on borderless cards ───────────────────────── */
 html[data-theme="dark"] .card,
 html[data-theme="dark"] .s-card,
@@ -177,11 +198,25 @@ html[data-theme="dark"] .widget-panel:hover {
 }
 
 /* Dark mode: restore colored widget top-borders (base rules already removed them) */
-html[data-theme="dark"] .widget-activity { border-top: 4px solid #f59e0b; }
-html[data-theme="dark"] .widget-performers { border-top: 4px solid #6366f1; }
-html[data-theme="dark"] .widget-earnings { border-top: 4px solid #f97316; }
-html[data-theme="dark"] .widget-dividends { border-top: 4px solid #22c55e; }
-html[data-theme="dark"] .widget-news { border-top: 4px solid #64748b; }
+html[data-theme="dark"] .widget-activity {
+  border-top: 4px solid #f59e0b;
+}
+
+html[data-theme="dark"] .widget-performers {
+  border-top: 4px solid #6366f1;
+}
+
+html[data-theme="dark"] .widget-earnings {
+  border-top: 4px solid #f97316;
+}
+
+html[data-theme="dark"] .widget-dividends {
+  border-top: 4px solid #22c55e;
+}
+
+html[data-theme="dark"] .widget-news {
+  border-top: 4px solid #64748b;
+}
 
 /* Dark mode: table borders */
 html[data-theme="dark"] .portfolio-table thead tr {
@@ -2894,7 +2929,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: 340px;
+  height: 420px;
   /* Default height for scrolling pages */
   min-height: 0;
   overflow: hidden;
@@ -4805,12 +4840,21 @@ html[data-theme="light"] .rating-strong-sell {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
+/* ── Topbar glassmorphism ────────────────────────────────────────────────── */
+.topbar {
+  background: rgba(247, 249, 251, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0px 1px 0px rgba(25, 28, 30, .07);
+  position: relative;
+  z-index: 100;
+}
+
 .sidebar-brand {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 14px 12px;
-  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -5262,7 +5306,7 @@ html[data-theme="dark"] .nav-item.active {
 .phm-ticker {
   font-size: 0.78rem;
   font-weight: 700;
-  color: rgba(255,255,255,0.95);
+  color: rgba(255, 255, 255, 0.95);
   line-height: 1.1;
   white-space: nowrap;
   overflow: hidden;
@@ -5272,14 +5316,14 @@ html[data-theme="dark"] .nav-item.active {
 
 .phm-weight {
   font-size: 0.62rem;
-  color: rgba(255,255,255,0.65);
+  color: rgba(255, 255, 255, 0.65);
   line-height: 1.3;
 }
 
 .phm-pct {
   font-size: 0.68rem;
   font-weight: 600;
-  color: rgba(255,255,255,0.9);
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.2;
 }
 
