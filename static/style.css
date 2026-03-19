@@ -158,8 +158,39 @@ html[data-theme="dark"] body {
   background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .08), transparent);
 }
 
+/* ─── Dark mode: restore borders on borderless cards ───────────────────────── */
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .s-card,
+html[data-theme="dark"] .widget-panel {
+  border: 1px solid var(--border);
+}
+
+html[data-theme="dark"] .card:hover,
+html[data-theme="dark"] .s-card:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+}
+
+html[data-theme="dark"] .widget-panel:hover {
+  border-color: var(--border-bright);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, .4);
+}
+
+/* Dark mode: restore colored widget top-borders (base rules already removed them) */
+html[data-theme="dark"] .widget-activity { border-top: 4px solid #f59e0b; }
+html[data-theme="dark"] .widget-performers { border-top: 4px solid #6366f1; }
+html[data-theme="dark"] .widget-earnings { border-top: 4px solid #f97316; }
+html[data-theme="dark"] .widget-dividends { border-top: 4px solid #22c55e; }
+html[data-theme="dark"] .widget-news { border-top: 4px solid #64748b; }
+
+/* Dark mode: table borders */
 html[data-theme="dark"] .portfolio-table thead tr {
   background: rgba(255, 255, 255, .03);
+  border-bottom: 1px solid var(--border);
+}
+
+html[data-theme="dark"] .portfolio-table tbody tr {
+  border-bottom: 1px solid var(--border);
 }
 
 html {
@@ -407,7 +438,6 @@ html[data-theme="dark"] .header {
 
 .s-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 22px 24px 18px;
   display: flex;
@@ -416,13 +446,17 @@ html[data-theme="dark"] .header {
   position: relative;
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  transition: border-color .2s, box-shadow .2s, transform .2s;
+  transition: box-shadow .2s, transform .2s;
 }
 
 .s-card:hover {
-  border-color: var(--border-bright);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, .5);
+  box-shadow: 0px 16px 40px rgba(25, 28, 30, .1);
   transform: translateY(-1px);
+}
+
+/* Coloured top accent bars — dark mode only */
+html[data-theme="light"] .s-card::before {
+  display: none;
 }
 
 /* Coloured top accent bar */
@@ -622,14 +656,13 @@ html[data-theme="dark"] .header {
 /* Generic card (used by table wrapper etc.) */
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-card);
-  transition: border-color .2s;
+  transition: box-shadow .2s, transform .2s;
 }
 
 .card:hover {
-  border-color: var(--border-bright);
+  box-shadow: 0px 16px 40px rgba(25, 28, 30, .1);
 }
 
 /* Allocation layout */
@@ -1173,8 +1206,7 @@ html[data-theme="dark"] .header {
 }
 
 .portfolio-table thead tr {
-  background: rgba(0, 0, 0, .2);
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-row-alt);
 }
 
 .portfolio-table th {
@@ -1231,7 +1263,6 @@ th.sort-desc .sort-icon::before {
 }
 
 .portfolio-table tbody tr {
-  border-bottom: 1px solid var(--border);
   transition: background .12s;
   position: relative;
 }
@@ -1245,7 +1276,7 @@ th.sort-desc .sort-icon::before {
 }
 
 .portfolio-table td {
-  padding: 12px 14px;
+  padding: 14px 14px;
   color: var(--text-primary);
   vertical-align: middle;
 }
@@ -2422,11 +2453,11 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .ov-card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
   border-radius: 14px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 0.25s, transform 0.25s;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2437,21 +2468,18 @@ html[data-glass="true"][data-theme="light"] .s-card {
 }
 
 .ov-card:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0px 16px 40px rgba(25, 28, 30, .1);
 }
 
 .ov-card-combined {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: linear-gradient(135deg, rgba(0, 88, 190, 0.04) 0%, rgba(33, 112, 228, 0.04) 100%);
   cursor: pointer;
 }
 
 .ov-card-combined:hover {
-  transform: translateY(-4px);
-  border-color: rgba(139, 92, 246, 0.3);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
+  box-shadow: 0px 16px 40px rgba(0, 88, 190, .1);
 }
 
 .ov-header {
@@ -2862,7 +2890,6 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .widget-panel {
   background: var(--bg-card);
-  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 0;
   display: flex;
@@ -2872,7 +2899,8 @@ html[data-glass="true"][data-theme="light"] .s-card {
   min-height: 0;
   overflow: hidden;
   position: relative;
-  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  box-shadow: var(--shadow-card);
+  transition: transform 0.2s, box-shadow 0.2s;
 }
 
 /* On the dashboard (fixed-layout), panels fill the available grid space */
@@ -2881,64 +2909,19 @@ html[data-glass="true"][data-theme="light"] .s-card {
 }
 
 .widget-panel:hover {
-  border-color: var(--border-bright);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: 0px 16px 40px rgba(25, 28, 30, .1);
 }
 
-/* Vibrant Accent Borders and Glows */
-.widget-activity {
-  border-top: 4px solid #3b82f6;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.08);
-}
-
-.widget-performers {
-  border-top: 4px solid #8b5cf6;
-  box-shadow: 0 4px 20px rgba(139, 92, 246, 0.08);
-}
-
-.widget-earnings {
-  border-top: 4px solid #f97316;
-  box-shadow: 0 4px 20px rgba(249, 115, 22, 0.08);
-}
-
-.widget-news {
-  border-top: 4px solid #64748b;
-  box-shadow: 0 4px 20px rgba(100, 116, 139, 0.08);
-}
-
-.widget-activity:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
-}
-
-.widget-performers:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
-}
-
-.widget-earnings:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
-}
-
+/* Widget hover lift — shared (border-color handled per-theme) */
+.widget-activity:hover,
+.widget-performers:hover,
+.widget-earnings:hover,
 .widget-news:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
-}
-
-.widget-dividends {
-  border-top: 4px solid #10b981;
-  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.08);
+  transform: translateY(-2px);
 }
 
 .widget-dividends:hover {
-  transform: translateY(-4px);
-  border-color: var(--accent);
-  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.3);
+  transform: translateY(-2px);
 }
 
 /* ── Dividend Calendar cards ─────────────────────────────────────────────── */
