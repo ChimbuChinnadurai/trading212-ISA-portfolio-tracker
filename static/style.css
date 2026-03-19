@@ -532,6 +532,7 @@ html[data-theme="dark"] .header {
 .s-card-value {
   font-size: 2rem;
   font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
   color: var(--text-primary);
   letter-spacing: -.03em;
   line-height: 1.1;
@@ -611,9 +612,9 @@ html[data-theme="dark"] .header {
 .s-card-badge {
   font-size: 0.72rem;
   font-weight: 700;
-  background: rgba(59, 130, 246, .1);
+  background: var(--accent-glow);
   color: var(--accent);
-  border: 1px solid rgba(59, 130, 246, .2);
+  border: 1px solid var(--accent-glow);
   padding: 1px 8px;
   border-radius: 99px;
 }
@@ -839,9 +840,9 @@ html[data-theme="dark"] .header {
 .panel-badge {
   font-size: 0.68rem;
   font-weight: 700;
-  background: rgba(59, 130, 246, .1);
+  background: var(--accent-glow);
   color: var(--accent);
-  border: 1px solid rgba(59, 130, 246, .2);
+  border: 1px solid var(--accent-glow);
   padding: 1px 7px;
   border-radius: 99px;
 }
@@ -948,12 +949,13 @@ html[data-theme="dark"] .header {
 }
 
 .activity-ticker {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
   color: var(--accent);
   display: inline-block;
-  background: rgba(59, 130, 246, .08);
-  border: 1px solid rgba(59, 130, 246, .18);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-glow);
   padding: 0 5px;
   border-radius: 4px;
 }
@@ -976,6 +978,7 @@ html[data-theme="dark"] .header {
 .activity-amount {
   font-size: 0.82rem;
   font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
   text-align: right;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1289,11 +1292,11 @@ th.sort-desc .sort-icon::before {
 }
 
 .cell-ticker {
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 0.78rem;
   color: var(--accent);
-  background: rgba(59, 130, 246, .1);
-  border: 1px solid rgba(59, 130, 246, .2);
+  background: var(--accent-glow);
+  border: 1px solid var(--accent-glow);
   padding: 2px 7px;
   border-radius: 5px;
   display: inline-block;
@@ -1311,6 +1314,15 @@ th.sort-desc .sort-icon::before {
 }
 
 .cell-num {
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+}
+
+/* All right-aligned numeric table cells use monospace for column alignment */
+.portfolio-table td.td-right {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -2450,8 +2462,10 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .ov-label {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.65rem;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .ov-link {
@@ -2520,6 +2534,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
 .ov-main-val {
   font-size: 1.25rem;
   font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
   letter-spacing: -0.02em;
 }
 
@@ -2580,6 +2595,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
 .ov-mini-val {
   font-size: 0.72rem;
   font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
   color: var(--text);
   display: flex;
   align-items: center;
@@ -2653,6 +2669,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
 .fg-score {
   font-size: 1.6rem;
   font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
   letter-spacing: -0.02em;
   line-height: 1;
 }
@@ -3098,8 +3115,8 @@ html[data-glass="true"][data-theme="light"] .s-card {
 }
 
 .ov-tag-p1 {
-  color: #3b82f6;
-  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent);
+  background: var(--accent-glow);
 }
 
 .ov-tag-p2 {
@@ -5133,10 +5150,10 @@ html[data-theme="dark"] .nav-item.active {
 }
 
 .pid-btn.active {
-  background: var(--bg-card);
-  color: var(--text-primary);
+  background: var(--accent);
+  color: #ffffff;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+  box-shadow: 0 1px 4px var(--accent-glow);
 }
 
 /* ── View main ───────────────────────────────────────────────────────────── */
@@ -5299,9 +5316,11 @@ html[data-theme="dark"] .nav-item.active {
 }
 
 .chart-card-title {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
 }
 
 .chart-canvas-wrap {
