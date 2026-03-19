@@ -1,39 +1,6 @@
-/* ─── Theme ───────────────────────────────────────────────────────────────── */
-(function () {
-  const saved = localStorage.getItem('theme') || 'light';
-  document.documentElement.setAttribute('data-theme', saved);
-  _updateThemeIcon(saved);
+/* ── SPA Note: Theme, toggleTheme, _updateThemeIcon are defined in home.js ── */
+/* ── PORTFOLIO_ID is set dynamically by router.js before calling loadPortfolio ── */
 
-  const glass = localStorage.getItem('glassMode') === 'true';
-  document.documentElement.setAttribute('data-glass', glass);
-})();
-
-function toggleTheme() {
-  const html = document.documentElement;
-  const isDark = html.getAttribute('data-theme') !== 'light';
-  const newTheme = isDark ? 'light' : 'dark';
-  html.setAttribute('data-theme', newTheme);
-  localStorage.setItem('theme', newTheme);
-  _updateThemeIcon(newTheme);
-}
-
-function toggleGlassMode() {
-  const html = document.documentElement;
-  const isGlass = html.getAttribute('data-glass') === 'true';
-  const newVal = !isGlass;
-  html.setAttribute('data-glass', newVal);
-  localStorage.setItem('glassMode', newVal);
-}
-
-function _updateThemeIcon(theme) {
-  const icon = document.getElementById('themeIcon');
-  if (!icon) return;
-  if (theme === 'light') {
-    icon.innerHTML = '<path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>';
-  } else {
-    icon.innerHTML = '<path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>';
-  }
-}
 
 /* ─── State ───────────────────────────────────────────────────────────────── */
 let allRows = [];
@@ -102,27 +69,27 @@ function esc(s) {
 
 
 /* ─── Activity panels ─────────────────────────────────────────────────────── */
-async function loadActivity() {
+async function loadDetailActivity() {
   try {
     const res = await fetch(`/api/p${PORTFOLIO_ID}/activity`);
     const json = await res.json();
     _activityData = json.data || [];
     _renderActivity(_activityData, json.warning);
   } catch (err) {
-    document.getElementById('activityList').innerHTML =
+    document.getElementById('detailActivityList').innerHTML =
       `<div class="activity-empty">Could not load activity: ${esc(err.message)}</div>`;
   }
 }
 
 function _renderActivity(data, warning) {
-  const listEl = document.getElementById('activityList');
+  const listEl = document.getElementById('detailActivityList');
   if (data.length === 0) {
     const msg = warning ? `API error: ${warning}` : 'No recent orders found.';
     listEl.innerHTML = `<div class="activity-empty">${esc(msg)}</div>`;
     return;
   }
 
-  const badge = document.getElementById('activityBadge');
+  const badge = document.getElementById('detailActivityBadge');
   if (badge) { badge.textContent = data.length; badge.style.display = ''; }
 
   listEl.innerHTML = data.map(order => {
@@ -240,8 +207,6 @@ async function loadPortfolio(force = false) {
     _lastDivScore = json.div_score ?? 0;
 
     renderSummary(allRows, _lastTotalDividends, _lastPAI, _lastDivScore);
-    // renderCountryFilters(allRows);
-    renderTable(allRows);
     document.getElementById('dashboard').style.display = '';
     document.getElementById('stateError').style.display = 'none';
     document.getElementById('stateEmpty').style.display = 'none';
@@ -308,11 +273,10 @@ async function loadPortfolio(force = false) {
       }
     }
 
-    // Load activity panels
-    loadActivity();
+    // Load portfolio bottom panels
+    loadDetailActivity();
     loadUpcomingDividends();
     loadMonthlyDividends();
-    loadAnalystRatings();
 
   } catch (err) {
     showState('error', 'Network error: ' + err.message);
@@ -433,9 +397,7 @@ function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
     wpEl.innerHTML = `📉 ${esc(worst.ticker)} <strong>${fmt.currency(worst.total_returns)}</strong>`;
   }
 
-  renderAllocBar(rows, totalValue);
-  renderCurrencyBar(rows, totalValue);
-  renderSectorBar(rows, totalValue);
+  drawPortfolioHeatmap(rows, totalValue);
 }
 
 /* ─── Country allocation bar ─────────────────────────────────────────────── */
@@ -1616,4 +1578,273 @@ async function openDiversificationDetails() {
 function closeSummaryPanel() {
   document.getElementById('summaryPanel').classList.remove('open');
   document.getElementById('summaryPanelBackdrop').classList.remove('active');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PORTFOLIO HEATMAP — Squarified treemap, size = weight, color = return
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+let _phmRects = [];
+
+function _pnlColor(pct) {
+  // Total return % — green = gain, amber = tiny loss, red = loss
+  if (pct >= 30) return 'linear-gradient(135deg,#052e16,#15803d)';
+  if (pct >= 15) return 'linear-gradient(135deg,#14532d,#16a34a)';
+  if (pct >= 5)  return 'linear-gradient(135deg,#166534,#22c55e)';
+  if (pct >= 0)  return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+  if (pct >= -5) return 'linear-gradient(135deg,#78350f,#b45309)';
+  if (pct >= -15)return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
+  return 'linear-gradient(135deg,#450a0a,#b91c1c)';
+}
+
+function drawPortfolioHeatmap(rows, totalValue) {
+  const container = document.getElementById('portfolioHeatmap');
+  if (!container || !rows.length) return;
+
+  const W = container.clientWidth || 600;
+  const H = Math.max(Math.round(W * 0.42), 220);
+  container.style.height = H + 'px';
+
+  const items = [...rows]
+    .filter(r => r.current_value > 0)
+    .sort((a, b) => b.current_value - a.current_value)
+    .map(r => ({ ...r, value: r.current_value }));
+
+  // _computeTreemap is defined globally in home.js (squarified algorithm)
+  _phmRects = _computeTreemap(items, W, H);
+
+  const GAP = 3;
+  container.innerHTML = _phmRects.map((rect, i) => {
+    const r     = rect.item;
+    const pct   = r.returns_pct || 0;
+    const sign  = pct >= 0 ? '+' : '';
+    const weight = totalValue > 0 ? (r.current_value / totalValue * 100) : (r.weight || 0);
+    const bg    = _pnlColor(pct);
+    const tinyW = rect.w < 52;
+    const tinyH = rect.h < 44;
+
+    const inner = tinyW || tinyH
+      ? `<span class="phm-ticker" style="font-size:0.58rem">${esc(r.ticker)}</span>`
+      : `<span class="phm-ticker">${esc(r.ticker)}</span>
+         <span class="phm-weight">${weight.toFixed(1)}%</span>
+         <span class="phm-pct">${sign}${pct.toFixed(2)}%</span>`;
+
+    return `<div class="phm-cell" data-i="${i}"
+      style="left:${(rect.x + GAP/2).toFixed(1)}px;top:${(rect.y + GAP/2).toFixed(1)}px;
+             width:${(rect.w - GAP).toFixed(1)}px;height:${(rect.h - GAP).toFixed(1)}px;
+             background:${bg}"
+      title="${esc(r.company_name)} · ${weight.toFixed(1)}% · ${sign}${pct.toFixed(2)}%">
+      ${inner}
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('.phm-cell').forEach(el => {
+    el.onclick = () => openStockPanel(_phmRects[+el.dataset.i].item);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DONUT CHARTS — Canvas-drawn, no external library
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Draw a donut chart on a canvas element.
+ * @param {string} canvasId   - canvas element id
+ * @param {string} legendId   - legend container id
+ * @param {Array}  segments   - [{label, value, color, pct}]
+ */
+function drawDonutChart(canvasId, legendId, segments) {
+  const canvas = document.getElementById(canvasId);
+  const legendEl = document.getElementById(legendId);
+  if (!canvas || !legendEl) return;
+
+  const dpr  = window.devicePixelRatio || 1;
+  const size = 220;
+  canvas.width  = size * dpr;
+  canvas.height = size * dpr;
+  canvas.style.width  = size + 'px';
+  canvas.style.height = size + 'px';
+
+  const ctx   = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const cx     = size / 2;
+  const cy     = size / 2;
+  const radius = size / 2 - 10;
+  const hole   = radius * 0.58;
+  const total  = segments.reduce((s, g) => s + g.value, 0);
+
+  if (total === 0) {
+    ctx.clearRect(0, 0, size, size);
+    legendEl.innerHTML = '<span style="font-size:0.78rem;color:var(--text-secondary)">No data</span>';
+    return;
+  }
+
+  let startAngle = -Math.PI / 2;
+  const gap = 0.018; // radians gap between segments
+
+  segments.forEach(seg => {
+    const slice = (seg.value / total) * (Math.PI * 2 - gap * segments.length);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startAngle + gap / 2, startAngle + gap / 2 + slice);
+    ctx.closePath();
+    ctx.fillStyle = seg.color;
+    ctx.fill();
+
+    // Inner hole — erase center
+    ctx.beginPath();
+    ctx.arc(cx, cy, hole, 0, Math.PI * 2);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim() || '#0f1629';
+    ctx.fill();
+
+    seg._startAngle = startAngle + gap / 2;
+    seg._endAngle   = startAngle + gap / 2 + slice;
+    startAngle     += slice + gap;
+  });
+
+  // Hover interaction
+  canvas._donutSegments = segments;
+  canvas._donutTotal    = total;
+  canvas._donutCx = cx; canvas._donutCy = cy;
+  canvas._donutR  = radius; canvas._donutHole = hole;
+  canvas.onmousemove = _donutHover;
+  canvas.onmouseleave = _donutLeave;
+
+  // Legend
+  legendEl.innerHTML = segments.map(seg => {
+    const pct = (seg.value / total * 100).toFixed(1);
+    return `<div class="chart-legend-item">
+      <div class="chart-legend-dot" style="background:${seg.color}"></div>
+      <span class="chart-legend-label">${esc(seg.label)}</span>
+      <span class="chart-legend-val">${pct}%</span>
+    </div>`;
+  }).join('');
+}
+
+function _donutHover(e) {
+  const canvas = e.currentTarget;
+  const rect   = canvas.getBoundingClientRect();
+  const mx     = e.clientX - rect.left;
+  const my     = e.clientY - rect.top;
+  const dx     = mx - canvas._donutCx;
+  const dy     = my - canvas._donutCy;
+  const dist   = Math.sqrt(dx * dx + dy * dy);
+  if (dist < canvas._donutHole || dist > canvas._donutR) { hideTooltip(); return; }
+
+  let angle = Math.atan2(dy, dx);
+  if (angle < -Math.PI / 2) angle += Math.PI * 2;
+
+  const seg = canvas._donutSegments.find(s => angle >= s._startAngle && angle <= s._endAngle);
+  if (seg) {
+    const pct = (seg.value / canvas._donutTotal * 100).toFixed(1);
+    showTooltip(e, `<strong>${esc(seg.label)}</strong><br/>${fmt.currency(seg.value)} · ${pct}%`);
+  } else {
+    hideTooltip();
+  }
+}
+function _donutLeave() { hideTooltip(); }
+
+/** Build segments and draw all 3 donut charts for the portfolio view */
+function drawDonutCharts(rows, totalValue) {
+  if (!totalValue) return;
+
+  // Palette
+  const palette = [
+    '#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444',
+    '#06b6d4','#ec4899','#84cc16','#f97316','#6366f1',
+    '#14b8a6','#a855f7','#eab308','#22c55e','#64748b',
+  ];
+  let pi = 0;
+  const nextColor = () => palette[pi++ % palette.length];
+
+  // --- By Holdings (top 8 + Other) ---
+  const sortedRows = [...rows].sort((a, b) => b.current_value - a.current_value);
+  const top8  = sortedRows.slice(0, 8);
+  const other = sortedRows.slice(8);
+  const stockSegs = top8.map(r => ({ label: r.ticker, value: r.current_value, color: nextColor() }));
+  if (other.length) {
+    const otherVal = other.reduce((s, r) => s + r.current_value, 0);
+    stockSegs.push({ label: 'Other', value: otherVal, color: '#475569' });
+  }
+  drawDonutChart('chartStocks', 'legendStocks', stockSegs);
+
+  // --- By Country ---
+  pi = 0;
+  const byCountry = {};
+  rows.forEach(r => { byCountry[r.country || 'Unknown'] = (byCountry[r.country || 'Unknown'] || 0) + r.current_value; });
+  const countrySegs = Object.entries(byCountry)
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, value]) => ({ label, value, color: countryColor(label) }));
+  drawDonutChart('chartCountry', 'legendCountry', countrySegs);
+
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STOCKS VIEW — Holdings table (separate from portfolio view)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+async function loadStocksView(force = false) {
+  const btn = document.getElementById('refreshBtn');
+  if (btn) btn.disabled = true;
+  showStocksState('loading');
+
+  try {
+    const url = force
+      ? `/api/p${PORTFOLIO_ID}/portfolio?force=1`
+      : `/api/p${PORTFOLIO_ID}/portfolio`;
+    const res  = await fetch(url);
+    const json = await res.json();
+
+    if (json.status !== 'ok') { showStocksState('error', json.message || 'Failed to load.'); return; }
+
+    allRows = json.data || [];
+    if (allRows.length === 0) { showStocksState('empty'); return; }
+
+    const totalValue = allRows.reduce((s, r) => s + r.current_value, 0);
+    allRows.forEach(r => {
+      r.weight    = totalValue ? r.current_value / totalValue * 100 : 0;
+      r.div_yield = r.current_value > 0 ? (r.dividends / r.current_value * 100) : 0;
+    });
+
+    _lastTotalDividends = json.total_dividends ?? null;
+    _lastPAI   = json.pai   ?? 0;
+    _lastDivScore = json.div_score ?? 0;
+
+    const titleEl = document.getElementById('stocksTableTitle');
+    const names   = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
+    if (titleEl) {
+      const label = PORTFOLIO_ID === 'combined' ? 'Combined'
+        : (names[PORTFOLIO_ID] || `Portfolio ${PORTFOLIO_ID}`);
+      titleEl.textContent = `Holdings · ${label}`;
+    }
+
+    renderCountryFilters(allRows);
+    renderTable(allRows);
+    loadAnalystRatings();
+    _loadStockSparklines(allRows);
+
+    showStocksState('table');
+  } catch (err) {
+    showStocksState('error', 'Network error: ' + err.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function showStocksState(state, msg) {
+  const loading = document.getElementById('stocksStateLoading');
+  const error   = document.getElementById('stocksStateError');
+  const empty   = document.getElementById('stocksStateEmpty');
+  const table   = document.getElementById('stocksTableWrapper');
+
+  if (loading) loading.style.display = state === 'loading' ? '' : 'none';
+  if (error)   error.style.display   = state === 'error'   ? '' : 'none';
+  if (empty)   empty.style.display   = state === 'empty'   ? '' : 'none';
+  if (table)   table.style.display   = state === 'table'   ? '' : 'none';
+
+  if (state === 'error' && msg) {
+    const el = document.getElementById('stocksErrorText');
+    if (el) el.textContent = msg;
+  }
 }

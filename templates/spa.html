@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    /* Critical inline CSS — prevents FOUC while style.css loads */
+    :root {
+      --bg: #080d18;
+      --bg-card: #0f1629;
+      --bg-sidebar: #0b1120;
+      --bg-row-alt: #131d35;
+      --bg-hover: #1a2846;
+      --border: #1e2d4a;
+      --accent: #3b82f6;
+      --text-primary: #e2e8f0;
+      --text-secondary: #7c8fad;
+      --radius: 12px;
+      --sidebar-w: 220px;
+      --topbar-h: 54px;
+    }
+
+    html[data-theme="light"] {
+      --bg: #f1f5f9;
+      --bg-card: #ffffff;
+      --bg-sidebar: #ffffff;
+      --bg-row-alt: #f8fafc;
+      --bg-hover: #f0f9ff;
+      --border: #e2e8f0;
+      --text-primary: #0f172a;
+      --text-secondary: #475569
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
+    html, body { height: 100%; overflow: hidden }
+
+    body {
+      background: var(--bg);
+      color: var(--text-primary);
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+
+    /* Shell */
+    .app-shell {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      transition: width .22s ease;
+      overflow: hidden;
+      z-index: 200;
+    }
+    .sidebar.collapsed { width: 60px }
+
+    /* Main */
+    .app-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    /* Topbar */
+    .topbar {
+      height: var(--topbar-h);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+      gap: 12px;
+    }
+
+    /* View container — scrolls */
+    .view-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      background: var(--bg);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59,130,246,.07), transparent);
+    }
+    html[data-theme="light"] .view-container {
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59,130,246,.05), transparent);
+    }
+
+    .ov-card, .widget-panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius)
+    }
+  </style>
+</head>
+
+<body>
+<div class="app-shell" id="appRoot">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="32" height="32" rx="9" fill="url(#sbLg)" />
+          <defs>
+            <linearGradient id="sbLg" x1="0" y1="0" x2="32" y2="32">
+              <stop offset="0%" stop-color="#3b82f6" />
+              <stop offset="100%" stop-color="#8b5cf6" />
+            </linearGradient>
+          </defs>
+          <path d="M7 22 L11 14 L15 18 L19 10 L25 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </div>
+      <span class="sidebar-brand-text">Portfolio<br>Tracker</span>
+    </div>
+
+    <nav class="sidebar-nav">
+
+      <!-- Home -->
+      <a class="nav-item" data-route="home" onclick="navigate('home')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h3a1 1 0 001-1v-2a1 1 0 011-1 1 1 0 011 1v2a1 1 0 001 1h3a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+        </svg>
+        <span class="nav-label">Home</span>
+      </a>
+
+      <!-- Portfolio group -->
+      <div class="nav-group" id="navGroupPortfolio">
+        <button class="nav-group-header" onclick="toggleNavGroup('portfolio')">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clip-rule="evenodd"/>
+            <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z"/>
+          </svg>
+          <span class="nav-label">Portfolio</span>
+          <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+        <div class="nav-group-items" id="navGroupPortfolioItems">
+          <a class="nav-item nav-sub" data-route="portfolio/1" onclick="navigate('portfolio/1')">
+            <span class="nav-sub-dot"></span>
+            <span class="nav-label">{{ names['1'] }}</span>
+          </a>
+          <a class="nav-item nav-sub" data-route="portfolio/2" onclick="navigate('portfolio/2')">
+            <span class="nav-sub-dot"></span>
+            <span class="nav-label">{{ names['2'] }}</span>
+          </a>
+          <a class="nav-item nav-sub" data-route="portfolio/combined" onclick="navigate('portfolio/combined')">
+            <span class="nav-sub-dot"></span>
+            <span class="nav-label">Combined</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Stocks group -->
+      <div class="nav-group" id="navGroupStocks">
+        <button class="nav-group-header" onclick="toggleNavGroup('stocks')">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+          </svg>
+          <span class="nav-label">Stocks</span>
+          <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+        <div class="nav-group-items" id="navGroupStocksItems">
+          <a class="nav-item nav-sub" data-route="stocks/1" onclick="navigate('stocks/1')">
+            <span class="nav-sub-dot"></span>
+            <span class="nav-label">{{ names['1'] }}</span>
+          </a>
+          <a class="nav-item nav-sub" data-route="stocks/2" onclick="navigate('stocks/2')">
+            <span class="nav-sub-dot"></span>
+            <span class="nav-label">{{ names['2'] }}</span>
+          </a>
+          <a class="nav-item nav-sub" data-route="stocks/combined" onclick="navigate('stocks/combined')">
+            <span class="nav-sub-dot"></span>
+            <span class="nav-label">Combined</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- News -->
+      <a class="nav-item" data-route="news" onclick="navigate('news')">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5zm3 1h6v4H5V6zm6 6H5v2h6v-2zM5 14h2v2H5v-2z" clip-rule="evenodd"/>
+          <path d="M15 7h1a2 2 0 012 2v5.5a1.5 1.5 0 01-3 0V7z"/>
+        </svg>
+        <span class="nav-label">News</span>
+      </a>
+
+    </nav><!-- /sidebar-nav -->
+
+    <div class="sidebar-footer">
+      <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" onclick="toggleSidebar()" title="Collapse sidebar">
+        <svg class="collapse-icon" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/>
+        </svg>
+        <span class="nav-label">Collapse</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Mobile scrim -->
+  <div class="sidebar-scrim" id="sidebarScrim" onclick="toggleSidebar()"></div>
+
+  <!-- ═══ MAIN ═══ -->
+  <div class="app-main">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" title="Menu">
+          <svg viewBox="0 0 20 20" fill="currentColor" style="width:18px;height:18px">
+            <path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/>
+          </svg>
+        </button>
+        <div class="topbar-breadcrumb">
+          <span class="topbar-title" id="breadcrumbText">Overview</span>
+        </div>
+        <!-- Pid switcher — shown on portfolio/* and stocks/* routes -->
+        <div class="pid-switcher" id="pidSwitcher" style="display:none">
+          <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
+          <button class="pid-btn" id="pidBtn2" onclick="switchPid('2')">{{ names['2'] }}</button>
+          <button class="pid-btn pid-btn-combined" id="pidBtnCombined" onclick="switchPid('combined')">Combined</button>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="mkt-status-wrap">
+          <div id="mkt-nasdaq" class="mkt-pill mkt-closed"></div>
+          <div id="mkt-lse" class="mkt-pill mkt-closed"></div>
+        </div>
+        <div class="currency-toggle">
+          <button class="currency-btn" data-currency="GBP" onclick="setCurrency('GBP')">GBP</button>
+          <button class="currency-btn" data-currency="USD" onclick="setCurrency('USD')">USD</button>
+        </div>
+        <button class="btn btn-refresh" id="refreshBtn" onclick="loadHomeData(true)">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+          </svg>
+          Refresh
+        </button>
+        <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+          <svg id="themeIcon" class="btn-icon" viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px"></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Dividend warning bar (shared) -->
+    <div id="divWarning" class="div-warning" style="display:none"></div>
+
+    <!-- ─── VIEW CONTAINER ─── -->
+    <div class="view-container">
+
+      <!-- ═══ VIEW: HOME ═══ -->
+      <div id="view-home" class="spa-view">
+        <div class="view-main">
+
+          <div class="overview-section">
+            <div class="section-header">
+              <h2 class="section-title">Overview</h2>
+            </div>
+            <div class="overview-grid">
+
+              <!-- Portfolio 1 -->
+              <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
+                <div class="ov-header">
+                  <span class="ov-label">{{ names['1'] }}</span>
+                  <span class="ov-link">View Details →</span>
+                </div>
+                <div class="ov-body">
+                  <div class="ov-stats">
+                    <div class="ov-main-val" id="p1-value">£0.00</div>
+                    <div class="ov-subline">
+                      <span class="ov-returns" id="p1-returns">+£0.00</span>
+                      <span class="ov-pct" id="p1-pct">(0.00%)</span>
+                    </div>
+                    <div class="ov-24h" id="p1-24h" style="display:none"></div>
+                  </div>
+                  <canvas class="ov-spark" id="p1-spark" width="320" height="128"></canvas>
+                </div>
+                <div class="ov-mini-stats">
+                  <div class="ov-mini-row">
+                    <span class="ov-mini-label">Invested</span>
+                    <span class="ov-mini-val" id="p1-invested">—</span>
+                  </div>
+                  <div class="ov-mini-row">
+                    <span class="ov-mini-label">Proj Div. Income</span>
+                    <span class="ov-mini-val" id="p1-pai">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Portfolio 2 -->
+              <div class="ov-card" id="ov2" onclick="navigate('portfolio/2')" style="cursor:pointer">
+                <div class="ov-header">
+                  <span class="ov-label">{{ names['2'] }}</span>
+                  <span class="ov-link">View Details →</span>
+                </div>
+                <div class="ov-body" id="p2-body" style="filter: grayscale(1); opacity: 0.6;">
+                  <div class="ov-stats">
+                    <div class="ov-main-val" id="p2-value">£0.00</div>
+                    <div class="ov-subline">
+                      <span class="ov-returns" id="p2-returns">+£0.00</span>
+                      <span class="ov-pct" id="p2-pct">(0.00%)</span>
+                    </div>
+                    <div class="ov-24h" id="p2-24h" style="display:none"></div>
+                  </div>
+                  <canvas class="ov-spark" id="p2-spark" width="320" height="128"></canvas>
+                </div>
+                <div class="ov-mini-stats" id="p2-mini" style="opacity:0.5">
+                  <div class="ov-mini-row">
+                    <span class="ov-mini-label">Invested</span>
+                    <span class="ov-mini-val" id="p2-invested">—</span>
+                  </div>
+                  <div class="ov-mini-row">
+                    <span class="ov-mini-label">Proj Div. Income</span>
+                    <span class="ov-mini-val" id="p2-pai">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Combined -->
+              <div class="ov-card ov-card-combined" onclick="navigate('portfolio/combined')" style="cursor:pointer">
+                <div class="ov-header">
+                  <span class="ov-label">Combined</span>
+                  <span class="ov-link">View Consolidated →</span>
+                </div>
+                <div class="ov-body">
+                  <div class="ov-stats">
+                    <div class="ov-main-val" id="c-value">£0.00</div>
+                    <div class="ov-subline">
+                      <span class="ov-returns" id="c-returns">+£0.00</span>
+                      <span class="ov-pct" id="c-pct">(0.00%)</span>
+                    </div>
+                    <div class="ov-24h" id="c-24h" style="display:none"></div>
+                  </div>
+                  <canvas class="ov-spark" id="pc-spark" width="320" height="128"></canvas>
+                </div>
+                <div class="ov-mini-stats">
+                  <div class="ov-mini-row">
+                    <span class="ov-mini-label">Invested</span>
+                    <span class="ov-mini-val" id="c-invested">—</span>
+                  </div>
+                  <div class="ov-mini-row">
+                    <span class="ov-mini-label">Proj Div. Income</span>
+                    <span class="ov-mini-val" id="c-pai">—</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Heatmap — spans 2 cols -->
+              <div class="ov-card ov-card-heatmap">
+                <div class="ov-header">
+                  <span class="ov-label">Stocks Heatmap</span>
+                  <span class="rc-label-wrap">
+                    <span style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
+                    <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="60"></span>
+                  </span>
+                </div>
+                <div id="heatmapContainer" class="heatmap-container">
+                  <div class="hm-skel"></div>
+                </div>
+              </div>
+
+              <!-- Fear & Greed -->
+              <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()" style="cursor:pointer">
+                <div class="ov-header">
+                  <span class="ov-label">Fear &amp; Greed Index</span>
+                  <span class="rc-label-wrap">
+                    <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
+                    <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span>
+                  </span>
+                </div>
+                <div class="fg-body">
+                  <div class="fg-gauge-wrap">
+                    <canvas id="fg-gauge"></canvas>
+                    <div class="fg-score-wrap">
+                      <span class="fg-score" id="fg-score">—</span>
+                      <span class="fg-rating" id="fg-rating">Loading…</span>
+                    </div>
+                  </div>
+                  <div class="fg-history" id="fg-history">
+                    <div class="skel-item" style="padding:6px 0">
+                      <div class="skel-body"><div class="skel skel-line" style="width:55%"></div></div>
+                      <div class="skel skel-amount"></div>
+                    </div>
+                    <div class="skel-item" style="padding:6px 0">
+                      <div class="skel-body"><div class="skel skel-line" style="width:50%"></div></div>
+                      <div class="skel skel-amount"></div>
+                    </div>
+                    <div class="skel-item" style="padding:6px 0">
+                      <div class="skel-body"><div class="skel skel-line" style="width:55%"></div></div>
+                      <div class="skel skel-amount"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- /overview-grid -->
+          </div><!-- /overview-section -->
+
+          <!-- Home widgets row -->
+          <div class="home-widgets">
+            <!-- Recent Activity -->
+            <section class="widget-panel widget-activity">
+              <div class="panel-header">
+                <h3 class="panel-title">Unified Recent Activity</h3>
+                <div class="panel-badge" id="activityBadge" style="display:none">0</div>
+              </div>
+              <div id="activityList" class="activity-list-home">
+                <div class="skel-item">
+                  <div class="skel skel-dot"></div>
+                  <div class="skel-body">
+                    <div class="skel skel-line" style="width:55%"></div>
+                    <div class="skel skel-line" style="width:35%"></div>
+                  </div>
+                  <div class="skel skel-amount"></div>
+                </div>
+                <div class="skel-item">
+                  <div class="skel skel-dot"></div>
+                  <div class="skel-body">
+                    <div class="skel skel-line" style="width:65%"></div>
+                    <div class="skel skel-line" style="width:40%"></div>
+                  </div>
+                  <div class="skel skel-amount"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Top Performers -->
+            <section class="widget-panel widget-performers">
+              <div class="panel-header">
+                <h3 class="panel-title">Top Performers</h3>
+              </div>
+              <div id="performerList" class="activity-list-home">
+                <div class="skel-item">
+                  <div class="skel skel-dot"></div>
+                  <div class="skel-body">
+                    <div class="skel skel-line" style="width:60%"></div>
+                    <div class="skel skel-line" style="width:40%"></div>
+                  </div>
+                  <div class="skel skel-amount"></div>
+                </div>
+                <div class="skel-item">
+                  <div class="skel skel-dot"></div>
+                  <div class="skel-body">
+                    <div class="skel skel-line" style="width:50%"></div>
+                    <div class="skel skel-line" style="width:35%"></div>
+                  </div>
+                  <div class="skel skel-amount"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Dividend Calendar -->
+            <section class="widget-panel widget-dividends">
+              <div class="panel-header">
+                <h3 class="panel-title">Dividend Calendar</h3>
+                <span class="panel-subtitle">US stocks · upcoming</span>
+              </div>
+              <div id="divCalendarList" class="activity-list-home">
+                <div class="skel-card">
+                  <div class="skel-card-header">
+                    <div class="skel skel-line" style="width:30%"></div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-card-row">
+                    <div class="skel skel-line" style="width:45%"></div>
+                    <div class="skel skel-line" style="width:45%"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Upcoming Earnings -->
+            <section class="widget-panel widget-earnings">
+              <div class="panel-header">
+                <h3 class="panel-title">Upcoming Earnings</h3>
+                <span class="panel-subtitle">Next 6 months</span>
+              </div>
+              <div id="earningsList" class="activity-list-home">
+                <div class="skel-card">
+                  <div class="skel-card-header">
+                    <div class="skel skel-line" style="width:30%"></div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-card-row">
+                    <div class="skel skel-line" style="width:25%"></div>
+                    <div class="skel skel-line" style="width:20%"></div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div><!-- /home-widgets -->
+
+        </div><!-- /view-main -->
+      </div><!-- /view-home -->
+
+      <!-- ═══ VIEW: PORTFOLIO ═══ -->
+      <div id="view-portfolio" class="spa-view" style="display:none">
+        <div class="view-main">
+
+          <!-- Loading / Error / Empty states -->
+          <div class="state-container" id="stateLoading" style="display:none">
+            <div class="spinner"></div>
+            <p class="state-text">Fetching portfolio data…</p>
+          </div>
+          <div class="state-container" id="stateError" style="display:none">
+            <div class="state-icon error-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <p class="state-text" id="errorText">An error occurred.</p>
+            <button class="btn btn-refresh" onclick="loadPortfolio()">Try again</button>
+          </div>
+          <div class="state-container" id="stateEmpty" style="display:none">
+            <div class="state-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M3 3h18v4H3zM3 10h18v11H3z" />
+                <path d="M8 10v11M16 10v11" />
+              </svg>
+            </div>
+            <p class="state-text">No open positions found.</p>
+          </div>
+
+          <!-- Main portfolio dashboard -->
+          <div id="dashboard" style="display:none">
+
+            <!-- Summary cards -->
+            <div class="summary-row">
+              <div class="summary-row-header">
+                <span class="summary-title">Overview</span>
+                <span class="summary-updated">Updated <span id="summaryTime">—</span></span>
+              </div>
+              <div class="summary-cards">
+
+                <div class="s-card s-card-blue">
+                  <div class="s-card-top">
+                    <div class="s-card-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <path d="M8 21h8M12 17v4" />
+                      </svg>
+                    </div>
+                    <span class="s-card-label">Portfolio Value</span>
+                  </div>
+                  <span class="s-card-value" id="totalValue">—</span>
+                  <div class="s-card-footer">
+                    <span class="s-card-sub" id="totalInvested">—</span>
+                    <span class="s-card-badge" id="totalHoldings">—</span>
+                  </div>
+                </div>
+
+                <div class="s-card s-card-dynamic" id="returnsCard">
+                  <div class="s-card-top">
+                    <div class="s-card-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                        <polyline points="16 7 22 7 22 13" />
+                      </svg>
+                    </div>
+                    <span class="s-card-label">Returns</span>
+                  </div>
+                  <div class="s-card-value-row">
+                    <span class="s-card-value" id="totalReturns">—</span>
+                    <span class="s-card-pct" id="totalReturnsPct">—</span>
+                  </div>
+                  <div class="s-card-footer s-card-footer-2row">
+                    <div class="s-footer-row"><span class="s-card-sub" id="winnersLosers">—</span></div>
+                    <div class="s-footer-row">
+                      <span class="s-card-sub" id="bestPct">—</span>
+                      <span class="s-card-sub" id="worstPct">—</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="s-card s-card-teal">
+                  <div class="s-card-top">
+                    <div class="s-card-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <line x1="12" y1="1" x2="12" y2="23" />
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                      </svg>
+                    </div>
+                    <span class="s-card-label">Dividends Received</span>
+                  </div>
+                  <span class="s-card-value" id="totalDividends">—</span>
+                  <div class="s-card-footer">
+                    <span class="s-card-sub" id="topDivStock">—</span>
+                    <span class="s-card-sub" id="totalFxImpact">—</span>
+                  </div>
+                </div>
+
+                <div class="s-card s-card-purple" id="cardPAI" onclick="openPaiDetails()" style="cursor:pointer">
+                  <div class="s-card-top">
+                    <div class="s-card-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                      </svg>
+                    </div>
+                    <span class="s-card-label">Projected Annual Income</span>
+                  </div>
+                  <span class="s-card-value" id="totalPAI">—</span>
+                  <div class="s-card-footer">
+                    <span class="s-card-sub">Estimated trailing 12m</span>
+                  </div>
+                </div>
+
+                <div class="s-card s-card-amber" id="cardDivScore" onclick="openDiversificationDetails()" style="cursor:pointer">
+                  <div class="s-card-top">
+                    <div class="s-card-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                      </svg>
+                    </div>
+                    <span class="s-card-label">Diversification Score</span>
+                  </div>
+                  <div class="s-card-value-row">
+                    <span class="s-card-value" id="divScore">—</span>
+                    <span class="s-card-pct" id="divScoreLabel">/ 100</span>
+                  </div>
+                  <div class="s-card-footer">
+                    <span class="s-card-sub" id="divScoreMeaning">Calculating...</span>
+                  </div>
+                </div>
+
+              </div><!-- /summary-cards -->
+            </div><!-- /summary-row -->
+
+            <!-- 2-column portfolio layout: charts left, panels right -->
+            <div class="portfolio-layout">
+
+              <!-- Left: portfolio heatmap -->
+              <div class="portfolio-left">
+                <div class="card portfolio-heatmap-card">
+                  <div class="phm-header">
+                    <span class="chart-card-title">Position Heatmap</span>
+                    <span class="phm-hint">Size = weight · Color = total return</span>
+                  </div>
+                  <div id="portfolioHeatmap" class="portfolio-heatmap"></div>
+                </div>
+
+                <!-- Stale banner -->
+                <div id="staleBanner" class="stale-banner" style="display:none">
+                  <svg viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;flex-shrink:0">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/>
+                  </svg>
+                  <span id="staleBannerText">Data is over 5 minutes old.</span>
+                  <a href="#" onclick="loadPortfolio(true); return false;">Refresh now</a>
+                  <button class="stale-close" onclick="document.getElementById('staleBanner').style.display='none'" title="Dismiss">✕</button>
+                </div>
+              </div><!-- /portfolio-left -->
+
+              <!-- Right rail: stacked panels -->
+              <div class="portfolio-right-rail">
+
+                <!-- Monthly Dividends -->
+                <div class="card portfolio-panel" id="monthlyDivPanel" style="display:none">
+                  <div class="panel-header">
+                    <h3 class="panel-title">Monthly Dividends</h3>
+                    <div class="panel-badge" id="monthlyDivBadge" style="display:none"></div>
+                  </div>
+                  <div class="monthly-chart-wrap" id="monthlyChart">
+                    <div class="activity-loading">Loading…</div>
+                  </div>
+                </div>
+
+                <!-- Dividend History -->
+                <div class="card portfolio-panel">
+                  <div class="panel-header">
+                    <h3 class="panel-title">Dividend History</h3>
+                  </div>
+                  <div class="activity-list" id="upcomingList">
+                    <div class="activity-loading">Loading…</div>
+                  </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card portfolio-panel">
+                  <div class="panel-header">
+                    <h3 class="panel-title">Recent Activity</h3>
+                    <div class="panel-badge" id="detailActivityBadge" style="display:none"></div>
+                  </div>
+                  <div class="activity-list" id="detailActivityList">
+                    <div class="activity-loading">Loading…</div>
+                  </div>
+                </div>
+
+              </div><!-- /portfolio-right-rail -->
+
+            </div><!-- /portfolio-layout -->
+
+          </div><!-- /dashboard -->
+        </div><!-- /view-main -->
+
+      </div><!-- /view-portfolio -->
+
+      <!-- ═══ VIEW: STOCKS ═══ -->
+      <div id="view-stocks" class="spa-view" style="display:none">
+        <div class="view-main">
+
+          <div class="state-container" id="stocksStateLoading" style="display:none">
+            <div class="spinner"></div>
+            <p class="state-text">Fetching holdings…</p>
+          </div>
+          <div class="state-container" id="stocksStateError" style="display:none">
+            <div class="state-icon error-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <p class="state-text" id="stocksErrorText">An error occurred.</p>
+            <button class="btn btn-refresh" onclick="loadStocksView()">Try again</button>
+          </div>
+          <div class="state-container" id="stocksStateEmpty" style="display:none">
+            <p class="state-text">No open positions found.</p>
+          </div>
+
+          <!-- Full-width holdings table -->
+          <div class="table-wrapper card" id="stocksTableWrapper" style="display:none">
+            <div class="panel-header">
+              <h3 class="panel-title" id="stocksTableTitle">Holdings</h3>
+              <div class="filter-bar" id="filterBar"></div>
+            </div>
+            <div class="table-toolbar">
+              <div class="toolbar-left">
+                <div class="search-wrap">
+                  <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                  </svg>
+                  <input class="search-input" id="searchInput" type="text" placeholder="Search company or ticker…" oninput="filterTable()" />
+                </div>
+              </div>
+              <div class="toolbar-right">
+                <span class="row-count" id="rowCount"></span>
+                <button class="btn btn-csv" onclick="exportCSV()">
+                  <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                  </svg>
+                  Export CSV
+                </button>
+              </div>
+            </div>
+            <div class="table-scroll">
+              <table class="portfolio-table">
+                <thead>
+                  <tr>
+                    <th class="th-sortable" data-col="company_name" onclick="sortTable(this)">Company <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable" data-col="country" onclick="sortTable(this)">Country <span class="sort-icon">↕</span></th>
+                    <th class="th-center" title="48-hour price movement">48h Trend</th>
+                    <th class="th-sortable th-right" data-col="quantity" onclick="sortTable(this)">Shares <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="avg_price" onclick="sortTable(this)">Avg Price <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="invested" onclick="sortTable(this)">Invested <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="current_value" onclick="sortTable(this)">Value (GBP) <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="weight" onclick="sortTable(this)">Weight <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="total_returns" onclick="sortTable(this)">P&amp;L <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="fx_impact" onclick="sortTable(this)" title="Gain or loss in GBP caused by currency movements since purchase.">FX Impact <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="returns_pct" onclick="sortTable(this)">Returns % <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="dividends" onclick="sortTable(this)">Dividends <span class="sort-icon">↕</span></th>
+                    <th class="th-sortable th-right" data-col="div_yield" onclick="sortTable(this)" title="Annual dividend yield based on dividends received vs current value">Div Yield <span class="sort-icon">↕</span></th>
+                    <th class="th-right" title="Analyst consensus rating from Finnhub (US stocks only)">Rating</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div><!-- /view-main -->
+      </div><!-- /view-stocks -->
+
+      <!-- ═══ VIEW: NEWS ═══ -->
+      <div id="view-news" class="spa-view" style="display:none">
+        <div class="view-main">
+          <div class="section-header" style="margin-bottom:16px">
+            <h2 class="section-title">Market News</h2>
+            <span class="rc-label-wrap">
+              <span class="panel-subtitle">General · CNBC</span>
+              <span id="rc-news" class="refresh-clock" data-refresh-secs="300"></span>
+            </span>
+          </div>
+          <div id="newsGrid" class="news-grid">
+            <!-- skeleton -->
+            <div class="news-card skel-news-card">
+              <div class="skel skel-news-img-lg"></div>
+              <div class="skel-news-body">
+                <div class="skel skel-line" style="width:30%"></div>
+                <div class="skel skel-line" style="width:90%"></div>
+                <div class="skel skel-line" style="width:70%"></div>
+              </div>
+            </div>
+            <div class="news-card skel-news-card">
+              <div class="skel skel-news-img-lg"></div>
+              <div class="skel-news-body">
+                <div class="skel skel-line" style="width:40%"></div>
+                <div class="skel skel-line" style="width:85%"></div>
+                <div class="skel skel-line" style="width:65%"></div>
+              </div>
+            </div>
+            <div class="news-card skel-news-card">
+              <div class="skel skel-news-img-lg"></div>
+              <div class="skel-news-body">
+                <div class="skel skel-line" style="width:35%"></div>
+                <div class="skel skel-line" style="width:80%"></div>
+                <div class="skel skel-line" style="width:60%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /view-news -->
+
+    </div><!-- /view-container -->
+
+    <!-- Stock drill-down side panel — global, accessible from any view -->
+    <div id="sidePanelBackdrop" class="side-panel-backdrop" onclick="closeStockPanel()"></div>
+    <div id="sidePanel" class="side-panel">
+      <div class="side-panel-header">
+        <div class="sp-brand">
+          <div class="sp-logo-wrap" id="spCompanyInitial">A</div>
+          <div>
+            <h2 class="sp-company-name" id="spCompanyName">Company Name</h2>
+            <span class="sp-ticker" id="spTicker">TICKER</span>
+          </div>
+        </div>
+        <button class="sp-close-btn" onclick="closeStockPanel()">✕</button>
+      </div>
+      <div class="side-panel-content">
+        <div class="sp-metrics-grid">
+          <div class="sp-metric"><span class="sp-metric-label">Current Value</span><span class="sp-metric-value" id="spValue">£0.00</span></div>
+          <div class="sp-metric"><span class="sp-metric-label">Total Return</span><span class="sp-metric-value" id="spReturn">£0.00 <span class="sp-metric-pct" id="spReturnPct">(0.00%)</span></span></div>
+          <div class="sp-metric"><span class="sp-metric-label">Shares</span><span class="sp-metric-value" id="spQuantity">0.00</span></div>
+          <div class="sp-metric"><span class="sp-metric-label">Avg Price</span><span class="sp-metric-value" id="spAvgPrice">0.00</span></div>
+          <div class="sp-metric"><span class="sp-metric-label">Current Price</span><span class="sp-metric-value" id="spCurrentPrice">0.00</span></div>
+          <div class="sp-metric"><span class="sp-metric-label">Category</span><span class="sp-metric-value" id="spSector">Sector</span></div>
+        </div>
+        <div class="sp-divider"></div>
+        <div class="sp-fundamentals-section" id="spFundamentalsSection" style="display:none">
+          <div class="sp-chart-header">
+            <h3 class="sp-section-title">Fundamentals</h3>
+            <span class="sp-fund-source">Finnhub</span>
+          </div>
+          <div id="spFundamentals"></div>
+          <div id="spAnalystRatingsSection" style="display:none">
+            <div class="sp-analyst-header">
+              <span class="sp-analyst-title">Analyst Ratings</span>
+              <span id="spAnalystPeriod" class="sp-analyst-period"></span>
+            </div>
+            <div id="spAnalystRatings"></div>
+          </div>
+          <div class="sp-divider" style="margin-top:16px"></div>
+        </div>
+        <div class="sp-activity-section">
+          <div class="sp-chart-header"><h3 class="sp-section-title">Activity &amp; Dividends</h3></div>
+          <div id="spActivityList" class="sp-activity-list">
+            <div class="activity-loading" id="spAcitivityLoading">Loading Activity…</div>
+          </div>
+        </div>
+        <div class="sp-divider"></div>
+        <div class="sp-news-section">
+          <div class="sp-chart-header">
+            <h3 class="sp-section-title">Company News</h3>
+            <span class="sp-news-badge" id="spNewsBadge" style="display:none"></span>
+          </div>
+          <div id="spNewsList" class="sp-news-list">
+            <div class="activity-loading">Loading news…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAI / Diversification side panel — global -->
+    <div id="summaryPanelBackdrop" class="side-panel-backdrop" onclick="closeSummaryPanel()"></div>
+    <div id="summaryPanel" class="side-panel">
+      <div class="side-panel-header">
+        <div class="sp-brand">
+          <div class="sp-logo-wrap" id="smIcon">∑</div>
+          <div>
+            <h2 class="sp-company-name" id="smTitle">Summary Details</h2>
+            <span class="sp-ticker" id="smSubtitle">Breakdown</span>
+          </div>
+        </div>
+        <button class="sp-close-btn" onclick="closeSummaryPanel()">✕</button>
+      </div>
+      <div class="side-panel-content" id="smContent">
+        <div class="activity-loading">Loading details...</div>
+      </div>
+    </div>
+
+    <!-- F&G detail panel — global, accessible from home -->
+    <div id="fgPanelBackdrop" class="side-panel-backdrop" onclick="closeFGPanel()"></div>
+    <div id="fgPanel" class="side-panel">
+      <div class="side-panel-header">
+        <div class="sp-brand">
+          <div class="sp-logo-wrap" style="font-size:1.3rem">📊</div>
+          <div>
+            <div class="sp-company-name">Market Indicators</div>
+            <div class="sp-ticker">S&amp;P 500 &amp; VIX · Yahoo Finance</div>
+          </div>
+        </div>
+        <button class="sp-close-btn" onclick="closeFGPanel()">✕</button>
+      </div>
+      <div class="side-panel-content" id="fgPanelContent">
+        <div class="activity-loading"><div class="table-loading-spinner"></div></div>
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="footer-item">
+        <span id="cacheBanner" class="cache-badge-footer" style="display:none"></span>
+      </div>
+    </footer>
+
+  </div><!-- /app-main -->
+</div><!-- /app-shell -->
+
+<div id="tooltip" class="chart-tooltip"></div>
+
+<script>
+  const PORTFOLIO_NAMES = {{ names | tojson }};
+  var PORTFOLIO_ID = null;
+</script>
+<script src="/static/currency.js"></script>
+<script src="/static/router.js"></script>
+<script src="/static/home.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

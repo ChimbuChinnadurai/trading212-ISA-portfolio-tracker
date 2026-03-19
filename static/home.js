@@ -284,23 +284,9 @@ function resetClock(id) {
     if (_clocks[id]) _clocks[id].reset();
 }
 
-// Initial load
-document.addEventListener('DOMContentLoaded', () => {
-    initRefreshClocks();
-    loadHomeData();
-    loadHomeWidgets();
-    loadSparklines();
-    loadFearGreed();
-    loadMarketIndicators();
-    loadMarketStatus();
-    loadStockTicker();
-    setInterval(loadFearGreed, 60000);
-    setInterval(loadMarketStatus, 60000);
-    setInterval(loadMarketIndicators, 1800000);
-    setInterval(loadStockTicker, 60000);
-    setInterval(loadMarketNews, 300000);
-    setInterval(() => { if (_mktStatusData) _renderMarketStatus(_mktStatusData); }, 1000);
-});
+// ── SPA lifecycle hooks (called by router.js) ────────────────────────────────
+// router.js calls these instead of running its own DOMContentLoaded auto-init.
+// This file intentionally has NO DOMContentLoaded block of its own.
 
 /* ─── Live Ticker Data (shared with Portfolio Heatmap) ───────────────────── */
 
@@ -619,7 +605,6 @@ async function loadHomeWidgets() {
     await Promise.all([
         loadDividendCalendar(),
         loadEarnings(),
-        loadMarketNews(),
     ]);
 }
 
@@ -1498,46 +1483,71 @@ async function loadMarketNews() {
         const res = await fetch('/api/news');
         const json = await res.json();
         if (json.status === 'ok') {
-            _renderMarketNews(json.data);
+            _renderNewsGrid(json.data);
             resetClock('rc-news');
         }
     } catch (err) {
-        const el = document.getElementById('newsList');
+        const el = document.getElementById('newsGrid');
         if (el) el.innerHTML = '<div class="activity-empty">Error loading news</div>';
     }
 }
 
-function _renderMarketNews(data) {
-    const listEl = document.getElementById('newsList');
-    if (!listEl) return;
+/** Load news for the dedicated news view (called by router) */
+async function loadNewsView(force = false) {
+    const grid = document.getElementById('newsGrid');
+    if (grid) grid.innerHTML = `
+        <div class="news-card skel-news-card">
+          <div class="skel skel-news-img-lg"></div>
+          <div class="skel-news-body">
+            <div class="skel skel-line" style="width:30%"></div>
+            <div class="skel skel-line" style="width:90%"></div>
+            <div class="skel skel-line" style="width:70%"></div>
+          </div>
+        </div>`.repeat(6);
+
+    try {
+        const url = force ? '/api/news?force=1' : '/api/news';
+        const res  = await fetch(url);
+        const json = await res.json();
+        if (json.status === 'ok') {
+            _renderNewsGrid(json.data);
+            resetClock('rc-news');
+        }
+    } catch (err) {
+        if (grid) grid.innerHTML = '<div class="activity-empty">Error loading news.</div>';
+    }
+}
+
+function _renderNewsGrid(data) {
+    const grid = document.getElementById('newsGrid');
+    if (!grid) return;
 
     if (!data || data.length === 0) {
-        listEl.innerHTML = '<div class="activity-empty">No market news available.</div>';
+        grid.innerHTML = '<div class="activity-empty">No market news available.</div>';
         return;
     }
 
-    listEl.innerHTML = data.map(news => {
-        const title = news.headline || '—';
-        const source = news.source || 'Finnhub';
-        const url = news.url || '#';
-        const time = news.datetime ? new Date(news.datetime * 1000).toLocaleString('en-GB', {
-            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-        }) : '—';
-        const summary = news.summary || '';
+    grid.innerHTML = data.map(news => {
+        const title  = news.headline || '—';
+        const source = news.source   || 'News';
+        const url    = news.url      || '#';
+        const time   = news.datetime
+            ? new Date(news.datetime * 1000).toLocaleString('en-GB', {
+                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+              })
+            : '—';
         const img = news.image || '';
 
-        return `
-            <div class="news-item-alt">
-                ${img ? `<img src="${img}" class="news-image-alt" alt="news" loading="lazy">` : ''}
-                <div class="news-content-alt">
-                    <div class="news-meta-alt">
-                        <span class="news-source-alt">${esc(source)}</span>
-                        <span>${time}</span>
-                    </div>
-                    <a href="${url}" target="_blank" class="news-title-alt">${esc(title)}</a>
-                    ${summary ? `<p class="news-summary-alt">${esc(summary)}</p>` : ''}
-                </div>
-            </div>`;
+        return `<a href="${url}" target="_blank" rel="noopener" class="news-card">
+            ${img
+                ? `<img src="${img}" class="news-card-img" alt="" loading="lazy" onerror="this.style.display='none'">`
+                : `<div class="news-card-img-placeholder">📰</div>`}
+            <div class="news-card-body">
+                <span class="news-card-source">${esc(source)}</span>
+                <span class="news-card-title">${esc(title)}</span>
+                <span class="news-card-time">${time}</span>
+            </div>
+        </a>`;
     }).join('');
 }
 
