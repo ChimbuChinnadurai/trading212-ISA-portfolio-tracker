@@ -27,7 +27,7 @@
       --text-primary: #191c1e;
       --text-secondary: #424754;
       --radius: 12px;
-      --sidebar-w: 220px;
+      --sidebar-w: 180px;
       --topbar-h: 54px;
     }
 
@@ -113,11 +113,11 @@
       overflow-y: auto;
       overflow-x: hidden;
       background: var(--bg);
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .07), transparent);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 88, 190, .06), transparent);
     }
 
     html[data-theme="light"] .view-container {
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .05), transparent);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 88, 190, .04), transparent);
     }
 
     .ov-card,
@@ -134,13 +134,13 @@
     <!-- ═══ SIDEBAR ═══ -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-brand">
-        <div class="sidebar-logo">
+        <div class="sidebar-logo" onclick="navigate('home')">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="32" height="32" rx="9" fill="url(#sbLg)" />
             <defs>
               <linearGradient id="sbLg" x1="0" y1="0" x2="32" y2="32">
-                <stop offset="0%" stop-color="#3b82f6" />
-                <stop offset="100%" stop-color="#8b5cf6" />
+                <stop offset="0%" stop-color="#0058be" />
+                <stop offset="100%" stop-color="#2170e4" />
               </linearGradient>
             </defs>
             <path d="M7 22 L11 14 L15 18 L19 10 L25 16" stroke="white" stroke-width="2.5" stroke-linecap="round"
@@ -154,29 +154,16 @@
 
         <!-- Home -->
         <a class="nav-item" data-route="home" onclick="navigate('home')">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h3a1 1 0 001-1v-2a1 1 0 011-1 1 1 0 011 1v2a1 1 0 001 1h3a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-          </svg>
+          <span class="material-symbols-outlined nav-icon">home</span>
           <span class="nav-label">Home</span>
         </a>
 
         <!-- Portfolio group -->
         <div class="nav-group" id="navGroupPortfolio">
           <button class="nav-group-header" onclick="toggleNavGroup('portfolio')">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd"
-                d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z"
-                clip-rule="evenodd" />
-              <path
-                d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
-            </svg>
+            <span class="material-symbols-outlined nav-icon">pie_chart</span>
             <span class="nav-label">Portfolio</span>
-            <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clip-rule="evenodd" />
-            </svg>
+            <span class="material-symbols-outlined nav-chevron">keyboard_arrow_down</span>
           </button>
           <div class="nav-group-items" id="navGroupPortfolioItems">
             <a class="nav-item nav-sub" data-route="portfolio/1" onclick="navigate('portfolio/1')">
@@ -197,16 +184,9 @@
         <!-- Stocks group -->
         <div class="nav-group" id="navGroupStocks">
           <button class="nav-group-header" onclick="toggleNavGroup('stocks')">
-            <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-            </svg>
+            <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
             <span class="nav-label">Stocks</span>
-            <svg class="nav-chevron" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd"
-                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                clip-rule="evenodd" />
-            </svg>
+            <span class="material-symbols-outlined nav-chevron">keyboard_arrow_down</span>
           </button>
           <div class="nav-group-items" id="navGroupStocksItems">
             <a class="nav-item nav-sub" data-route="stocks/1" onclick="navigate('stocks/1')">
@@ -226,18 +206,13 @@
 
         <!-- News -->
         <a class="nav-item" data-route="news" onclick="navigate('news')">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5zm3 1h6v4H5V6zm6 6H5v2h6v-2zM5 14h2v2H5v-2z"
-              clip-rule="evenodd" />
-            <path d="M15 7h1a2 2 0 012 2v5.5a1.5 1.5 0 01-3 0V7z" />
-          </svg>
+          <span class="material-symbols-outlined nav-icon">newspaper</span>
           <span class="nav-label">News</span>
         </a>
 
       </nav><!-- /sidebar-nav -->
 
-      <div class="sidebar-footer">
+      <!-- <div class="sidebar-footer">
         <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" onclick="toggleSidebar()" title="Collapse sidebar">
           <svg class="collapse-icon" viewBox="0 0 20 20" fill="currentColor">
             <path fill-rule="evenodd"
@@ -246,7 +221,7 @@
           </svg>
           <span class="nav-label">Collapse</span>
         </button>
-      </div>
+      </div> -->
     </aside>
 
     <!-- Mobile scrim -->
@@ -259,11 +234,7 @@
       <header class="topbar">
         <div class="topbar-left">
           <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" title="Menu">
-            <svg viewBox="0 0 20 20" fill="currentColor" style="width:18px;height:18px">
-              <path fill-rule="evenodd"
-                d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"
-                clip-rule="evenodd" />
-            </svg>
+            <span class="material-symbols-outlined" style="font-size:20px;line-height:1">menu</span>
           </button>
           <div class="topbar-breadcrumb">
             <span class="topbar-title" id="breadcrumbText">Overview</span>
@@ -286,16 +257,11 @@
             <button class="currency-btn" data-currency="USD" onclick="setCurrency('USD')">USD</button>
           </div>
           <button class="btn btn-refresh" id="refreshBtn" onclick="loadHomeData(true)">
-            <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd"
-                d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z"
-                clip-rule="evenodd" />
-            </svg>
+            <span class="material-symbols-outlined btn-icon">refresh</span>
             Refresh
           </button>
           <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
-            <svg id="themeIcon" class="btn-icon" viewBox="0 0 20 20" fill="currentColor"
-              style="width:16px;height:16px"></svg>
+            <span class="material-symbols-outlined" id="themeIcon" style="font-size:17px;line-height:1">dark_mode</span>
           </button>
         </div>
       </header>
@@ -1003,11 +969,11 @@
         </div>
       </div>
 
-      <footer class="footer">
+      <!-- <footer class="footer">
         <div class="footer-item">
           <span id="cacheBanner" class="cache-badge-footer" style="display:none"></span>
         </div>
-      </footer>
+      </footer> -->
 
     </div><!-- /app-main -->
   </div><!-- /app-shell -->
