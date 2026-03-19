@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
@@ -7,11 +7,27 @@
   <title>Portfolio Tracker</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
   <style>
     /* Critical inline CSS — prevents FOUC while style.css loads */
     :root {
+      --bg: #f7f9fb;
+      --bg-card: #ffffff;
+      --bg-sidebar: #f2f4f6;
+      --bg-row-alt: #f2f4f6;
+      --bg-hover: #eceef0;
+      --border: #c2c6d6;
+      --accent: #0058be;
+      --text-primary: #191c1e;
+      --text-secondary: #424754;
+      --radius: 12px;
+      --sidebar-w: 220px;
+      --topbar-h: 54px;
+    }
+
+    html[data-theme="dark"] {
       --bg: #080d18;
       --bg-card: #0f1629;
       --bg-sidebar: #0b1120;
@@ -21,20 +37,6 @@
       --accent: #3b82f6;
       --text-primary: #e2e8f0;
       --text-secondary: #7c8fad;
-      --radius: 12px;
-      --sidebar-w: 220px;
-      --topbar-h: 54px;
-    }
-
-    html[data-theme="light"] {
-      --bg: #f1f5f9;
-      --bg-card: #ffffff;
-      --bg-sidebar: #ffffff;
-      --bg-row-alt: #f8fafc;
-      --bg-hover: #f0f9ff;
-      --border: #e2e8f0;
-      --text-primary: #0f172a;
-      --text-secondary: #475569
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
@@ -43,7 +45,7 @@
     body {
       background: var(--bg);
       color: var(--text-primary);
-      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
     }
 
     /* Shell */
