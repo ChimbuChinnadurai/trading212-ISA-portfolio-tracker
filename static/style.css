@@ -162,6 +162,60 @@ html[data-theme="dark"] body {
   background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .08), transparent);
 }
 
+/* ─── Dark mode: button & chip borders ─────────────────────────────────────── */
+html[data-theme="dark"] .btn-theme {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+html[data-theme="dark"] .btn-theme:hover {
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+}
+
+html[data-theme="dark"] .btn-csv {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+html[data-theme="dark"] .btn-csv:hover {
+  border-color: var(--border-bright);
+}
+
+html[data-theme="dark"] .currency-toggle {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+html[data-theme="dark"] .currency-btn {
+  border-radius: 6px;
+}
+
+html[data-theme="dark"] .pid-switcher {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+html[data-theme="dark"] .pid-btn {
+  border-radius: 6px;
+}
+
+html[data-theme="dark"] .filter-pill {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+html[data-theme="dark"] .filter-pill:hover {
+  border-color: var(--border-bright);
+  background: var(--bg-hover);
+}
+
+html[data-theme="dark"] .table-wrapper {
+  border: 1px solid var(--border);
+}
+
 /* ─── Dark mode: sidebar & topbar borders ──────────────────────────────────── */
 html[data-theme="dark"] .sidebar {
   border-right: 1px solid var(--border);
@@ -376,14 +430,15 @@ html[data-theme="dark"] .header {
 }
 
 .btn-refresh {
-  background: linear-gradient(135deg, var(--accent), #6366f1);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
   color: #fff;
-  box-shadow: 0 2px 12px rgba(59, 130, 246, .35);
+  border-radius: 99px;
+  box-shadow: 0 2px 12px var(--accent-glow);
 }
 
 .btn-refresh:hover {
-  filter: brightness(1.12);
-  box-shadow: 0 4px 18px rgba(59, 130, 246, .5);
+  filter: brightness(1.08);
+  box-shadow: 0 4px 20px var(--accent-glow), 0 0 0 2px rgba(255,255,255,.15) inset;
 }
 
 .btn-refresh:disabled {
@@ -399,15 +454,15 @@ html[data-theme="dark"] .header {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-card);
+  background: var(--bg-row-alt);
   color: var(--text-secondary);
-  border: 1px solid var(--border);
+  border: none;
   border-radius: 8px;
-  transition: border-color .15s, color .15s, background .2s;
+  transition: background .15s, color .15s;
 }
 
 .btn-theme:hover {
-  border-color: var(--border-bright);
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
@@ -421,15 +476,15 @@ html[data-theme="dark"] .header {
   display: flex;
   align-items: center;
   gap: 2px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  background: var(--bg-row-alt);
+  border: none;
+  border-radius: 99px;
   padding: 2px;
 }
 
 .currency-btn {
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: 99px;
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -437,17 +492,18 @@ html[data-theme="dark"] .header {
   color: var(--text-secondary);
   border: none;
   cursor: pointer;
-  transition: all .15s;
+  transition: background .13s, color .13s;
 }
 
 .currency-btn:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
 .currency-btn.active {
-  background: linear-gradient(135deg, var(--accent), #6366f1);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
   color: #fff;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, .4);
+  box-shadow: 0 1px 6px var(--accent-glow);
 }
 
 /* ─── Summary header (inside sidebar) ──────────────────────────────────── */
@@ -1126,23 +1182,22 @@ html[data-theme="light"] .s-card::before {
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 600;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
+  border: none;
+  background: var(--bg-row-alt);
   color: var(--text-secondary);
-  transition: all .15s;
+  transition: background .13s, color .13s;
   user-select: none;
 }
 
 .filter-pill:hover {
-  border-color: var(--border-bright);
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
 .filter-pill.active {
   background: var(--accent);
   color: #fff;
-  border-color: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
+  box-shadow: 0 1px 6px var(--accent-glow);
 }
 
 .filter-pill-count {
@@ -1162,9 +1217,8 @@ html[data-theme="light"] .s-card::before {
 /* ─── Table Wrapper ───────────────────────────────────────────────────────── */
 .table-wrapper {
   background: var(--bg-table);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -1549,7 +1603,6 @@ th.sort-desc .sort-icon::before {
 
 /* ─── Portfolio Heatmap (overview-grid card) ─────────────────────────────── */
 .ov-card-heatmap {
-  border-top: 4px solid #06b6d4;
   box-shadow: 0 4px 20px rgba(6, 182, 212, 0.08);
   grid-column: span 2;
   cursor: default;
@@ -1677,13 +1730,13 @@ th.sort-desc .sort-icon::before {
 
 /* ─── CSV export button ──────────────────────────────────────────────────── */
 .btn-csv {
-  background: var(--bg-card);
+  background: var(--bg-row-alt);
   color: var(--text-secondary);
-  border: 1px solid var(--border);
+  border: none;
 }
 
 .btn-csv:hover {
-  border-color: var(--border-bright);
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
@@ -5152,8 +5205,8 @@ html[data-theme="dark"] .nav-item.active {
   align-items: center;
   gap: 4px;
   background: var(--bg-row-alt);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border: none;
+  border-radius: 99px;
   padding: 3px;
 }
 
@@ -5165,7 +5218,7 @@ html[data-theme="dark"] .nav-item.active {
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: 99px;
   font-family: inherit;
   transition: background .13s, color .13s;
   white-space: nowrap;
@@ -5239,6 +5292,7 @@ html[data-theme="dark"] .nav-item.active {
   display: grid;
   grid-template-columns: 1fr 340px;
   gap: 16px;
+  padding-top: 20px;
   align-items: start;
 }
 
