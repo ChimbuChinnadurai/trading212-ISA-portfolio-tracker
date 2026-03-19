@@ -204,6 +204,12 @@
           </div>
         </div>
 
+        <!-- Calendar -->
+        <a class="nav-item" data-route="calendar" onclick="navigate('calendar')">
+          <span class="material-symbols-outlined nav-icon">calendar_month</span>
+          <span class="nav-label">Calendar</span>
+        </a>
+
         <!-- News -->
         <a class="nav-item" data-route="news" onclick="navigate('news')">
           <span class="material-symbols-outlined nav-icon">newspaper</span>
@@ -476,45 +482,6 @@
                 </div>
               </section>
 
-              <!-- Dividend Calendar -->
-              <section class="widget-panel widget-dividends">
-                <div class="panel-header">
-                  <h3 class="panel-title">Dividend Calendar</h3>
-                  <span class="panel-subtitle">US stocks · upcoming</span>
-                </div>
-                <div id="divCalendarList" class="activity-list-home">
-                  <div class="skel-card">
-                    <div class="skel-card-header">
-                      <div class="skel skel-line" style="width:30%"></div>
-                      <div class="skel skel-amount"></div>
-                    </div>
-                    <div class="skel-card-row">
-                      <div class="skel skel-line" style="width:45%"></div>
-                      <div class="skel skel-line" style="width:45%"></div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Upcoming Earnings -->
-              <section class="widget-panel widget-earnings">
-                <div class="panel-header">
-                  <h3 class="panel-title">Upcoming Earnings</h3>
-                  <span class="panel-subtitle">Next 6 months</span>
-                </div>
-                <div id="earningsList" class="activity-list-home">
-                  <div class="skel-card">
-                    <div class="skel-card-header">
-                      <div class="skel skel-line" style="width:30%"></div>
-                      <div class="skel skel-amount"></div>
-                    </div>
-                    <div class="skel-card-row">
-                      <div class="skel skel-line" style="width:25%"></div>
-                      <div class="skel skel-line" style="width:20%"></div>
-                    </div>
-                  </div>
-                </div>
-              </section>
             </div><!-- /home-widgets -->
 
           </div><!-- /view-main -->
@@ -821,6 +788,64 @@
             </div>
           </div>
         </div><!-- /view-news -->
+
+        <!-- ═══ VIEW: CALENDAR ═══ -->
+        <div id="view-calendar" class="spa-view" style="display:none">
+          <div class="view-main">
+
+            <div class="cal-view-header">
+              <div class="cal-view-title-block">
+                <h1 class="cal-view-title">Market Calendar</h1>
+                <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
+              </div>
+            </div>
+
+            <div class="calendar-layout">
+
+              <!-- Left: Dividend Calendar -->
+              <section class="widget-panel widget-dividends calendar-panel">
+                <div class="panel-header">
+                  <h3 class="panel-title">Dividend Calendar</h3>
+                  <span class="panel-subtitle">Upcoming ex-div &amp; pay dates</span>
+                </div>
+                <div id="divCalendarList" class="activity-list-home">
+                  <div class="skel-card">
+                    <div class="skel-card-header">
+                      <div class="skel skel-line" style="width:30%"></div>
+                      <div class="skel skel-amount"></div>
+                    </div>
+                    <div class="skel-card-row">
+                      <div class="skel skel-line" style="width:45%"></div>
+                      <div class="skel skel-line" style="width:45%"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Right: Upcoming Earnings -->
+              <section class="widget-panel widget-earnings calendar-panel">
+                <div class="panel-header">
+                  <h3 class="panel-title">Upcoming Earnings</h3>
+                  <span class="panel-subtitle">Next 6 months</span>
+                </div>
+                <div id="earningsList" class="activity-list-home">
+                  <div class="skel-card">
+                    <div class="skel-card-header">
+                      <div class="skel skel-line" style="width:30%"></div>
+                      <div class="skel skel-amount"></div>
+                    </div>
+                    <div class="skel-card-row">
+                      <div class="skel skel-line" style="width:25%"></div>
+                      <div class="skel skel-line" style="width:20%"></div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+            </div><!-- /calendar-layout -->
+
+          </div><!-- /view-main -->
+        </div><!-- /view-calendar -->
 
       </div><!-- /view-container -->
 

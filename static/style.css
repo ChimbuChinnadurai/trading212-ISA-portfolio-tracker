@@ -438,7 +438,7 @@ html[data-theme="dark"] .header {
 
 .btn-refresh:hover {
   filter: brightness(1.08);
-  box-shadow: 0 4px 20px var(--accent-glow), 0 0 0 2px rgba(255,255,255,.15) inset;
+  box-shadow: 0 4px 20px var(--accent-glow), 0 0 0 2px rgba(255, 255, 255, .15) inset;
 }
 
 .btn-refresh:disabled {
@@ -2177,6 +2177,15 @@ html[data-glass="true"][data-theme="light"] .s-card {
     gap: 10px;
   }
 
+  .calendar-layout {
+    grid-template-columns: 1fr;
+    padding: 12px 16px 20px;
+  }
+
+  .calendar-panel {
+    min-height: 320px;
+  }
+
   .widget-panel {
     height: 300px;
   }
@@ -2948,8 +2957,42 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 .home-widgets {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 14px;
+}
+
+/* ─── Calendar view ──────────────────────────────────────────────────────── */
+.cal-view-header {
+  padding: 28px 24px 4px;
+}
+
+.cal-view-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
+.cal-view-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.calendar-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  padding: 16px 24px 24px;
+  min-height: 0;
+}
+
+.calendar-panel {
+  height: auto;
+  min-height: 480px;
+  max-height: none;
+  overflow: hidden;
 }
 
 /* ─── Landing page two-column layout (content + news sidebar) ─────────────── */
@@ -3824,7 +3867,6 @@ html[data-theme="light"] .cal-nav {
 /* Subtitle already defined above */
 
 .earnings-card {
-  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
@@ -5323,10 +5365,10 @@ html[data-theme="dark"] .nav-item.active {
   gap: 10px;
 }
 
-/* ── Home widgets (4 cols, no sidebar) ───────────────────────────────────── */
+/* ── Home widgets (2 cols — Calendar & Earnings moved to #calendar view) ── */
 .home-widgets {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 14px;
 }
 

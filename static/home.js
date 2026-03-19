@@ -599,6 +599,14 @@ function drawSparkline(canvasId, points, colors, hoverIdx = -1) {
 }
 
 async function loadHomeWidgets() {
+    // Dividend calendar and earnings are now in the dedicated Calendar view
+}
+
+async function loadCalendarView(force) {
+    if (force) {
+        // Clear cached data so both functions re-fetch
+        try { sessionStorage.removeItem('divCal'); } catch(_) {}
+    }
     await Promise.all([
         loadDividendCalendar(),
         loadEarnings(),

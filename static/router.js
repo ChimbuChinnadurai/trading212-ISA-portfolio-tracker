@@ -18,7 +18,8 @@ let _detailInitialized  = false;
 let _detailActivePid    = null;
 let _stocksInitialized  = false;
 let _stocksActivePid    = null;
-let _newsInitialized    = false;
+let _newsInitialized        = false;
+let _calendarInitialized    = false;
 
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
@@ -50,6 +51,7 @@ function _updateBreadcrumb(route) {
         'stocks/2':             `Stocks · ${names['2'] || 'Portfolio 2'}`,
         'stocks/combined':      'Stocks · Combined',
         'news':                 'Market News',
+        'calendar':             'Market Calendar',
     };
     el.textContent = map[route] || 'Portfolio Tracker';
 }
@@ -96,6 +98,8 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadStocksView(true);
     } else if (view === 'news') {
         btn.onclick = () => loadNewsView(true);
+    } else if (view === 'calendar') {
+        btn.onclick = () => loadCalendarView(true);
     }
 }
 
@@ -239,6 +243,16 @@ function _router() {
         if (!_newsInitialized) {
             if (typeof loadNewsView === 'function') loadNewsView();
             _newsInitialized = true;
+        }
+
+    /* ── Calendar ── */
+    } else if (hash === 'calendar') {
+        _showView('calendar');
+        _updateRefreshBtn('calendar');
+        document.title = 'Market Calendar — Portfolio Tracker';
+        if (!_calendarInitialized) {
+            if (typeof loadCalendarView === 'function') loadCalendarView();
+            _calendarInitialized = true;
         }
     }
 }
