@@ -96,10 +96,6 @@ async function loadHomeData(refresh = false) {
             }
         }
 
-        // Activity widget
-        _homeActivityData = data.activity || [];
-        _renderHomeActivity(_homeActivityData);
-
         // Top performers widget
         _homePerformerData = data.top_performers || [];
         _renderHomePerformers(_homePerformerData);
@@ -201,11 +197,8 @@ function toggleGlassMode() {
 function _updateThemeIcon(theme) {
     const icon = document.getElementById('themeIcon');
     if (!icon) return;
-    if (theme === 'light') {
-        icon.innerHTML = '<path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/>';
-    } else {
-        icon.innerHTML = '<path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"/>';
-    }
+    // Material Symbols: show dark_mode in light theme (click to go dark), light_mode in dark theme
+    icon.textContent = theme === 'light' ? 'dark_mode' : 'light_mode';
 }
 
 function fmtAge(s) {
@@ -284,23 +277,9 @@ function resetClock(id) {
     if (_clocks[id]) _clocks[id].reset();
 }
 
-// Initial load
-document.addEventListener('DOMContentLoaded', () => {
-    initRefreshClocks();
-    loadHomeData();
-    loadHomeWidgets();
-    loadSparklines();
-    loadFearGreed();
-    loadMarketIndicators();
-    loadMarketStatus();
-    loadStockTicker();
-    setInterval(loadFearGreed, 60000);
-    setInterval(loadMarketStatus, 60000);
-    setInterval(loadMarketIndicators, 1800000);
-    setInterval(loadStockTicker, 60000);
-    setInterval(loadMarketNews, 300000);
-    setInterval(() => { if (_mktStatusData) _renderMarketStatus(_mktStatusData); }, 1000);
-});
+// ── SPA lifecycle hooks (called by router.js) ────────────────────────────────
+// router.js calls these instead of running its own DOMContentLoaded auto-init.
+// This file intentionally has NO DOMContentLoaded block of its own.
 
 /* ─── Live Ticker Data (shared with Portfolio Heatmap) ───────────────────── */
 
@@ -616,11 +595,201 @@ function drawSparkline(canvasId, points, colors, hoverIdx = -1) {
 }
 
 async function loadHomeWidgets() {
+    // Dividend calendar and earnings are now in the dedicated Calendar view
+}
+
+async function loadCalendarView(force) {
+    if (force) {
+        // Clear cached data so both functions re-fetch
+        try { sessionStorage.removeItem('divCal'); } catch(_) {}
+    }
     await Promise.all([
         loadDividendCalendar(),
         loadEarnings(),
-        loadMarketNews(),
     ]);
+}
+
+/* ─── Activity View ──────────────────────────────────────────────────────── */
+
+async function loadActivityView(force = false) {
+    await Promise.all([
+        _loadActivityTimeline(force),
+        _loadDivHistoryTimeline(),
+    ]);
+}
+
+async function _loadActivityTimeline(force) {
+    const el = document.getElementById('activityTimelineList');
+    if (!el) return;
+    el.innerHTML = '<div class="activity-loading"><div class="table-loading-spinner"></div></div>';
+    try {
+        const url = force ? '/api/pcombined/activity?force=1' : '/api/pcombined/activity';
+        const res = await fetch(url);
+        const json = await res.json();
+        _renderActivityTimeline(json.data || []);
+    } catch (err) {
+        el.innerHTML = '<div class="activity-empty">Error loading activity</div>';
+    }
+}
+
+async function _loadDivHistoryTimeline() {
+    const el = document.getElementById('divHistoryList');
+    if (!el) return;
+    el.innerHTML = '<div class="activity-loading"><div class="table-loading-spinner"></div></div>';
+    try {
+        const res = await fetch('/api/pcombined/recent-dividends');
+        const json = await res.json();
+        _renderDivHistoryTimeline(json.data || []);
+    } catch (err) {
+        el.innerHTML = '<div class="activity-empty">Error loading dividend history</div>';
+    }
+}
+
+function _renderActivityTimeline(data) {
+    const el = document.getElementById('activityTimelineList');
+    if (!el) return;
+    if (!data.length) {
+        el.innerHTML = '<div class="activity-empty">No recent activity found.</div>';
+        return;
+    }
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+
+    const items = data.map((order, i) => {
+        const ticker    = (order.ticker || '').split('_')[0];
+        const company   = order.company_name || ticker || 'Unknown';
+        const qty       = order.filledQuantity || 0;
+        const dateStr   = order.dateExecuted || order.dateCreated || '';
+        const status    = (order.status || '').toUpperCase();
+        const pid       = order._pid || '1';
+        const ownerName = names[pid] || pid;
+        const isCancelled = status === 'CANCELLED' || status === 'REJECTED';
+        const typeUpper = (order.type || '').toUpperCase();
+        const isSell    = (order.side || '').toUpperCase() === 'SELL' || typeUpper.includes('SELL');
+        const actionWord = isCancelled ? 'Cancelled' : (isSell ? 'Sold' : 'Bought');
+        const value     = fmt.currency(order.filledValue || (qty * (order.fillPrice || 0)));
+
+        const date  = dateStr ? new Date(dateStr) : new Date();
+        const day   = date.getDate();
+        const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        const timeStr = dateStr
+            ? date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '—';
+
+        const diffDays = dateStr
+            ? Math.round((today - new Date(dateStr.split('T')[0] + 'T00:00:00')) / 86400000)
+            : 0;
+        let relLabel;
+        if (diffDays === 0)       relLabel = 'TODAY';
+        else if (diffDays === 1)  relLabel = 'YESTERDAY';
+        else if (diffDays < 7)   relLabel = `${diffDays}D AGO`;
+        else                     relLabel = `${Math.floor(diffDays / 7)}W AGO`;
+
+        const badgeClass  = isCancelled ? 'div-tl-date-badge--paid' : (isSell ? 'div-tl-date-badge--sell' : 'div-tl-date-badge--buy');
+        const statusClass = isCancelled ? 'div-tl-status--paid'     : (isSell ? 'div-tl-status--sell'     : 'div-tl-status--buy');
+        const isLast      = i === data.length - 1;
+
+        return `
+        <div class="div-tl-item">
+          <div class="div-tl-left">
+            <div class="div-tl-date-badge ${badgeClass}">
+              <span class="div-tl-month">${month}</span>
+              <span class="div-tl-day">${day}</span>
+            </div>
+            <span class="div-tl-relative">${relLabel}</span>
+            ${isLast ? '' : '<div class="div-tl-line"></div>'}
+          </div>
+          <div class="div-tl-card">
+            <div class="div-tl-card-top">
+              <span class="div-tl-ticker">${esc(ticker)}</span>
+              <div class="div-tl-company-block">
+                <span class="div-tl-company">${esc(company)}</span>
+                <span class="div-tl-type">${actionWord} · ${fmt.number(qty, 4)} shares</span>
+              </div>
+              <div class="div-tl-amount-block">
+                <span class="div-tl-value">${value}</span>
+              </div>
+            </div>
+            <div class="div-tl-card-bottom">
+              <div class="div-tl-dates">
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Executed</span>
+                  <span class="div-tl-date-val">${timeStr}</span>
+                </div>
+              </div>
+              <span class="ov-card-pid-tag ov-tag-p${pid}">${esc(ownerName)}</span>
+              <span class="div-tl-status ${statusClass}">${actionWord}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="div-timeline">${items}</div>`;
+}
+
+function _renderDivHistoryTimeline(data) {
+    const el = document.getElementById('divHistoryList');
+    if (!el) return;
+    if (!data.length) {
+        el.innerHTML = '<div class="activity-empty">No dividend history found.</div>';
+        return;
+    }
+    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+
+    const items = data.map((div, i) => {
+        const ticker    = (div.ticker || '').split('_')[0];
+        const company   = div.company_name || '';
+        const amount    = fmt.currency(div.amount || 0);
+        const dateStr   = div.paidOn || div.date || '';
+        const pid       = div._pid || '1';
+        const ownerName = names[pid] || pid;
+
+        let day = '—', month = '—', timeStr = dateStr || '—';
+        if (dateStr && dateStr !== '—') {
+            const d   = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+            day       = d.getDate();
+            month     = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+            timeStr   = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        const isLast = i === data.length - 1;
+
+        return `
+        <div class="div-tl-item">
+          <div class="div-tl-left">
+            <div class="div-tl-date-badge div-tl-date-badge--div">
+              <span class="div-tl-month">${month}</span>
+              <span class="div-tl-day">${day}</span>
+            </div>
+            <span class="div-tl-relative" style="color:#00786e">RECEIVED</span>
+            ${isLast ? '' : '<div class="div-tl-line"></div>'}
+          </div>
+          <div class="div-tl-card">
+            <div class="div-tl-card-top">
+              <span class="div-tl-ticker">${esc(ticker)}</span>
+              <div class="div-tl-company-block">
+                ${company ? `<span class="div-tl-company">${esc(company)}</span>` : ''}
+                <span class="div-tl-type">Dividend received</span>
+              </div>
+              <div class="div-tl-amount-block">
+                <span class="div-tl-value pos">${amount}</span>
+              </div>
+            </div>
+            <div class="div-tl-card-bottom">
+              <div class="div-tl-dates">
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Paid On</span>
+                  <span class="div-tl-date-val">${esc(timeStr)}</span>
+                </div>
+              </div>
+              <span class="ov-card-pid-tag ov-tag-p${pid}">${esc(ownerName)}</span>
+              <span class="div-tl-status div-tl-status--received">Dividend</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="div-timeline">${items}</div>`;
 }
 
 async function loadTopPerformers() {
@@ -1188,51 +1357,81 @@ function _renderDividendCalendar(data) {
     if (!el) return;
 
     if (!data.length) {
-        el.innerHTML = '<div class="activity-empty">No upcoming dividends for held US stocks.</div>';
+        el.innerHTML = '<div class="activity-empty">No upcoming dividends for held stocks.</div>';
         return;
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const cards = data.map(d => {
-        // Count down to pay date (what the investor actually receives)
-        const payDate = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
-        const diff = Math.round((payDate - today) / 86400000);
-        let daysLabel = '', daysClass = '';
-        if (diff === 0) { daysLabel = 'Pays Today'; daysClass = 'earnings-days-today'; }
-        else if (diff === 1) { daysLabel = 'Pays Tomorrow'; daysClass = 'earnings-days-soon'; }
-        else if (diff <= 7) { daysLabel = `Pays in ${diff}d`; daysClass = 'earnings-days-soon'; }
-        else { daysLabel = `Pays in ${diff}d`; daysClass = ''; }
 
-        const fmtDate = dt => dt ? new Date(dt + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-        const payout = d.expected_payout > 0 ? `$${d.expected_payout.toFixed(2)}` : '—';
+    const fmtDate = dt => dt
+        ? new Date(dt + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+        : '—';
+
+    const items = data.map((d, i) => {
+        const payDate = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
+        const exDate  = new Date(d.ex_dividend_date + 'T00:00:00');
+        const diff    = Math.round((payDate - today) / 86400000);
+        const exDiff  = Math.round((exDate  - today) / 86400000);
+
+        const isPaid = diff < 0;
+        let status, statusClass;
+        if (isPaid)        { status = 'Paid';           statusClass = 'div-tl-status--paid'; }
+        else if (exDiff < 0){ status = 'Pending Payout'; statusClass = 'div-tl-status--pending'; }
+        else                { status = 'Upcoming';       statusClass = 'div-tl-status--upcoming'; }
+
+        let relLabel;
+        if (isPaid)      relLabel = 'PAID';
+        else if (diff === 0) relLabel = 'TODAY';
+        else if (diff === 1) relLabel = 'TOMORROW';
+        else             relLabel = `IN ${diff} DAYS`;
+
+        const month    = payDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        const day      = payDate.getDate();
         const perShare = d.amount_per_share > 0 ? `$${d.amount_per_share.toFixed(4)}` : '—';
-        const qty = d.quantity > 0 ? d.quantity.toFixed(d.quantity % 1 === 0 ? 0 : 4) : '—';
+        const payout   = d.expected_payout  > 0 ? `Est. $${d.expected_payout.toFixed(2)} total` : '';
+        const isLast   = i === data.length - 1;
 
         return `
-            <div class="div-cal-card">
-                <div class="div-cal-header">
-                    <div class="div-cal-left">
-                        <span class="earnings-symbol">${esc(d.ticker)}</span>
-                        <span class="earnings-company">${esc(d.company_name)}</span>
-                    </div>
-                    <div class="div-cal-right">
-                        ${daysLabel ? `<span class="earnings-days ${daysClass}">${esc(daysLabel)}</span>` : ''}
-                        <span class="div-cal-payout">${payout} <span class="div-cal-usd">USD</span></span>
-                    </div>
+        <div class="div-tl-item${isPaid ? ' div-tl-item--paid' : ''}">
+          <div class="div-tl-left">
+            <div class="div-tl-date-badge${isPaid ? ' div-tl-date-badge--paid' : ''}">
+              <span class="div-tl-month">${month}</span>
+              <span class="div-tl-day">${day}</span>
+            </div>
+            <span class="div-tl-relative">${relLabel}</span>
+            ${isLast ? '' : '<div class="div-tl-line"></div>'}
+          </div>
+          <div class="div-tl-card">
+            <div class="div-tl-card-top">
+              <span class="div-tl-ticker">${esc(d.ticker)}</span>
+              <div class="div-tl-company-block">
+                <span class="div-tl-company">${esc(d.company_name)}</span>
+                ${payout ? `<span class="div-tl-type">${esc(payout)}</span>` : ''}
+              </div>
+              <div class="div-tl-amount-block">
+                <span class="div-tl-value">${perShare}</span>
+                <span class="div-tl-per-share">per share</span>
+              </div>
+            </div>
+            <div class="div-tl-card-bottom">
+              <div class="div-tl-dates">
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Ex-Date</span>
+                  <span class="div-tl-date-val">${fmtDate(d.ex_dividend_date)}</span>
                 </div>
-                <div class="div-cal-dates">
-                    <span class="div-cal-date-item"><span class="div-cal-date-label">Ex-Div</span>${fmtDate(d.ex_dividend_date)}</span>
-                    <span class="div-cal-sep">→</span>
-                    <span class="div-cal-date-item"><span class="div-cal-date-label">Pay</span>${fmtDate(d.payment_date)}</span>
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Pay Date</span>
+                  <span class="div-tl-date-val">${fmtDate(d.payment_date)}</span>
                 </div>
-                <div class="div-cal-calc">
-                    ${perShare}/share × ${qty} shares = <strong>${payout}</strong>
-                </div>
-            </div>`;
+              </div>
+              <span class="div-tl-status ${statusClass}">${status}</span>
+            </div>
+          </div>
+        </div>`;
     }).join('');
 
-    el.innerHTML = cards;
+    el.innerHTML = `<div class="div-timeline">${items}</div>`;
 }
 
 /* ─── Upcoming Earnings ──────────────────────────────────────────────────── */
@@ -1498,46 +1697,71 @@ async function loadMarketNews() {
         const res = await fetch('/api/news');
         const json = await res.json();
         if (json.status === 'ok') {
-            _renderMarketNews(json.data);
+            _renderNewsGrid(json.data);
             resetClock('rc-news');
         }
     } catch (err) {
-        const el = document.getElementById('newsList');
+        const el = document.getElementById('newsGrid');
         if (el) el.innerHTML = '<div class="activity-empty">Error loading news</div>';
     }
 }
 
-function _renderMarketNews(data) {
-    const listEl = document.getElementById('newsList');
-    if (!listEl) return;
+/** Load news for the dedicated news view (called by router) */
+async function loadNewsView(force = false) {
+    const grid = document.getElementById('newsGrid');
+    if (grid) grid.innerHTML = `
+        <div class="news-card skel-news-card">
+          <div class="skel skel-news-img-lg"></div>
+          <div class="skel-news-body">
+            <div class="skel skel-line" style="width:30%"></div>
+            <div class="skel skel-line" style="width:90%"></div>
+            <div class="skel skel-line" style="width:70%"></div>
+          </div>
+        </div>`.repeat(6);
+
+    try {
+        const url = force ? '/api/news?force=1' : '/api/news';
+        const res  = await fetch(url);
+        const json = await res.json();
+        if (json.status === 'ok') {
+            _renderNewsGrid(json.data);
+            resetClock('rc-news');
+        }
+    } catch (err) {
+        if (grid) grid.innerHTML = '<div class="activity-empty">Error loading news.</div>';
+    }
+}
+
+function _renderNewsGrid(data) {
+    const grid = document.getElementById('newsGrid');
+    if (!grid) return;
 
     if (!data || data.length === 0) {
-        listEl.innerHTML = '<div class="activity-empty">No market news available.</div>';
+        grid.innerHTML = '<div class="activity-empty">No market news available.</div>';
         return;
     }
 
-    listEl.innerHTML = data.map(news => {
-        const title = news.headline || '—';
-        const source = news.source || 'Finnhub';
-        const url = news.url || '#';
-        const time = news.datetime ? new Date(news.datetime * 1000).toLocaleString('en-GB', {
-            day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-        }) : '—';
-        const summary = news.summary || '';
+    grid.innerHTML = data.map(news => {
+        const title  = news.headline || '—';
+        const source = news.source   || 'News';
+        const url    = news.url      || '#';
+        const time   = news.datetime
+            ? new Date(news.datetime * 1000).toLocaleString('en-GB', {
+                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+              })
+            : '—';
         const img = news.image || '';
 
-        return `
-            <div class="news-item-alt">
-                ${img ? `<img src="${img}" class="news-image-alt" alt="news" loading="lazy">` : ''}
-                <div class="news-content-alt">
-                    <div class="news-meta-alt">
-                        <span class="news-source-alt">${esc(source)}</span>
-                        <span>${time}</span>
-                    </div>
-                    <a href="${url}" target="_blank" class="news-title-alt">${esc(title)}</a>
-                    ${summary ? `<p class="news-summary-alt">${esc(summary)}</p>` : ''}
-                </div>
-            </div>`;
+        return `<a href="${url}" target="_blank" rel="noopener" class="news-card">
+            ${img
+                ? `<img src="${img}" class="news-card-img" alt="" loading="lazy" onerror="this.style.display='none'">`
+                : `<div class="news-card-img-placeholder">📰</div>`}
+            <div class="news-card-body">
+                <span class="news-card-source">${esc(source)}</span>
+                <span class="news-card-title">${esc(title)}</span>
+                <span class="news-card-time">${time}</span>
+            </div>
+        </a>`;
     }).join('');
 }
 

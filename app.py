@@ -8,7 +8,7 @@ import requests
 from collections import defaultdict
 from datetime import date, timedelta
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request
 
 from cache import (
     TTL_DIV, TTL_NEWS, init_db, kv_age, kv_get, kv_set,
@@ -46,7 +46,8 @@ PORTFOLIO_NAMES = {
 
 @app.route("/")
 def index():
-    return render_template("index.html", names=PORTFOLIO_NAMES)
+    # SPA shell — all views (home, portfolio 1/2/combined) rendered client-side via hash routing
+    return render_template("spa.html", names=PORTFOLIO_NAMES)
 
 
 @app.route("/terminal")
@@ -56,9 +57,8 @@ def terminal():
 
 @app.route("/portfolio/<pid>")
 def details(pid):
-    if pid != "combined" and (pid not in API_KEYS or not API_KEYS[pid]):
-        return "Portfolio not configured", 404
-    return render_template("details.html", pid=pid, names=PORTFOLIO_NAMES)
+    # Redirect old multi-page URLs to SPA hash routes (backward-compat for bookmarks)
+    return redirect(f"/#portfolio/{pid}", code=302)
 
 
 def fetch_and_cache_portfolio(pid, force=False):
