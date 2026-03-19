@@ -1178,51 +1178,81 @@ function _renderDividendCalendar(data) {
     if (!el) return;
 
     if (!data.length) {
-        el.innerHTML = '<div class="activity-empty">No upcoming dividends for held US stocks.</div>';
+        el.innerHTML = '<div class="activity-empty">No upcoming dividends for held stocks.</div>';
         return;
     }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const cards = data.map(d => {
-        // Count down to pay date (what the investor actually receives)
-        const payDate = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
-        const diff = Math.round((payDate - today) / 86400000);
-        let daysLabel = '', daysClass = '';
-        if (diff === 0) { daysLabel = 'Pays Today'; daysClass = 'earnings-days-today'; }
-        else if (diff === 1) { daysLabel = 'Pays Tomorrow'; daysClass = 'earnings-days-soon'; }
-        else if (diff <= 7) { daysLabel = `Pays in ${diff}d`; daysClass = 'earnings-days-soon'; }
-        else { daysLabel = `Pays in ${diff}d`; daysClass = ''; }
 
-        const fmtDate = dt => dt ? new Date(dt + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-        const payout = d.expected_payout > 0 ? `$${d.expected_payout.toFixed(2)}` : '—';
+    const fmtDate = dt => dt
+        ? new Date(dt + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+        : '—';
+
+    const items = data.map((d, i) => {
+        const payDate = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
+        const exDate  = new Date(d.ex_dividend_date + 'T00:00:00');
+        const diff    = Math.round((payDate - today) / 86400000);
+        const exDiff  = Math.round((exDate  - today) / 86400000);
+
+        const isPaid = diff < 0;
+        let status, statusClass;
+        if (isPaid)        { status = 'Paid';           statusClass = 'div-tl-status--paid'; }
+        else if (exDiff < 0){ status = 'Pending Payout'; statusClass = 'div-tl-status--pending'; }
+        else                { status = 'Upcoming';       statusClass = 'div-tl-status--upcoming'; }
+
+        let relLabel;
+        if (isPaid)      relLabel = 'PAID';
+        else if (diff === 0) relLabel = 'TODAY';
+        else if (diff === 1) relLabel = 'TOMORROW';
+        else             relLabel = `IN ${diff} DAYS`;
+
+        const month    = payDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        const day      = payDate.getDate();
         const perShare = d.amount_per_share > 0 ? `$${d.amount_per_share.toFixed(4)}` : '—';
-        const qty = d.quantity > 0 ? d.quantity.toFixed(d.quantity % 1 === 0 ? 0 : 4) : '—';
+        const payout   = d.expected_payout  > 0 ? `Est. $${d.expected_payout.toFixed(2)} total` : '';
+        const isLast   = i === data.length - 1;
 
         return `
-            <div class="div-cal-card">
-                <div class="div-cal-header">
-                    <div class="div-cal-left">
-                        <span class="earnings-symbol">${esc(d.ticker)}</span>
-                        <span class="earnings-company">${esc(d.company_name)}</span>
-                    </div>
-                    <div class="div-cal-right">
-                        ${daysLabel ? `<span class="earnings-days ${daysClass}">${esc(daysLabel)}</span>` : ''}
-                        <span class="div-cal-payout">${payout} <span class="div-cal-usd">USD</span></span>
-                    </div>
+        <div class="div-tl-item${isPaid ? ' div-tl-item--paid' : ''}">
+          <div class="div-tl-left">
+            <div class="div-tl-date-badge${isPaid ? ' div-tl-date-badge--paid' : ''}">
+              <span class="div-tl-month">${month}</span>
+              <span class="div-tl-day">${day}</span>
+            </div>
+            <span class="div-tl-relative">${relLabel}</span>
+            ${isLast ? '' : '<div class="div-tl-line"></div>'}
+          </div>
+          <div class="div-tl-card">
+            <div class="div-tl-card-top">
+              <span class="div-tl-ticker">${esc(d.ticker)}</span>
+              <div class="div-tl-company-block">
+                <span class="div-tl-company">${esc(d.company_name)}</span>
+                ${payout ? `<span class="div-tl-type">${esc(payout)}</span>` : ''}
+              </div>
+              <div class="div-tl-amount-block">
+                <span class="div-tl-value">${perShare}</span>
+                <span class="div-tl-per-share">per share</span>
+              </div>
+            </div>
+            <div class="div-tl-card-bottom">
+              <div class="div-tl-dates">
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Ex-Date</span>
+                  <span class="div-tl-date-val">${fmtDate(d.ex_dividend_date)}</span>
                 </div>
-                <div class="div-cal-dates">
-                    <span class="div-cal-date-item"><span class="div-cal-date-label">Ex-Div</span>${fmtDate(d.ex_dividend_date)}</span>
-                    <span class="div-cal-sep">→</span>
-                    <span class="div-cal-date-item"><span class="div-cal-date-label">Pay</span>${fmtDate(d.payment_date)}</span>
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Pay Date</span>
+                  <span class="div-tl-date-val">${fmtDate(d.payment_date)}</span>
                 </div>
-                <div class="div-cal-calc">
-                    ${perShare}/share × ${qty} shares = <strong>${payout}</strong>
-                </div>
-            </div>`;
+              </div>
+              <span class="div-tl-status ${statusClass}">${status}</span>
+            </div>
+          </div>
+        </div>`;
     }).join('');
 
-    el.innerHTML = cards;
+    el.innerHTML = `<div class="div-timeline">${items}</div>`;
 }
 
 /* ─── Upcoming Earnings ──────────────────────────────────────────────────── */

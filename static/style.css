@@ -3047,7 +3047,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: 420px;
+  height: 600px;
   /* Default height for scrolling pages */
   min-height: 0;
   overflow: hidden;
@@ -3078,94 +3078,224 @@ html[data-glass="true"][data-theme="light"] .s-card {
 }
 
 /* ── Dividend Calendar cards ─────────────────────────────────────────────── */
-.div-cal-card {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
+/* ─── Dividend Calendar Timeline ─────────────────────────────────────────── */
+.div-timeline {
+  padding: 16px 16px 8px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  transition: background 0.15s;
 }
 
-.div-cal-card:last-child {
-  border-bottom: none;
-}
-
-.div-cal-card:hover {
-  background: var(--bg-hover);
-}
-
-.div-cal-header {
+.div-tl-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 14px;
 }
 
-.div-cal-left {
+/* Left column: date badge + relative label + connecting line */
+.div-tl-left {
+  width: 64px;
+  flex-shrink: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  min-width: 0;
+}
+
+.div-tl-date-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  background: var(--bg-row-alt);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(25, 28, 30, .06);
+}
+
+.div-tl-date-badge--paid {
+  opacity: 0.45;
+}
+
+.div-tl-month {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.div-tl-day {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.div-tl-relative {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  margin-top: 5px;
+  text-align: center;
+}
+
+.div-tl-item--paid .div-tl-relative {
+  color: var(--text-muted);
+}
+
+.div-tl-line {
   flex: 1;
+  width: 2px;
+  background: var(--bg-hover);
+  margin: 6px 0;
+  border-radius: 1px;
+  min-height: 16px;
 }
 
-.div-cal-right {
+/* Right: entry card */
+.div-tl-card {
+  flex: 1;
+  background: var(--bg-card);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  box-shadow: 0px 4px 12px rgba(25, 28, 30, .04);
+  min-width: 0;
+}
+
+.div-tl-item--paid .div-tl-card {
+  opacity: 0.55;
+}
+
+.div-tl-card-top {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.div-tl-ticker {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--accent);
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+  min-width: 48px;
+}
+
+.div-tl-item--paid .div-tl-ticker {
+  color: var(--text-muted);
+}
+
+.div-tl-company-block {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.div-tl-company {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.div-tl-type {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.div-tl-amount-block {
+  text-align: right;
   flex-shrink: 0;
 }
 
-.div-cal-payout {
-  font-size: 0.9rem;
+.div-tl-value {
+  display: block;
+  font-size: 0.95rem;
   font-weight: 700;
-  color: #10b981;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
 }
 
-.div-cal-usd {
-  font-size: 0.65rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  vertical-align: middle;
-}
-
-.div-cal-dates {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.72rem;
-  color: var(--text-muted);
-}
-
-.div-cal-date-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.div-cal-date-label {
+.div-tl-per-share {
+  display: block;
   font-size: 0.62rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+/* Bottom: dates + status badge */
+.div-tl-card-bottom {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--bg-hover);
+}
+
+.div-tl-dates {
+  display: flex;
+  gap: 18px;
+  flex: 1;
+}
+
+.div-tl-date-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.div-tl-date-label {
+  font-size: 0.58rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.07em;
   color: var(--text-muted);
-  opacity: 0.7;
 }
 
-.div-cal-sep {
-  color: var(--border-bright);
-  font-size: 0.75rem;
-}
-
-.div-cal-calc {
+.div-tl-date-val {
   font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.div-tl-status {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.div-tl-status--paid {
+  background: var(--bg-row-alt);
   color: var(--text-muted);
 }
 
-.div-cal-calc strong {
-  color: #10b981;
-  font-weight: 700;
+.div-tl-status--pending {
+  background: rgba(0, 88, 190, .10);
+  color: var(--accent);
+}
+
+.div-tl-status--upcoming {
+  background: var(--bg-row-alt);
+  color: var(--text-secondary);
+}
+
+html[data-theme="dark"] .div-tl-status--pending {
+  background: rgba(59, 130, 246, .15);
+  color: #60a5fa;
 }
 
 .div-cal-progress {
