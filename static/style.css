@@ -117,7 +117,7 @@ html[data-theme="dark"] .widget-dividends {
 html[data-theme="dark"] .widget-performers {
   background: #0f1629;
   border: 1px solid #1e2d4a;
-  border-top: 4px solid #6366f1;
+  border-top: 4px solid var(--accent);
 }
 
 html[data-theme="dark"] .widget-earnings {
@@ -257,7 +257,7 @@ html[data-theme="dark"] .widget-activity {
 }
 
 html[data-theme="dark"] .widget-performers {
-  border-top: 4px solid #6366f1;
+  border-top: 4px solid var(--accent);
 }
 
 html[data-theme="dark"] .widget-earnings {
@@ -353,7 +353,7 @@ html[data-theme="dark"] .header {
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 0 12px rgba(59, 130, 246, .3);
+  box-shadow: 0 0 12px rgba(0, 88, 190, .25);
 }
 
 .logo-wrap svg {
@@ -562,7 +562,7 @@ html[data-theme="light"] .s-card::before {
 }
 
 .s-card-blue::before {
-  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  background: linear-gradient(135deg, #0058be, #2170e4);
 }
 
 .s-card-teal::before {
@@ -616,8 +616,8 @@ html[data-theme="light"] .s-card::before {
 }
 
 .s-card-blue .s-card-icon {
-  background: rgba(59, 130, 246, .15);
-  color: #60a5fa;
+  background: rgba(0, 88, 190, .10);
+  color: #2170e4;
 }
 
 .s-card-teal .s-card-icon {
@@ -998,8 +998,8 @@ html[data-theme="light"] .s-card::before {
 
 /* Detail page specific accents */
 .activity-panel.widget-activity {
-  border-top: 4px solid #3b82f6;
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.08);
+  border-top: 4px solid var(--accent);
+  box-shadow: 0 4px 20px rgba(0, 88, 190, 0.08);
 }
 
 .activity-panel.widget-dividends {
@@ -1463,9 +1463,9 @@ th.sort-desc .sort-icon::before {
 }
 
 .cb-UK {
-  background: rgba(59, 130, 246, .12);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, .3);
+  background: rgba(0, 88, 190, .10);
+  color: #2170e4;
+  border-color: rgba(0, 88, 190, .25);
 }
 
 .cb-US {
@@ -1481,9 +1481,9 @@ th.sort-desc .sort-icon::before {
 }
 
 .cb-FR {
-  background: rgba(99, 102, 241, .12);
-  color: #a5b4fc;
-  border-color: rgba(99, 102, 241, .3);
+  background: rgba(0, 88, 190, .10);
+  color: #2170e4;
+  border-color: rgba(0, 88, 190, .25);
 }
 
 .cb-IE {
@@ -1581,7 +1581,7 @@ th.sort-desc .sort-icon::before {
 .weight-bar-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, var(--accent), #6366f1);
+  background: linear-gradient(135deg, #0058be, #2170e4);
 }
 
 .weight-val {
@@ -1911,11 +1911,11 @@ html[data-glass="true"][data-theme="light"] {
 html[data-glass="true"] body {
   background: var(--bg);
   background-image:
-    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-    radial-gradient(at 50% 0%, rgba(139, 92, 246, 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(244, 63, 94, 0.1) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, rgba(0, 88, 190, 0.12) 0px, transparent 50%),
+    radial-gradient(at 50% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(0, 88, 190, 0.08) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, rgba(244, 63, 94, 0.08) 0px, transparent 50%);
   background-attachment: fixed;
 }
 
@@ -1957,7 +1957,7 @@ html[data-glass="true"] .table-toolbar {
 
 /* Glowing accents for glass cards */
 html[data-glass="true"] .widget-activity {
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(0, 88, 190, 0.18) !important;
 }
 
 html[data-glass="true"] .widget-dividends {
@@ -1971,7 +1971,7 @@ html[data-glass="true"] .widget-earnings {
 /* Light mode adjustments for glass */
 html[data-glass="true"][data-theme="light"] body {
   background-image:
-    radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
+    radial-gradient(at 0% 0%, rgba(0, 88, 190, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
 }
 
@@ -2730,7 +2730,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
 
 /* ── Fear & Greed Index card ─────────────────────────────────────────────── */
 .ov-card-fg {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(0, 88, 190, 0.04) 0%, rgba(139, 92, 246, 0.04) 100%);
   border-color: rgba(139, 92, 246, 0.3);
   cursor: pointer;
 }
@@ -3129,7 +3129,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  border-top: 4px solid #6366f1;
+  border-top: 4px solid var(--accent);
   /* Purple accent for table */
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
   overflow: hidden;
@@ -3139,7 +3139,7 @@ html[data-glass="true"][data-theme="light"] .s-card {
   box-shadow: none;
   border-radius: 0;
   border: none;
-  border-top: 4px solid #6366f1;
+  border-top: 4px solid var(--accent);
 }
 
 .activity-list-home {
@@ -3660,8 +3660,8 @@ html[data-theme="light"] .side-panel-backdrop {
 }
 
 .cal-ev-buy {
-  background: rgba(59, 130, 246, .2);
-  color: #60a5fa;
+  background: rgba(0, 88, 190, .12);
+  color: #2170e4;
 }
 
 .cal-ev-sell {
@@ -3748,8 +3748,8 @@ html[data-theme="light"] .cal-nav {
 }
 
 .sp-icon-buy {
-  background: rgba(59, 130, 246, 0.1);
-  color: #3b82f6;
+  background: rgba(0, 88, 190, .10);
+  color: #2170e4;
 }
 
 .sp-icon-sell {
@@ -3855,8 +3855,8 @@ html[data-theme="light"] .cal-nav {
 .earnings-quarter {
   font-size: 0.68rem;
   font-weight: 700;
-  background: rgba(99, 102, 241, .15);
-  color: #818cf8;
+  background: rgba(0, 88, 190, .10);
+  color: #2170e4;
   padding: 1px 7px;
   border-radius: 4px;
 }
@@ -4130,8 +4130,8 @@ html[data-theme="light"] .cal-nav {
 .news-cat {
   font-size: 0.65rem;
   font-weight: 600;
-  background: rgba(99, 102, 241, .12);
-  color: #818cf8;
+  background: rgba(0, 88, 190, .08);
+  color: #2170e4;
   padding: 1px 6px;
   border-radius: 4px;
   text-transform: capitalize;
@@ -4709,13 +4709,13 @@ html[data-theme="light"] .rating-strong-sell {
 
 /* Pre-market: blue */
 .mkt-pre {
-  background: rgba(59, 130, 246, .12);
-  color: #3b82f6;
-  border-color: rgba(59, 130, 246, .22);
+  background: rgba(0, 88, 190, .08);
+  color: #2170e4;
+  border-color: rgba(0, 88, 190, .18);
 }
 
 .mkt-pre .mkt-dot {
-  background: #3b82f6;
+  background: #2170e4;
 }
 
 /* After-hours: purple */
@@ -4982,7 +4982,7 @@ html[data-theme="light"] .rating-strong-sell {
 
 html[data-theme="dark"] .nav-item.active {
   background: rgba(59, 130, 246, .14);
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid var(--accent);
 }
 
 .nav-icon {
