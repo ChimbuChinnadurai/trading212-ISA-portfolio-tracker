@@ -275,7 +275,6 @@ async function loadPortfolio(force = false) {
 
     // Load portfolio bottom panels
     loadDetailActivity();
-    loadUpcomingDividends();
     loadMonthlyDividends();
 
   } catch (err) {

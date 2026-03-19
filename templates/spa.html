@@ -204,6 +204,12 @@
           </div>
         </div>
 
+        <!-- Activity -->
+        <a class="nav-item" data-route="activity" onclick="navigate('activity')">
+          <span class="material-symbols-outlined nav-icon">history</span>
+          <span class="nav-label">Activity</span>
+        </a>
+
         <!-- Calendar -->
         <a class="nav-item" data-route="calendar" onclick="navigate('calendar')">
           <span class="material-symbols-outlined nav-icon">calendar_month</span>
@@ -431,31 +437,6 @@
 
             <!-- Home widgets row -->
             <div class="home-widgets">
-              <!-- Recent Activity -->
-              <section class="widget-panel widget-activity">
-                <div class="panel-header">
-                  <h3 class="panel-title">Unified Recent Activity</h3>
-                  <div class="panel-badge" id="activityBadge" style="display:none">0</div>
-                </div>
-                <div id="activityList" class="activity-list-home">
-                  <div class="skel-item">
-                    <div class="skel skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skel skel-line" style="width:55%"></div>
-                      <div class="skel skel-line" style="width:35%"></div>
-                    </div>
-                    <div class="skel skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skel skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skel skel-line" style="width:65%"></div>
-                      <div class="skel skel-line" style="width:40%"></div>
-                    </div>
-                    <div class="skel skel-amount"></div>
-                  </div>
-                </div>
-              </section>
 
               <!-- Top Performers -->
               <section class="widget-panel widget-performers">
@@ -635,16 +616,6 @@
                     </div>
                   </div>
 
-                  <!-- Dividend History -->
-                  <div class="card portfolio-panel">
-                    <div class="panel-header">
-                      <h3 class="panel-title">Dividend History</h3>
-                    </div>
-                    <div class="activity-list" id="upcomingList">
-                      <div class="activity-loading">Loading…</div>
-                    </div>
-                  </div>
-
                   <!-- Recent Activity -->
                   <div class="card portfolio-panel">
                     <div class="panel-header">
@@ -788,6 +759,76 @@
             </div>
           </div>
         </div><!-- /view-news -->
+
+        <!-- ═══ VIEW: ACTIVITY ═══ -->
+        <div id="view-activity" class="spa-view" style="display:none">
+          <div class="view-main">
+
+            <div class="act-view-header">
+              <div class="act-view-title-block">
+                <h1 class="act-view-title">Activity &amp; History</h1>
+                <p class="act-view-subtitle">Recent trades and dividend payments across all portfolios</p>
+              </div>
+            </div>
+
+            <div class="act-layout">
+
+              <!-- Left: Recent Activity -->
+              <section class="widget-panel act-panel">
+                <div class="panel-header">
+                  <h3 class="panel-title">Recent Activity</h3>
+                  <span class="panel-subtitle">All portfolios combined</span>
+                </div>
+                <div id="activityTimelineList" class="activity-list-home">
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:55%"></div>
+                      <div class="skel skel-line" style="width:35%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:65%"></div>
+                      <div class="skel skel-line" style="width:40%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Right: Dividend History -->
+              <section class="widget-panel act-panel">
+                <div class="panel-header">
+                  <h3 class="panel-title">Dividend History</h3>
+                  <span class="panel-subtitle">Combined from all portfolios</span>
+                </div>
+                <div id="divHistoryList" class="activity-list-home">
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:50%"></div>
+                      <div class="skel skel-line" style="width:30%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line" style="width:60%"></div>
+                      <div class="skel skel-line" style="width:40%"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                </div>
+              </section>
+
+            </div><!-- /act-layout -->
+
+          </div><!-- /view-main -->
+        </div><!-- /view-activity -->
 
         <!-- ═══ VIEW: CALENDAR ═══ -->
         <div id="view-calendar" class="spa-view" style="display:none">

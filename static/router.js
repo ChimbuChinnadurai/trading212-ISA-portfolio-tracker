@@ -20,6 +20,7 @@ let _stocksInitialized  = false;
 let _stocksActivePid    = null;
 let _newsInitialized        = false;
 let _calendarInitialized    = false;
+let _activityInitialized    = false;
 
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
@@ -52,6 +53,7 @@ function _updateBreadcrumb(route) {
         'stocks/combined':      'Stocks · Combined',
         'news':                 'Market News',
         'calendar':             'Market Calendar',
+        'activity':             'Activity & History',
     };
     el.textContent = map[route] || 'Portfolio Tracker';
 }
@@ -100,6 +102,8 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadNewsView(true);
     } else if (view === 'calendar') {
         btn.onclick = () => loadCalendarView(true);
+    } else if (view === 'activity') {
+        btn.onclick = () => loadActivityView(true);
     }
 }
 
@@ -253,6 +257,16 @@ function _router() {
         if (!_calendarInitialized) {
             if (typeof loadCalendarView === 'function') loadCalendarView();
             _calendarInitialized = true;
+        }
+
+    /* ── Activity ── */
+    } else if (hash === 'activity') {
+        _showView('activity');
+        _updateRefreshBtn('activity');
+        document.title = 'Activity & History — Portfolio Tracker';
+        if (!_activityInitialized) {
+            if (typeof loadActivityView === 'function') loadActivityView();
+            _activityInitialized = true;
         }
     }
 }

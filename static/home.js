@@ -96,10 +96,6 @@ async function loadHomeData(refresh = false) {
             }
         }
 
-        // Activity widget
-        _homeActivityData = data.activity || [];
-        _renderHomeActivity(_homeActivityData);
-
         // Top performers widget
         _homePerformerData = data.top_performers || [];
         _renderHomePerformers(_homePerformerData);
@@ -611,6 +607,189 @@ async function loadCalendarView(force) {
         loadDividendCalendar(),
         loadEarnings(),
     ]);
+}
+
+/* ─── Activity View ──────────────────────────────────────────────────────── */
+
+async function loadActivityView(force = false) {
+    await Promise.all([
+        _loadActivityTimeline(force),
+        _loadDivHistoryTimeline(),
+    ]);
+}
+
+async function _loadActivityTimeline(force) {
+    const el = document.getElementById('activityTimelineList');
+    if (!el) return;
+    el.innerHTML = '<div class="activity-loading"><div class="table-loading-spinner"></div></div>';
+    try {
+        const url = force ? '/api/pcombined/activity?force=1' : '/api/pcombined/activity';
+        const res = await fetch(url);
+        const json = await res.json();
+        _renderActivityTimeline(json.data || []);
+    } catch (err) {
+        el.innerHTML = '<div class="activity-empty">Error loading activity</div>';
+    }
+}
+
+async function _loadDivHistoryTimeline() {
+    const el = document.getElementById('divHistoryList');
+    if (!el) return;
+    el.innerHTML = '<div class="activity-loading"><div class="table-loading-spinner"></div></div>';
+    try {
+        const res = await fetch('/api/pcombined/recent-dividends');
+        const json = await res.json();
+        _renderDivHistoryTimeline(json.data || []);
+    } catch (err) {
+        el.innerHTML = '<div class="activity-empty">Error loading dividend history</div>';
+    }
+}
+
+function _renderActivityTimeline(data) {
+    const el = document.getElementById('activityTimelineList');
+    if (!el) return;
+    if (!data.length) {
+        el.innerHTML = '<div class="activity-empty">No recent activity found.</div>';
+        return;
+    }
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+
+    const items = data.map((order, i) => {
+        const ticker    = (order.ticker || '').split('_')[0];
+        const company   = order.company_name || ticker || 'Unknown';
+        const qty       = order.filledQuantity || 0;
+        const dateStr   = order.dateExecuted || order.dateCreated || '';
+        const status    = (order.status || '').toUpperCase();
+        const pid       = order._pid || '1';
+        const ownerName = names[pid] || pid;
+        const isCancelled = status === 'CANCELLED' || status === 'REJECTED';
+        const typeUpper = (order.type || '').toUpperCase();
+        const isSell    = (order.side || '').toUpperCase() === 'SELL' || typeUpper.includes('SELL');
+        const actionWord = isCancelled ? 'Cancelled' : (isSell ? 'Sold' : 'Bought');
+        const value     = fmt.currency(order.filledValue || (qty * (order.fillPrice || 0)));
+
+        const date  = dateStr ? new Date(dateStr) : new Date();
+        const day   = date.getDate();
+        const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        const timeStr = dateStr
+            ? date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : '—';
+
+        const diffDays = dateStr
+            ? Math.round((today - new Date(dateStr.split('T')[0] + 'T00:00:00')) / 86400000)
+            : 0;
+        let relLabel;
+        if (diffDays === 0)       relLabel = 'TODAY';
+        else if (diffDays === 1)  relLabel = 'YESTERDAY';
+        else if (diffDays < 7)   relLabel = `${diffDays}D AGO`;
+        else                     relLabel = `${Math.floor(diffDays / 7)}W AGO`;
+
+        const badgeClass  = isCancelled ? 'div-tl-date-badge--paid' : (isSell ? 'div-tl-date-badge--sell' : 'div-tl-date-badge--buy');
+        const statusClass = isCancelled ? 'div-tl-status--paid'     : (isSell ? 'div-tl-status--sell'     : 'div-tl-status--buy');
+        const isLast      = i === data.length - 1;
+
+        return `
+        <div class="div-tl-item">
+          <div class="div-tl-left">
+            <div class="div-tl-date-badge ${badgeClass}">
+              <span class="div-tl-month">${month}</span>
+              <span class="div-tl-day">${day}</span>
+            </div>
+            <span class="div-tl-relative">${relLabel}</span>
+            ${isLast ? '' : '<div class="div-tl-line"></div>'}
+          </div>
+          <div class="div-tl-card">
+            <div class="div-tl-card-top">
+              <span class="div-tl-ticker">${esc(ticker)}</span>
+              <div class="div-tl-company-block">
+                <span class="div-tl-company">${esc(company)}</span>
+                <span class="div-tl-type">${actionWord} · ${fmt.number(qty, 4)} shares</span>
+              </div>
+              <div class="div-tl-amount-block">
+                <span class="div-tl-value">${value}</span>
+              </div>
+            </div>
+            <div class="div-tl-card-bottom">
+              <div class="div-tl-dates">
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Executed</span>
+                  <span class="div-tl-date-val">${timeStr}</span>
+                </div>
+              </div>
+              <span class="ov-card-pid-tag ov-tag-p${pid}">${esc(ownerName)}</span>
+              <span class="div-tl-status ${statusClass}">${actionWord}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="div-timeline">${items}</div>`;
+}
+
+function _renderDivHistoryTimeline(data) {
+    const el = document.getElementById('divHistoryList');
+    if (!el) return;
+    if (!data.length) {
+        el.innerHTML = '<div class="activity-empty">No dividend history found.</div>';
+        return;
+    }
+    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+
+    const items = data.map((div, i) => {
+        const ticker    = (div.ticker || '').split('_')[0];
+        const company   = div.company_name || '';
+        const amount    = fmt.currency(div.amount || 0);
+        const dateStr   = div.paidOn || div.date || '';
+        const pid       = div._pid || '1';
+        const ownerName = names[pid] || pid;
+
+        let day = '—', month = '—', timeStr = dateStr || '—';
+        if (dateStr && dateStr !== '—') {
+            const d   = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+            day       = d.getDate();
+            month     = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+            timeStr   = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+
+        const isLast = i === data.length - 1;
+
+        return `
+        <div class="div-tl-item">
+          <div class="div-tl-left">
+            <div class="div-tl-date-badge div-tl-date-badge--div">
+              <span class="div-tl-month">${month}</span>
+              <span class="div-tl-day">${day}</span>
+            </div>
+            <span class="div-tl-relative" style="color:#00786e">RECEIVED</span>
+            ${isLast ? '' : '<div class="div-tl-line"></div>'}
+          </div>
+          <div class="div-tl-card">
+            <div class="div-tl-card-top">
+              <span class="div-tl-ticker">${esc(ticker)}</span>
+              <div class="div-tl-company-block">
+                ${company ? `<span class="div-tl-company">${esc(company)}</span>` : ''}
+                <span class="div-tl-type">Dividend received</span>
+              </div>
+              <div class="div-tl-amount-block">
+                <span class="div-tl-value pos">${amount}</span>
+              </div>
+            </div>
+            <div class="div-tl-card-bottom">
+              <div class="div-tl-dates">
+                <div class="div-tl-date-col">
+                  <span class="div-tl-date-label">Paid On</span>
+                  <span class="div-tl-date-val">${esc(timeStr)}</span>
+                </div>
+              </div>
+              <span class="ov-card-pid-tag ov-tag-p${pid}">${esc(ownerName)}</span>
+              <span class="div-tl-status div-tl-status--received">Dividend</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="div-timeline">${items}</div>`;
 }
 
 async function loadTopPerformers() {
