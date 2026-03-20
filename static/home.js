@@ -5,7 +5,13 @@
 let _overviewData = null;
 let _homeActivityData = null;
 let _homeDividendData = null;
-let _homePerformerData = null;
+let _sp500Data = [];          // S&P 500 heatmap full dataset
+let _mktChartData    = null;  // market-indicators API data
+let _mktActiveRange  = '3M'; // 1W | 1M | 3M | 1Y
+let _nasdaqActiveRange = '3M';
+let _portfolioVsData = null; // [{date, ts, value}] from /api/pcombined/daily-history
+let _signalsData = {};        // cache per signal type
+let _insiderData = {};
 
 async function loadOverview(refresh = false) {
     try {
@@ -96,10 +102,6 @@ async function loadHomeData(refresh = false) {
             }
         }
 
-        // Top performers widget
-        _homePerformerData = data.top_performers || [];
-        _renderHomePerformers(_homePerformerData);
-
         // Market indicators (stored for F&G detail panel)
         if (data.market_indicators) {
             _marketIndData = data.market_indicators;
@@ -108,10 +110,36 @@ async function loadHomeData(refresh = false) {
             }
         }
 
+        // Home performers
+        _renderHomeTopUnder(data.top_performers || [], data.under_performers || []);
+
         // Market status is client-side time-based — no server data needed
     } catch (e) {
         console.error('Failed to load home data:', e);
     }
+}
+
+function _renderHomeTopUnder(top, under) {
+    const topEl = document.getElementById('homeTopPerformers');
+    const underEl = document.getElementById('homeUnderPerformers');
+
+    function renderList(el, items) {
+        if (!el) return;
+        if (!items.length) { el.innerHTML = '<div class="activity-empty">No data.</div>'; return; }
+        el.innerHTML = items.map(r => {
+            const pct = r.returns_pct ?? 0;
+            const sign = pct >= 0 ? '+' : '';
+            const cls = pct >= 0 ? 'pos' : 'neg';
+            const name = (r.company_name || r.ticker || '').slice(0, 16);
+            return `<div class="home-perf-item">
+                <span class="home-perf-ticker">${esc(r.ticker || '—')}</span>
+                <span class="home-perf-pct ${cls}">${sign}${pct.toFixed(1)}%</span>
+            </div>`;
+        }).join('');
+    }
+
+    renderList(topEl, top);
+    renderList(underEl, under);
 }
 
 function renderOverview(data) {
@@ -167,32 +195,6 @@ function updateCard(prefix, stats) {
 }
 
 
-/* ─── Theme ───────────────────────────────────────────────────────────────── */
-(function () {
-    const saved = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', saved);
-    _updateThemeIcon(saved);
-
-    const glass = localStorage.getItem('glassMode') === 'true';
-    document.documentElement.setAttribute('data-glass', glass);
-})();
-
-function toggleTheme() {
-    const html = document.documentElement;
-    const isDark = html.getAttribute('data-theme') !== 'light';
-    const newTheme = isDark ? 'light' : 'dark';
-    html.setAttribute('data-theme', newTheme);
-    localStorage.setItem('theme', newTheme);
-    _updateThemeIcon(newTheme);
-}
-
-function toggleGlassMode() {
-    const html = document.documentElement;
-    const isGlass = html.getAttribute('data-glass') === 'true';
-    const newVal = !isGlass;
-    html.setAttribute('data-glass', newVal);
-    localStorage.setItem('glassMode', newVal);
-}
 
 function _updateThemeIcon(theme) {
     const icon = document.getElementById('themeIcon');
@@ -222,7 +224,7 @@ const _clocks = {};
 
 function _initClock(el) {
     const totalSecs = parseInt(el.dataset.refreshSecs, 10);
-    const showMins  = totalSecs >= 120;
+    const showMins = totalSecs >= 120;
     const R = 8, CX = 10, CY = 10;
     const circ = +(2 * Math.PI * R).toFixed(3);
     const accentMap = { 'rc-heatmap': '#06b6d4', 'rc-fg': '#8b5cf6', 'rc-news': '#f59e0b' };
@@ -238,7 +240,7 @@ function _initClock(el) {
         ` fill="${accent}" stroke="none"></text>` +
         `</svg>`;
 
-    const arc  = el.querySelector('.rc-arc');
+    const arc = el.querySelector('.rc-arc');
     const text = el.querySelector('.rc-text');
     let remaining = totalSecs;
 
@@ -288,7 +290,7 @@ let _tickerRetryTimer = null;
 
 async function loadStockTicker() {
     try {
-        const res  = await fetch('/api/stock-tickers');
+        const res = await fetch('/api/stock-tickers');
         const json = await res.json();
         if (json.status === 'ok' && json.data.length > 0) {
             _tickerData = json.data;
@@ -310,14 +312,15 @@ async function loadStockTicker() {
 
 function _heatColor(pct) {
     const v = pct ?? 0;
-    if (Math.abs(v) < 0.05) return 'hsl(220,10%,20%)';
-    if (v > 0) {
-        const t = Math.min(v / 4, 1);
-        return `hsl(142,${Math.round(30 + t * 50)}%,${Math.round(26 - t * 10)}%)`;
-    } else {
-        const t = Math.min(Math.abs(v) / 4, 1);
-        return `hsl(0,${Math.round(30 + t * 55)}%,${Math.round(24 - t * 10)}%)`;
-    }
+    // Thresholds tuned for daily % change (vs total-return in Position Heatmap)
+    if (Math.abs(v) < 0.05) return 'linear-gradient(135deg,#1e293b,#334155)';
+    if (v >= 3)   return 'linear-gradient(135deg,#052e16,#15803d)';
+    if (v >= 1.5) return 'linear-gradient(135deg,#14532d,#16a34a)';
+    if (v >= 0.5) return 'linear-gradient(135deg,#166534,#22c55e)';
+    if (v > 0)    return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+    if (v >= -0.5)return 'linear-gradient(135deg,#78350f,#b45309)';
+    if (v >= -1.5)return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
+    return             'linear-gradient(135deg,#450a0a,#b91c1c)';
 }
 
 function _computeTreemap(items, W, H) {
@@ -343,10 +346,10 @@ function _computeTreemap(items, W, H) {
     }
 
     function placeRow(row, x, y, w, h) {
-        const rA  = row.reduce((s, i) => s + i._a, 0);
+        const rA = row.reduce((s, i) => s + i._a, 0);
         const isH = w >= h;
-        const rL  = isH ? rA / h : rA / w;
-        let pos   = isH ? y : x;
+        const rL = isH ? rA / h : rA / w;
+        let pos = isH ? y : x;
         for (const item of row) {
             const len = item._a / rL;
             rects.push(isH
@@ -368,7 +371,7 @@ function _computeTreemap(items, W, H) {
             } else {
                 const dim = placeRow(row, x, y, w, h);
                 if (w >= h) layout(items.slice(i), x + dim, y, w - dim, h);
-                else        layout(items.slice(i), x, y + dim, w, h - dim);
+                else layout(items.slice(i), x, y + dim, w, h - dim);
                 return;
             }
         }
@@ -382,33 +385,86 @@ function _computeTreemap(items, W, H) {
 function _renderHeatmap(items) {
     const container = document.getElementById('heatmapContainer');
     if (!container) return;
-
-    const valid = items.filter(d => d.price != null && (d.current_value || 0) > 0);
+    const valid = items.filter(d => d.price != null);
     if (!valid.length) return;
 
-    // Sort: highest absolute movement first (biggest movers, up or down)
-    valid.sort((a, b) => Math.abs(b.change_pct ?? 0) - Math.abs(a.change_pct ?? 0));
+    // Defer until layout is painted so offsetWidth/Height are non-zero
+    if (!container.offsetWidth || !container.offsetHeight) {
+        requestAnimationFrame(() => _renderHeatmap(items));
+        return;
+    }
 
-    const _currencySymbol = { USD:'$', GBP:'£', GBp:'p', GBX:'p', EUR:'€', CAD:'CA$', AUD:'A$', JPY:'¥', CHF:'Fr' };
+    const CW = container.offsetWidth;
+    const CH = container.offsetHeight;
+    const GAP = 3;
 
-    const cells = valid.map(d => {
-        const pct    = d.change_pct ?? 0;
-        const up     = pct >= 0;
-        const bg     = _heatColor(pct);
-        const sign   = (up && pct !== 0) ? '+' : '';
-        const pctStr = `${sign}${pct.toFixed(2)}%`;
-        const sym    = _currencySymbol[d.currency] ?? '';
-        const price  = d.price != null ? `${sym}${d.price.toFixed(2)}` : '';
-        const title  = `${d.company_name}\n${d.ticker}  ${pctStr}`;
+    // Group by sector, sized by portfolio holding value (fallback to 1 if missing)
+    const sectorMap = {};
+    for (const d of valid) {
+        const sec = d.sector || 'Other';
+        const val = d.current_value > 0 ? d.current_value : 1;
+        if (!sectorMap[sec]) sectorMap[sec] = { name: sec, value: 0, items: [] };
+        sectorMap[sec].value += val;
+        sectorMap[sec].items.push({ ...d, value: val });
+    }
+    const sectors = Object.values(sectorMap);
 
-        return `<div class="hm-cell" title="${title}" style="background:${bg}">` +
-            `<span class="hm-ticker">${esc(d.ticker)}</span>` +
-            `<span class="hm-price">${price}</span>` +
-            `<span class="hm-pct">${up ? '▲' : '▼'} ${pctStr}</span>` +
-            `</div>`;
-    }).join('');
+    const secRects = _computeTreemap(sectors, CW, CH);
 
-    container.innerHTML = cells;
+    const html = [];
+    for (const sr of secRects) {
+        const { item: sec, x: sx, y: sy, w: sw, h: sh } = sr;
+        const ix = Math.round(sx + GAP);
+        const iy = Math.round(sy + GAP);
+        const iw = Math.max(0, Math.round(sw - GAP * 2));
+        const ih = Math.max(0, Math.round(sh - GAP * 2));
+        if (iw < 8 || ih < 8) continue;
+
+        const LABEL_H = ih >= 32 ? 14 : 0;
+
+        html.push(`<div class="hm-sector-bg" style="left:${ix}px;top:${iy}px;width:${iw}px;height:${ih}px"></div>`);
+        if (LABEL_H) {
+            html.push(`<div class="hm-sector-label" style="left:${ix + 2}px;top:${iy + 1}px;width:${iw - 4}px;height:${LABEL_H}px">${esc(sec.name)}</div>`);
+        }
+
+        const stockH = ih - LABEL_H;
+        if (stockH < 8) continue;
+
+        const cellRects = _computeTreemap(sec.items, iw, stockH);
+        for (const cr of cellRects) {
+            const { item: d, x: cx, y: cy, w: cw, h: ch } = cr;
+            const celX = ix + Math.round(cx) + 1;
+            const celY = iy + LABEL_H + Math.round(cy) + 1;
+            const celW = Math.max(0, Math.round(cw) - 2);
+            const celH = Math.max(0, Math.round(ch) - 2);
+            if (celW < 4 || celH < 4) continue;
+
+            const pct = d.change_pct ?? 0;
+            const bg = _heatColor(pct);
+            const sign = pct > 0 ? '+' : '';
+            const pctStr = `${sign}${pct.toFixed(2)}%`;
+            const title = `${d.company_name}\n${d.ticker}  ${pctStr}`;
+
+            const minDim = Math.min(celW, celH);
+            let content = '';
+            if (minDim >= 50) {
+                content = `<span class="hm-t hm-tl">${esc(d.ticker)}</span><span class="hm-p hm-pm">${pctStr}</span>`;
+            } else if (minDim >= 30) {
+                content = `<span class="hm-t hm-tm">${esc(d.ticker)}</span><span class="hm-p hm-ps">${pctStr}</span>`;
+            } else if (minDim >= 18) {
+                content = `<span class="hm-t hm-ts">${esc(d.ticker)}</span>`;
+            } else if (celW >= 12 && celH >= 8) {
+                content = `<span class="hm-t hm-tx">${esc(d.ticker)}</span>`;
+            }
+
+            html.push(
+                `<div class="hm-cell" title="${title}" ` +
+                `style="left:${celX}px;top:${celY}px;width:${celW}px;height:${celH}px;background:${bg}">` +
+                content + `</div>`
+            );
+        }
+    }
+    container.innerHTML = html.join('');
 }
 
 /* ─── Sparkline charts ───────────────────────────────────────────────────── */
@@ -595,13 +651,28 @@ function drawSparkline(canvasId, points, colors, hoverIdx = -1) {
 }
 
 async function loadHomeWidgets() {
-    // Dividend calendar and earnings are now in the dedicated Calendar view
+    // Nothing to load here currently — widgets moved to dedicated Market view
+}
+
+async function loadMarketView(force = false) {
+    if (force) {
+        _sp500Data       = [];
+        _mktChartData    = null;
+        _portfolioVsData = null;
+        _signalsData     = {};
+        _insiderData     = {};
+    }
+    loadMarketChart();
+    loadSP500Data();
+    loadPortfolioVsMarket();
+    loadMarketSignals(_activeSignal || 'gainers');
+    loadInsiderTrading(_activeInsiderPeriod || 'latest');
 }
 
 async function loadCalendarView(force) {
     if (force) {
         // Clear cached data so both functions re-fetch
-        try { sessionStorage.removeItem('divCal'); } catch(_) {}
+        try { sessionStorage.removeItem('divCal'); } catch (_) { }
     }
     await Promise.all([
         loadDividendCalendar(),
@@ -656,21 +727,21 @@ function _renderActivityTimeline(data) {
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
 
     const items = data.map((order, i) => {
-        const ticker    = (order.ticker || '').split('_')[0];
-        const company   = order.company_name || ticker || 'Unknown';
-        const qty       = order.filledQuantity || 0;
-        const dateStr   = order.dateExecuted || order.dateCreated || '';
-        const status    = (order.status || '').toUpperCase();
-        const pid       = order._pid || '1';
+        const ticker = (order.ticker || '').split('_')[0];
+        const company = order.company_name || ticker || 'Unknown';
+        const qty = order.filledQuantity || 0;
+        const dateStr = order.dateExecuted || order.dateCreated || '';
+        const status = (order.status || '').toUpperCase();
+        const pid = order._pid || '1';
         const ownerName = names[pid] || pid;
         const isCancelled = status === 'CANCELLED' || status === 'REJECTED';
         const typeUpper = (order.type || '').toUpperCase();
-        const isSell    = (order.side || '').toUpperCase() === 'SELL' || typeUpper.includes('SELL');
+        const isSell = (order.side || '').toUpperCase() === 'SELL' || typeUpper.includes('SELL');
         const actionWord = isCancelled ? 'Cancelled' : (isSell ? 'Sold' : 'Bought');
-        const value     = fmt.currency(order.filledValue || (qty * (order.fillPrice || 0)));
+        const value = fmt.currency(order.filledValue || (qty * (order.fillPrice || 0)));
 
-        const date  = dateStr ? new Date(dateStr) : new Date();
-        const day   = date.getDate();
+        const date = dateStr ? new Date(dateStr) : new Date();
+        const day = date.getDate();
         const month = date.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
         const timeStr = dateStr
             ? date.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -680,14 +751,14 @@ function _renderActivityTimeline(data) {
             ? Math.round((today - new Date(dateStr.split('T')[0] + 'T00:00:00')) / 86400000)
             : 0;
         let relLabel;
-        if (diffDays === 0)       relLabel = 'TODAY';
-        else if (diffDays === 1)  relLabel = 'YESTERDAY';
-        else if (diffDays < 7)   relLabel = `${diffDays}D AGO`;
-        else                     relLabel = `${Math.floor(diffDays / 7)}W AGO`;
+        if (diffDays === 0) relLabel = 'TODAY';
+        else if (diffDays === 1) relLabel = 'YESTERDAY';
+        else if (diffDays < 7) relLabel = `${diffDays}D AGO`;
+        else relLabel = `${Math.floor(diffDays / 7)}W AGO`;
 
-        const badgeClass  = isCancelled ? 'div-tl-date-badge--paid' : (isSell ? 'div-tl-date-badge--sell' : 'div-tl-date-badge--buy');
-        const statusClass = isCancelled ? 'div-tl-status--paid'     : (isSell ? 'div-tl-status--sell'     : 'div-tl-status--buy');
-        const isLast      = i === data.length - 1;
+        const badgeClass = isCancelled ? 'div-tl-date-badge--paid' : (isSell ? 'div-tl-date-badge--sell' : 'div-tl-date-badge--buy');
+        const statusClass = isCancelled ? 'div-tl-status--paid' : (isSell ? 'div-tl-status--sell' : 'div-tl-status--buy');
+        const isLast = i === data.length - 1;
 
         return `
         <div class="div-tl-item">
@@ -713,8 +784,7 @@ function _renderActivityTimeline(data) {
             <div class="div-tl-card-bottom">
               <div class="div-tl-dates">
                 <div class="div-tl-date-col">
-                  <span class="div-tl-date-label">Executed</span>
-                  <span class="div-tl-date-val">${timeStr}</span>
+                  <span class="div-tl-date-label">Executed ${timeStr}</span>
                 </div>
               </div>
               <span class="ov-card-pid-tag ov-tag-p${pid}">${esc(ownerName)}</span>
@@ -737,19 +807,19 @@ function _renderDivHistoryTimeline(data) {
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
 
     const items = data.map((div, i) => {
-        const ticker    = (div.ticker || '').split('_')[0];
-        const company   = div.company_name || '';
-        const amount    = fmt.currency(div.amount || 0);
-        const dateStr   = div.paidOn || div.date || '';
-        const pid       = div._pid || '1';
+        const ticker = (div.ticker || '').split('_')[0];
+        const company = div.company_name || '';
+        const amount = fmt.currency(div.amount || 0);
+        const dateStr = div.paidOn || div.date || '';
+        const pid = div._pid || '1';
         const ownerName = names[pid] || pid;
 
         let day = '—', month = '—', timeStr = dateStr || '—';
         if (dateStr && dateStr !== '—') {
-            const d   = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
-            day       = d.getDate();
-            month     = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-            timeStr   = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const d = new Date(dateStr + (dateStr.includes('T') ? '' : 'T00:00:00'));
+            day = d.getDate();
+            month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+            timeStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         }
 
         const isLast = i === data.length - 1;
@@ -769,7 +839,6 @@ function _renderDivHistoryTimeline(data) {
               <span class="div-tl-ticker">${esc(ticker)}</span>
               <div class="div-tl-company-block">
                 ${company ? `<span class="div-tl-company">${esc(company)}</span>` : ''}
-                <span class="div-tl-type">Dividend received</span>
               </div>
               <div class="div-tl-amount-block">
                 <span class="div-tl-value pos">${amount}</span>
@@ -778,8 +847,7 @@ function _renderDivHistoryTimeline(data) {
             <div class="div-tl-card-bottom">
               <div class="div-tl-dates">
                 <div class="div-tl-date-col">
-                  <span class="div-tl-date-label">Paid On</span>
-                  <span class="div-tl-date-val">${esc(timeStr)}</span>
+                  <span class="div-tl-date-label">Paid On ${esc(timeStr)}</span>
                 </div>
               </div>
               <span class="ov-card-pid-tag ov-tag-p${pid}">${esc(ownerName)}</span>
@@ -792,44 +860,701 @@ function _renderDivHistoryTimeline(data) {
     el.innerHTML = `<div class="div-timeline">${items}</div>`;
 }
 
-async function loadTopPerformers() {
+/* ─── S&P 500 Data + Sector Bars ─────────────────────────────────────────── */
+
+async function loadSP500Data() {
     try {
-        const res = await fetch('/api/pcombined/top-performers');
+        const res  = await fetch('/api/finviz/sp500-heatmap');
         const json = await res.json();
-        _homePerformerData = json.data || [];
-        _renderHomePerformers(_homePerformerData);
+        if (json.status === 'ok') {
+            _sp500Data = json.data || [];
+            _renderSectorBars();
+        }
     } catch (err) {
-        document.getElementById('performerList').innerHTML =
-            '<div class="activity-empty">Error loading performers</div>';
+        console.warn('[sp500Data]', err);
     }
 }
 
-function _renderHomePerformers(data) {
-    const listEl = document.getElementById('performerList');
-    if (data.length === 0) {
-        listEl.innerHTML = '<div class="activity-empty">No performance data found.</div>';
+function _renderSectorBars() {
+    const el = document.getElementById('sectorBarsList');
+    if (!el || !_sp500Data.length) return;
+
+    const sectorMap = {};
+    for (const s of _sp500Data) {
+        const sec = s.sector || 'Other';
+        if (!sectorMap[sec]) sectorMap[sec] = { sum: 0, n: 0 };
+        sectorMap[sec].sum += s.change_pct ?? 0;
+        sectorMap[sec].n++;
+    }
+    const sectors = Object.entries(sectorMap)
+        .map(([name, d]) => ({ name, avg: d.sum / d.n }))
+        .sort((a, b) => b.avg - a.avg);
+
+    const maxAbs = Math.max(...sectors.map(s => Math.abs(s.avg)), 0.5);
+
+    el.innerHTML = sectors.map(s => {
+        const pct   = s.avg;
+        const sign  = pct >= 0 ? '+' : '';
+        const cls   = pct >= 0 ? 'pos' : 'neg';
+        const barW  = (Math.abs(pct) / maxAbs * 100).toFixed(1);
+        const color = pct >= 0 ? '#16a34a' : '#dc2626';
+        const label = s.name
+            .replace('Consumer ', '').replace(' Services', '')
+            .replace('Basic Materials', 'Materials').replace('Financial Services', 'Financials');
+        return `<div class="sector-bar-row">
+            <span class="sector-bar-name">${esc(label)}</span>
+            <div class="sector-bar-track">
+              <div class="sector-bar-fill" style="width:${barW}%;background:${color}"></div>
+            </div>
+            <span class="sector-bar-pct ${cls}">${sign}${pct.toFixed(2)}%</span>
+        </div>`;
+    }).join('');
+}
+
+/* ─── S&P 500 Chart ──────────────────────────────────────────────────────── */
+
+const _MKT_RANGE_DAYS = { '1W': 5, '1M': 22, '3M': 66, '1Y': 252 };
+
+async function loadMarketChart() {
+    if (_mktChartData) {
+        _drawMarketChart();
+        _drawNasdaqChart();
+        _updateMarketStats();
+        _updateNasdaqStats();
+        // redraw portfolio vs S&P if data already loaded
+        if (_portfolioVsData) _drawPortfolioVsChart();
         return;
     }
-    listEl.innerHTML = data.map(r => {
-        const ticker = r.ticker;
-        const returns = fmt.currency(r.total_returns);
-        const pct = r.returns_pct.toFixed(2);
-        const pid = r._pid || '1';
-        const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
-        const ownerName = names[pid] || pid;
-        const company = r.company_name || ticker;
-        return `
-            <div class="activity-item">
-                <div class="activity-dot activity-dot-buy"></div>
-                <div class="activity-content">
-                    <span class="ov-card-pid-tag ov-tag-p${pid}">${ownerName}</span>
-                    <span class="activity-company">${esc(company)}</span>
-                    <span class="activity-ticker activity-ticker-sm">${esc(ticker)}</span>
-                    <div class="activity-desc">Total Gain: ${returns}</div>
-                </div>
-                <div class="activity-amount pos">+${pct}%</div>
-            </div>`;
+    try {
+        const res  = await fetch('/api/market-indicators');
+        const json = await res.json();
+        if (json.status === 'ok') {
+            _mktChartData = json.data;
+            if (!_marketIndData) _marketIndData = json.data;
+            _drawMarketChart();
+            _drawNasdaqChart();
+            _updateMarketStats();
+            _updateNasdaqStats();
+            if (_portfolioVsData) _drawPortfolioVsChart();
+        }
+    } catch (err) { console.warn('[marketChart]', err); }
+}
+
+function _updateMarketStats() {
+    const sp  = _mktChartData?.GSPC;
+    const vix = _mktChartData?.VIX;
+    if (!sp?.values?.length) return;
+
+    const n       = _MKT_RANGE_DAYS[_mktActiveRange] || 66;
+    const vals    = sp.values.slice(-n);
+    const current = vals[vals.length - 1];
+    const prev    = sp.values[sp.values.length - 2];
+
+    const priceEl  = document.getElementById('mktSpPrice');
+    const changeEl = document.getElementById('mktSpChange');
+    if (priceEl) priceEl.textContent = current != null
+        ? current.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—';
+    if (changeEl && current != null && prev != null) {
+        const d = ((current / prev) - 1) * 100;
+        changeEl.textContent = (d >= 0 ? '+' : '') + d.toFixed(2) + '%';
+        changeEl.className = 'mkt-sp-change ' + (d >= 0 ? 'pos' : 'neg');
+    }
+
+    const rangePctEl = document.getElementById('mktRangePct');
+    if (rangePctEl && current != null && vals[0] != null) {
+        const p = ((current / vals[0]) - 1) * 100;
+        rangePctEl.textContent = (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
+        rangePctEl.className = 'mkt-footer-val ' + (p >= 0 ? 'pos' : 'neg');
+    }
+
+    const vsMaEl = document.getElementById('mktVsMa');
+    if (vsMaEl && sp.pct_vs_ma != null) {
+        vsMaEl.textContent = (sp.pct_vs_ma >= 0 ? '+' : '') + sp.pct_vs_ma.toFixed(1) + '%';
+        vsMaEl.className = 'mkt-footer-val ' + (sp.pct_vs_ma >= 0 ? 'pos' : 'neg');
+    }
+
+    const vixEl = document.getElementById('mktVix');
+    if (vixEl && vix?.current != null) {
+        vixEl.textContent = vix.current.toFixed(1);
+        vixEl.className = 'mkt-footer-val ' + (vix.current > 25 ? 'neg' : vix.current > 18 ? '' : 'pos');
+    }
+}
+
+function _updateNasdaqStats() {
+    const nd = _mktChartData?.IXIC;
+    if (!nd?.values?.length) return;
+    const n       = _MKT_RANGE_DAYS[_nasdaqActiveRange] || 66;
+    const vals    = nd.values.slice(-n);
+    const current = vals[vals.length - 1];
+    const prev    = nd.values[nd.values.length - 2];
+
+    const priceEl  = document.getElementById('nasdaqPrice');
+    const changeEl = document.getElementById('nasdaqChange');
+    if (priceEl) priceEl.textContent = current != null
+        ? current.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—';
+    if (changeEl && current != null && prev != null) {
+        const d = ((current / prev) - 1) * 100;
+        changeEl.textContent = (d >= 0 ? '+' : '') + d.toFixed(2) + '%';
+        changeEl.className = 'mkt-sp-change ' + (d >= 0 ? 'pos' : 'neg');
+    }
+
+    const rangePctEl = document.getElementById('nasdaqRangePct');
+    if (rangePctEl && current != null && vals[0] != null) {
+        const p = ((current / vals[0]) - 1) * 100;
+        rangePctEl.textContent = (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
+        rangePctEl.className = 'mkt-footer-val ' + (p >= 0 ? 'pos' : 'neg');
+    }
+
+    const vsMaEl = document.getElementById('nasdaqVsMa');
+    if (vsMaEl && nd.pct_vs_ma != null) {
+        vsMaEl.textContent = (nd.pct_vs_ma >= 0 ? '+' : '') + nd.pct_vs_ma.toFixed(1) + '%';
+        vsMaEl.className = 'mkt-footer-val ' + (nd.pct_vs_ma >= 0 ? 'pos' : 'neg');
+    }
+}
+
+// ── Generic index chart drawing (S&P 500 + NASDAQ) ──────────────────────────
+
+function _drawMarketChart() {
+    _drawIndexChart('mktChart', _mktChartData?.GSPC, _mktActiveRange, 'mktChartTooltip');
+}
+
+function _drawNasdaqChart() {
+    _drawIndexChart('nasdaqChart', _mktChartData?.IXIC, _nasdaqActiveRange, 'nasdaqChartTooltip');
+}
+
+function _drawIndexChart(canvasId, sp, activeRange, tooltipId) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas || !sp?.values?.length) return;
+    if (!canvas.offsetWidth) { requestAnimationFrame(() => _drawIndexChart(canvasId, sp, activeRange, tooltipId)); return; }
+
+    const n      = _MKT_RANGE_DAYS[activeRange] || 66;
+    const values = sp.values.slice(-n);
+    const maAll  = sp.ma.slice(-n);
+    const tsAll  = sp.timestamps.slice(-n);
+    if (!values.length) return;
+
+    const W   = canvas.offsetWidth;
+    const H   = canvas.offsetHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const PAD  = { top: 12, right: 10, bottom: 26, left: 52 };
+    const cW   = W - PAD.left - PAD.right;
+    const cH   = H - PAD.top  - PAD.bottom;
+    const minV = Math.min(...values) * 0.9985;
+    const maxV = Math.max(...values) * 1.0015;
+    const vRng = maxV - minV || 1;
+
+    const xOf = i => PAD.left + (i / (values.length - 1)) * cW;
+    const yOf = v => PAD.top  + (1 - (v - minV) / vRng) * cH;
+
+    const isUp      = values[values.length - 1] >= values[0];
+    const lineColor = isUp ? '#22c55e' : '#ef4444';
+    const fillA     = isUp ? 'rgba(34,197,94,0.18)'  : 'rgba(239,68,68,0.18)';
+    const fillB     = isUp ? 'rgba(34,197,94,0.02)'  : 'rgba(239,68,68,0.02)';
+
+    // Y gridlines + labels
+    for (let i = 0; i <= 4; i++) {
+        const v = minV + (i / 4) * (maxV - minV);
+        const y = yOf(v);
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth   = 1;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+        ctx.fillStyle  = 'rgba(255,255,255,0.28)';
+        ctx.font       = '10px "JetBrains Mono",monospace';
+        ctx.textAlign  = 'right';
+        ctx.fillText(Math.round(v).toLocaleString('en-US'), PAD.left - 4, y + 3);
+    }
+
+    // X labels
+    const xCount = activeRange === '1W' ? 5 : 6;
+    ctx.textAlign  = 'center';
+    ctx.fillStyle  = 'rgba(255,255,255,0.28)';
+    ctx.font       = '10px system-ui,sans-serif';
+    for (let i = 0; i < xCount; i++) {
+        const idx = Math.round(i / (xCount - 1) * (values.length - 1));
+        const d   = new Date(tsAll[idx] * 1000);
+        const lbl = activeRange === '1W'
+            ? d.toLocaleDateString('en-GB', { weekday: 'short' })
+            : activeRange === '1Y'
+            ? d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
+            : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+        ctx.fillText(lbl, xOf(idx), H - 6);
+    }
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+    grad.addColorStop(0, fillA); grad.addColorStop(1, fillB);
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(values[0]));
+    for (let i = 1; i < values.length; i++) ctx.lineTo(xOf(i), yOf(values[i]));
+    ctx.lineTo(xOf(values.length - 1), PAD.top + cH);
+    ctx.lineTo(xOf(0), PAD.top + cH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // MA line
+    if (maAll.some(v => v != null)) {
+        ctx.beginPath();
+        let started = false;
+        for (let i = 0; i < maAll.length; i++) {
+            if (maAll[i] == null) continue;
+            if (!started) { ctx.moveTo(xOf(i), yOf(maAll[i])); started = true; }
+            else ctx.lineTo(xOf(i), yOf(maAll[i]));
+        }
+        ctx.strokeStyle = 'rgba(251,191,36,0.55)';
+        ctx.lineWidth   = 1.5;
+        ctx.setLineDash([4, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Price line
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(values[0]));
+    for (let i = 1; i < values.length; i++) ctx.lineTo(xOf(i), yOf(values[i]));
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth   = 2;
+    ctx.lineJoin    = 'round';
+    ctx.stroke();
+
+    // Data dots (visible at shorter ranges)
+    if (values.length <= 66) {
+        const dotR = values.length <= 5 ? 3.5 : values.length <= 22 ? 2.5 : 1.5;
+        ctx.fillStyle = lineColor;
+        for (let i = 0; i < values.length; i++) {
+            ctx.beginPath();
+            ctx.arc(xOf(i), yOf(values[i]), dotR, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Store for hover
+    canvas._mkt = { values, tsAll, PAD, cW, cH, minV, vRng, lineColor, W, H };
+    canvas._mktRedraw = canvasId === 'mktChart' ? _drawMarketChart : _drawNasdaqChart;
+    _initChartHoverGeneric(canvas, tooltipId);
+}
+
+function _initChartHoverGeneric(canvas, tooltipId) {
+    if (canvas._mktHoverBound) return;
+    canvas._mktHoverBound = true;
+
+    canvas.addEventListener('mousemove', e => {
+        const m = canvas._mkt;
+        if (!m) return;
+        const rect  = canvas.getBoundingClientRect();
+        const mx    = e.clientX - rect.left;
+        const { values, tsAll, PAD, cW, cH, minV, vRng, lineColor } = m;
+        const xOf   = i => PAD.left + (i / (values.length - 1)) * cW;
+        const yOf   = v => PAD.top  + (1 - (v - minV) / vRng) * cH;
+        const idx   = Math.max(0, Math.min(values.length - 1,
+            Math.round((mx - PAD.left) / cW * (values.length - 1))));
+
+        if (canvas._mktRedraw) canvas._mktRedraw();
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        ctx.scale(dpr, dpr);
+
+        const hx = xOf(idx), hy = yOf(values[idx]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth   = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(hx, PAD.top);    ctx.lineTo(hx, PAD.top + cH); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(PAD.left, hy);   ctx.lineTo(canvas.offsetWidth - PAD.right, hy); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = lineColor + '40'; ctx.fill();
+        ctx.beginPath(); ctx.arc(hx, hy, 3, 0, Math.PI * 2);
+        ctx.fillStyle = lineColor; ctx.fill();
+
+        const tooltip = document.getElementById(tooltipId);
+        if (tooltip) {
+            const d     = new Date(tsAll[idx] * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            const price = values[idx].toLocaleString('en-US', { maximumFractionDigits: 0 });
+            tooltip.innerHTML = `<span class="mkt-tt-date">${d}</span><span class="mkt-tt-price" style="color:${lineColor}">${price}</span>`;
+            const tx = Math.min(mx + 12, canvas.offsetWidth - 120);
+            const ty = Math.max(e.clientY - rect.top - 40, 4);
+            tooltip.style.cssText = `display:flex;left:${tx}px;top:${ty}px`;
+        }
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        if (canvas._mktRedraw) canvas._mktRedraw();
+        const tooltip = document.getElementById(tooltipId);
+        if (tooltip) tooltip.style.display = 'none';
+    });
+}
+
+// ── Portfolio vs S&P 500 overlay chart ──────────────────────────────────────
+
+async function loadPortfolioVsMarket() {
+    if (_portfolioVsData) { _drawPortfolioVsChart(); return; }
+    try {
+        const res  = await fetch('/api/pcombined/daily-history');
+        const json = await res.json();
+        if (json.status === 'ok') {
+            _portfolioVsData = json.data;
+            _drawPortfolioVsChart();
+        }
+    } catch (err) { console.warn('[portfolioVs]', err); }
+}
+
+function _drawPortfolioVsChart() {
+    const canvas = document.getElementById('pvsChart');
+    if (!canvas) return;
+    if (!canvas.offsetWidth) { requestAnimationFrame(_drawPortfolioVsChart); return; }
+
+    const W   = canvas.offsetWidth;
+    const H   = canvas.offsetHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    if (!_portfolioVsData?.length || !_mktChartData?.GSPC) {
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.font = '12px system-ui,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Collecting portfolio history…', W / 2, H / 2);
+        _updatePortfolioVsStats(null, null);
+        return;
+    }
+
+    const sp = _mktChartData.GSPC;
+    // Build S&P date map
+    const spByDate = {};
+    for (let i = 0; i < sp.timestamps.length; i++) {
+        const d = new Date(sp.timestamps[i] * 1000).toISOString().slice(0, 10);
+        spByDate[d] = sp.values[i];
+    }
+    // Build portfolio date map
+    const pvsByDate = {};
+    for (const pt of _portfolioVsData) pvsByDate[pt.date] = pt.value;
+
+    // Overlapping dates (last 60 trading days max)
+    const allDates = Object.keys(spByDate).filter(d => pvsByDate[d]).sort();
+    const dates = allDates.slice(-60);
+    if (dates.length < 2) {
+        ctx.fillStyle = 'rgba(255,255,255,0.18)';
+        ctx.font = '12px system-ui,sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Not enough data yet', W / 2, H / 2);
+        _updatePortfolioVsStats(null, null);
+        return;
+    }
+
+    // Normalize to % change from first overlapping date
+    const spBase  = spByDate[dates[0]];
+    const pvsBase = pvsByDate[dates[0]];
+    const spVals  = dates.map(d => ((spByDate[d]  / spBase)  - 1) * 100);
+    const pvsVals = dates.map(d => ((pvsByDate[d] / pvsBase) - 1) * 100);
+
+    const PAD = { top: 12, right: 10, bottom: 26, left: 46 };
+    const cW  = W - PAD.left - PAD.right;
+    const cH  = H - PAD.top  - PAD.bottom;
+
+    const allVals = [...spVals, ...pvsVals];
+    const minV = Math.min(...allVals);
+    const maxV = Math.max(...allVals);
+    const vPad = (maxV - minV) * 0.1 || 1;
+    const minVP = minV - vPad, maxVP = maxV + vPad;
+    const vRng  = maxVP - minVP;
+
+    const xOf = i => PAD.left + (i / (dates.length - 1)) * cW;
+    const yOf = v => PAD.top  + (1 - (v - minVP) / vRng) * cH;
+
+    // Y gridlines
+    for (let i = 0; i <= 4; i++) {
+        const v = minVP + (i / 4) * vRng;
+        const y = yOf(v);
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.28)';
+        ctx.font = '10px "JetBrains Mono",monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText((v >= 0 ? '+' : '') + v.toFixed(1) + '%', PAD.left - 4, y + 3);
+    }
+
+    // Zero baseline
+    if (minVP < 0 && maxVP > 0) {
+        const y0 = yOf(0);
+        ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        ctx.beginPath(); ctx.moveTo(PAD.left, y0); ctx.lineTo(W - PAD.right, y0); ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // X labels
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.font = '10px system-ui,sans-serif';
+    const xCount = Math.min(5, dates.length);
+    for (let i = 0; i < xCount; i++) {
+        const idx = Math.round(i / (xCount - 1) * (dates.length - 1));
+        const d   = new Date(dates[idx] + 'T12:00:00');
+        ctx.fillText(d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }), xOf(idx), H - 6);
+    }
+
+    // S&P gradient fill
+    const spColor = '#3b82f6';
+    const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+    const spIsUp = spVals[spVals.length - 1] >= 0;
+    grad.addColorStop(0, spIsUp ? 'rgba(59,130,246,0.15)' : 'rgba(239,68,68,0.12)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(spVals[0]));
+    for (let i = 1; i < spVals.length; i++) ctx.lineTo(xOf(i), yOf(spVals[i]));
+    ctx.lineTo(xOf(spVals.length - 1), yOf(0));
+    ctx.lineTo(xOf(0), yOf(0));
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // S&P line
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(spVals[0]));
+    for (let i = 1; i < spVals.length; i++) ctx.lineTo(xOf(i), yOf(spVals[i]));
+    ctx.strokeStyle = spColor;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.setLineDash([]);
+    ctx.stroke();
+
+    // Portfolio line
+    const pvsColor = '#14b8a6';
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(pvsVals[0]));
+    for (let i = 1; i < pvsVals.length; i++) ctx.lineTo(xOf(i), yOf(pvsVals[i]));
+    ctx.strokeStyle = pvsColor;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Data dots
+    if (dates.length <= 66) {
+        const dotR = dates.length <= 22 ? 2.5 : 1.5;
+        for (const [vals, col] of [[spVals, spColor], [pvsVals, pvsColor]]) {
+            ctx.fillStyle = col;
+            for (let i = 0; i < vals.length; i++) {
+                ctx.beginPath();
+                ctx.arc(xOf(i), yOf(vals[i]), dotR, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+    }
+
+    _updatePortfolioVsStats(spVals, pvsVals);
+}
+
+function _updatePortfolioVsStats(spVals, pvsVals) {
+    const portEl  = document.getElementById('pvsPortPct');
+    const spEl    = document.getElementById('pvsSpPct');
+    const alphaEl = document.getElementById('pvsAlpha');
+    if (!portEl) return;
+    if (!spVals || !pvsVals) {
+        [portEl, spEl, alphaEl].forEach(el => { if (el) el.textContent = '—'; el?.classList.remove('pos','neg'); });
+        return;
+    }
+    const portPct  = pvsVals[pvsVals.length - 1];
+    const spPct    = spVals[spVals.length - 1];
+    const alphaPct = portPct - spPct;
+    const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+    const cls = v => v >= 0 ? 'pos' : 'neg';
+    portEl.textContent  = fmt(portPct);  portEl.className  = 'mkt-footer-val ' + cls(portPct);
+    spEl.textContent    = fmt(spPct);    spEl.className    = 'mkt-footer-val ' + cls(spPct);
+    alphaEl.textContent = fmt(alphaPct); alphaEl.className = 'mkt-footer-val ' + cls(alphaPct);
+}
+
+function _initChartRangeTabs() {
+    const tabs = document.getElementById('mktRangeTabs');
+    if (!tabs || tabs._mktInit) return;
+    tabs._mktInit = true;
+    tabs.addEventListener('click', e => {
+        const btn = e.target.closest('.mkt-range-tab');
+        if (!btn) return;
+        tabs.querySelectorAll('.mkt-range-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _mktActiveRange = btn.dataset.range;
+        _drawMarketChart();
+        _updateMarketStats();
+    });
+}
+
+function _initNasdaqRangeTabs() {
+    const tabs = document.getElementById('nasdaqRangeTabs');
+    if (!tabs || tabs._nqInit) return;
+    tabs._nqInit = true;
+    tabs.addEventListener('click', e => {
+        const btn = e.target.closest('.mkt-range-tab');
+        if (!btn) return;
+        tabs.querySelectorAll('.mkt-range-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _nasdaqActiveRange = btn.dataset.range;
+        _drawNasdaqChart();
+        _updateNasdaqStats();
+    });
+}
+
+function _initSP500Tabs() { /* replaced by _initChartRangeTabs */ }
+
+
+/* ─── Market Signals ─────────────────────────────────────────────────────── */
+
+let _activeSignal = 'gainers';
+
+async function loadMarketSignals(signalType) {
+    _activeSignal = signalType || _activeSignal;
+    const listEl = document.getElementById('signalsList');
+
+    // Use cached data if available for this signal type
+    if (_signalsData[_activeSignal]) {
+        _renderSignals(_signalsData[_activeSignal]);
+        return;
+    }
+
+    if (listEl) listEl.innerHTML = '<div class="activity-empty">Loading…</div>';
+    try {
+        const res = await fetch(`/api/finviz/signals?type=${encodeURIComponent(_activeSignal)}`);
+        const json = await res.json();
+        if (json.status === 'ok') {
+            _signalsData[_activeSignal] = json.data || [];
+            _renderSignals(_signalsData[_activeSignal]);
+        }
+    } catch (err) {
+        if (listEl) listEl.innerHTML = '<div class="activity-empty">Error loading signals</div>';
+    }
+}
+
+function _renderSignals(data) {
+    const listEl = document.getElementById('signalsList');
+    if (!listEl) return;
+    if (!data || data.length === 0) {
+        listEl.innerHTML = '<div class="activity-empty">No data available</div>';
+        return;
+    }
+    listEl.innerHTML = data.map(s => {
+        const sign = s.change_pct >= 0 ? '+' : '';
+        const chgCls = s.change_pct >= 0 ? 'pos' : 'neg';
+        const capStr = s.market_cap ? _fmtCap(s.market_cap) : '—';
+        const volStr = s.volume ? _fmtVol(s.volume) : '—';
+        return `<div class="signal-item">
+            <div class="signal-ticker-chip">${esc(s.ticker)}</div>
+            <div class="signal-info">
+                <span class="signal-company">${esc(s.company)}</span>
+                <span class="signal-meta">${esc(s.sector || '—')} · Cap ${capStr} · Vol ${volStr}</span>
+            </div>
+            <div class="signal-right">
+                <span class="signal-price">$${s.price != null ? s.price.toFixed(2) : '—'}</span>
+                <span class="signal-change ${chgCls}">${sign}${s.change_pct.toFixed(2)}%</span>
+            </div>
+        </div>`;
     }).join('');
+}
+
+function _initSignalTabs() {
+    const tabs = document.getElementById('signalTabs');
+    if (!tabs || tabs._signalInit) return;
+    tabs._signalInit = true;
+    tabs.addEventListener('click', e => {
+        const btn = e.target.closest('.signal-tab');
+        if (!btn) return;
+        tabs.querySelectorAll('.signal-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _signalsData[btn.dataset.signal] = null; // bust cache on tab switch
+        loadMarketSignals(btn.dataset.signal);
+    });
+}
+
+function _fmtCap(n) {
+    if (n >= 1e12) return `$${(n / 1e12).toFixed(1)}T`;
+    if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
+    return `$${n}`;
+}
+
+function _fmtVol(n) {
+    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
+    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
+    if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
+    return String(n);
+}
+
+
+/* ─── Insider Trading ────────────────────────────────────────────────────── */
+
+let _activeInsiderPeriod = 'latest';
+
+async function loadInsiderTrading(period) {
+    _activeInsiderPeriod = period || _activeInsiderPeriod;
+    const listEl = document.getElementById('insiderList');
+
+    if (_insiderData[_activeInsiderPeriod]) {
+        _renderInsider(_insiderData[_activeInsiderPeriod]);
+        return;
+    }
+
+    if (listEl) listEl.innerHTML = '<div class="activity-empty">Loading…</div>';
+    try {
+        const res = await fetch(`/api/finviz/insider?period=${encodeURIComponent(_activeInsiderPeriod)}`);
+        const json = await res.json();
+        if (json.status === 'ok') {
+            _insiderData[_activeInsiderPeriod] = json.data || [];
+            _renderInsider(_insiderData[_activeInsiderPeriod]);
+        }
+    } catch (err) {
+        if (listEl) listEl.innerHTML = '<div class="activity-empty">Error loading insider data</div>';
+    }
+}
+
+function _renderInsider(data) {
+    const listEl = document.getElementById('insiderList');
+    if (!listEl) return;
+    if (!data || data.length === 0) {
+        listEl.innerHTML = '<div class="activity-empty">No insider trades found</div>';
+        return;
+    }
+    listEl.innerHTML = data.map(t => {
+        const badge = t.is_buy
+            ? '<span class="insider-badge insider-buy">BUY</span>'
+            : '<span class="insider-badge insider-sell">SELL</span>';
+        const valStr = t.value != null ? `$${_fmtVol(t.value)}` : '—';
+        const sharesStr = t.shares != null ? _fmtVol(t.shares) + ' sh' : '—';
+        const role = t.relationship ? t.relationship.replace(/Director/g, 'Dir').replace(/Officer/g, 'Ofcr') : '';
+        return `<div class="insider-item">
+            <div class="signal-ticker-chip">${esc(t.ticker || '—')}</div>
+            <div class="signal-info">
+                <span class="signal-company">${esc(t.insider || '—')}</span>
+                <span class="signal-meta">${esc(role)} · ${esc(t.date || '—')}</span>
+            </div>
+            <div class="signal-right">
+                ${badge}
+                <span class="signal-meta" style="margin-top:2px">${sharesStr} · ${valStr}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function _initInsiderTabs() {
+    const tabs = document.getElementById('insiderTabs');
+    if (!tabs || tabs._insiderInit) return;
+    tabs._insiderInit = true;
+    tabs.addEventListener('click', e => {
+        const btn = e.target.closest('.signal-tab');
+        if (!btn) return;
+        tabs.querySelectorAll('.signal-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _insiderData[btn.dataset.period] = null; // bust cache on tab switch
+        loadInsiderTrading(btn.dataset.period);
+    });
 }
 
 
@@ -860,7 +1585,7 @@ function _renderMarketStatus(data) {
     const SESSION_CLS = { 'open': 'mkt-open', 'pre-market': 'mkt-pre', 'after-hours': 'mkt-post', 'closed': 'mkt-closed' };
 
     const nasdaqSession = data?.NASDAQ?.session ?? 'closed';
-    const lseSession    = data?.LSE?.session    ?? 'closed';
+    const lseSession = data?.LSE?.session ?? 'closed';
 
     // ET time for NASDAQ, GMT for LSE
     const now = new Date();
@@ -868,7 +1593,7 @@ function _renderMarketStatus(data) {
     new Intl.DateTimeFormat('en-CA', {
         timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false,
     }).formatToParts(now).forEach(p => { if (p.type !== 'literal') etParts[p.type] = p.value; });
-    const etHH  = etParts.hour === '24' ? '00' : etParts.hour;
+    const etHH = etParts.hour === '24' ? '00' : etParts.hour;
     const etStr = `${etHH}:${etParts.minute} ET`;
     const gmtStr = new Intl.DateTimeFormat('en-GB', {
         timeZone: 'UTC', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -924,11 +1649,11 @@ function _mktPillEnter(e) {
     requestAnimationFrame(() => {
         const pr = pill.getBoundingClientRect();
         const tr = tt.getBoundingClientRect();
-        let top  = pr.bottom + window.scrollY + 6;
-        let left = pr.left   + window.scrollX;
+        let top = pr.bottom + window.scrollY + 6;
+        let left = pr.left + window.scrollX;
         if (left + tr.width > window.innerWidth - 8) left = window.innerWidth - tr.width - 8;
         if (left < 8) left = 8;
-        tt.style.top  = top  + 'px';
+        tt.style.top = top + 'px';
         tt.style.left = left + 'px';
     });
 }
@@ -952,7 +1677,7 @@ function _getMktTooltip() {
 function _buildMktTooltipHTML(meta) {
     const { name, session, tz, tzLabel, sched } = meta;
     const SESSION_LABEL = { 'open': 'Open', 'pre-market': 'Pre-Market', 'after-hours': 'After Hours', 'closed': 'Closed' };
-    const SESSION_CLS   = { 'open': 'mkt-open', 'pre-market': 'mkt-pre', 'after-hours': 'mkt-post', 'closed': 'mkt-closed' };
+    const SESSION_CLS = { 'open': 'mkt-open', 'pre-market': 'mkt-pre', 'after-hours': 'mkt-post', 'closed': 'mkt-closed' };
 
     const fmtTime = iso => {
         const p = {};
@@ -963,7 +1688,7 @@ function _buildMktTooltipHTML(meta) {
     };
 
     const fmtDay = iso => {
-        const d   = new Date(iso);
+        const d = new Date(iso);
         const now = new Date();
         const fmt = tz => dt => new Intl.DateTimeFormat('en-CA', { timeZone: tz, dateStyle: 'short' }).format(dt);
         const inTz = fmt(tz);
@@ -975,7 +1700,7 @@ function _buildMktTooltipHTML(meta) {
 
     let html = `<div class="mkt-tt-name">${name}</div>`;
     html += `<div class="mkt-tt-status ${SESSION_CLS[session]}">` +
-            `<span class="mkt-dot"></span>${SESSION_LABEL[session] ?? session}</div>`;
+        `<span class="mkt-dot"></span>${SESSION_LABEL[session] ?? session}</div>`;
 
     if (sched.today_open || sched.today_close) {
         html += `<div class="mkt-tt-divider"></div>`;
@@ -1006,9 +1731,9 @@ function _buildMktTooltipHTML(meta) {
                 timeStr = `– ${fmtTime(pair.close)}`;
             }
             html += `<tr>` +
-                    `<td class="mkt-tt-day">${fmtDay(refDate)}</td>` +
-                    `<td class="mkt-tt-time">${timeStr}</td>` +
-                    `</tr>`;
+                `<td class="mkt-tt-day">${fmtDay(refDate)}</td>` +
+                `<td class="mkt-tt-time">${timeStr}</td>` +
+                `</tr>`;
         });
         html += `</table>`;
     }
@@ -1370,27 +2095,27 @@ function _renderDividendCalendar(data) {
 
     const items = data.map((d, i) => {
         const payDate = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
-        const exDate  = new Date(d.ex_dividend_date + 'T00:00:00');
-        const diff    = Math.round((payDate - today) / 86400000);
-        const exDiff  = Math.round((exDate  - today) / 86400000);
+        const exDate = new Date(d.ex_dividend_date + 'T00:00:00');
+        const diff = Math.round((payDate - today) / 86400000);
+        const exDiff = Math.round((exDate - today) / 86400000);
 
         const isPaid = diff < 0;
         let status, statusClass;
-        if (isPaid)        { status = 'Paid';           statusClass = 'div-tl-status--paid'; }
-        else if (exDiff < 0){ status = 'Pending Payout'; statusClass = 'div-tl-status--pending'; }
-        else                { status = 'Upcoming';       statusClass = 'div-tl-status--upcoming'; }
+        if (isPaid) { status = 'Paid'; statusClass = 'div-tl-status--paid'; }
+        else if (exDiff < 0) { status = 'Pending Payout'; statusClass = 'div-tl-status--pending'; }
+        else { status = 'Upcoming'; statusClass = 'div-tl-status--upcoming'; }
 
         let relLabel;
-        if (isPaid)      relLabel = 'PAID';
+        if (isPaid) relLabel = 'PAID';
         else if (diff === 0) relLabel = 'TODAY';
         else if (diff === 1) relLabel = 'TOMORROW';
-        else             relLabel = `IN ${diff} DAYS`;
+        else relLabel = `IN ${diff} DAYS`;
 
-        const month    = payDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
-        const day      = payDate.getDate();
+        const month = payDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        const day = payDate.getDate();
         const perShare = d.amount_per_share > 0 ? `$${d.amount_per_share.toFixed(4)}` : '—';
-        const payout   = d.expected_payout  > 0 ? `Est. $${d.expected_payout.toFixed(2)} total` : '';
-        const isLast   = i === data.length - 1;
+        const payout = d.expected_payout > 0 ? `Est. $${d.expected_payout.toFixed(2)} total` : '';
+        const isLast = i === data.length - 1;
 
         return `
         <div class="div-tl-item${isPaid ? ' div-tl-item--paid' : ''}">
@@ -1538,11 +2263,11 @@ function _fmtRevenue(n) {
 /* ─── Fear & Greed Index ─────────────────────────────────────────────────── */
 function _fgScoreColor(score) {
     if (score == null) return 'var(--text-muted)';
-    if (score <= 25) return '#e57373';
-    if (score <= 45) return '#ffb74d';
-    if (score <= 55) return '#9e9e9e';
-    if (score <= 75) return '#81c784';
-    return '#4caf50';
+    if (score <= 25) return '#ef4444';
+    if (score <= 45) return '#f97316';
+    if (score <= 55) return '#94a3b8';
+    if (score <= 75) return '#22c55e';
+    return '#10b981';
 }
 
 function _fgScoreToRating(score) {
@@ -1579,7 +2304,7 @@ function _renderFearGreed(fg) {
     const scoreEl = document.getElementById('fg-score');
     const ratingEl = document.getElementById('fg-rating');
     if (scoreEl) { scoreEl.textContent = score ?? '—'; scoreEl.style.color = _fgScoreColor(score); }
-    if (ratingEl) ratingEl.textContent = rating;
+    if (ratingEl) { ratingEl.textContent = rating; ratingEl.style.color = _fgScoreColor(score); }
 
     requestAnimationFrame(() => drawFGGauge('fg-gauge', score));
 
@@ -1632,11 +2357,11 @@ function drawFGGauge(canvasId, score) {
 
     // Sectors: [startScore, endScore, color]
     const sectors = [
-        [0, 25, '#e57373'],
-        [25, 45, '#ffb74d'],
-        [45, 55, '#9e9e9e'],
-        [55, 75, '#81c784'],
-        [75, 100, '#4caf50'],
+        [0,   25, '#dc2626'],
+        [25,  45, '#ea580c'],
+        [45,  55, '#475569'],
+        [55,  75, '#16a34a'],
+        [75, 100, '#15803d'],
     ];
     const gapRad = (1.5 / 100) * Math.PI;
 
@@ -1648,9 +2373,7 @@ function drawFGGauge(canvasId, score) {
         ctx.arc(cx, cy, innerR, ea, sa, true);
         ctx.closePath();
         ctx.fillStyle = color;
-        ctx.globalAlpha = 0.82;
         ctx.fill();
-        ctx.globalAlpha = 1;
     }
 
     if (score != null) {
@@ -1688,7 +2411,14 @@ function onCurrencyChange() {
     if (_overviewData) renderOverview(_overviewData);
     if (_homeActivityData) _renderHomeActivity(_homeActivityData);
     if (_homeDividendData) _renderHomeDividends(_homeDividendData);
-    if (_homePerformerData) _renderHomePerformers(_homePerformerData);
+}
+
+/* ─── Tab initialisation (called once after DOM ready) ───────────────────── */
+function initFinvizTabs() {
+    _initChartRangeTabs();
+    _initNasdaqRangeTabs();
+    _initSignalTabs();
+    _initInsiderTabs();
 }
 
 /* ─── Market News ────────────────────────────────────────────────────────── */
@@ -1721,7 +2451,7 @@ async function loadNewsView(force = false) {
 
     try {
         const url = force ? '/api/news?force=1' : '/api/news';
-        const res  = await fetch(url);
+        const res = await fetch(url);
         const json = await res.json();
         if (json.status === 'ok') {
             _renderNewsGrid(json.data);
@@ -1742,13 +2472,13 @@ function _renderNewsGrid(data) {
     }
 
     grid.innerHTML = data.map(news => {
-        const title  = news.headline || '—';
-        const source = news.source   || 'News';
-        const url    = news.url      || '#';
-        const time   = news.datetime
+        const title = news.headline || '—';
+        const source = news.source || 'News';
+        const url = news.url || '#';
+        const time = news.datetime
             ? new Date(news.datetime * 1000).toLocaleString('en-GB', {
                 day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-              })
+            })
             : '—';
         const img = news.image || '';
 
@@ -1763,5 +2493,75 @@ function _renderNewsGrid(data) {
             </div>
         </a>`;
     }).join('');
+}
+
+
+/* ─── AI Market Digest ───────────────────────────────────────────────────── */
+let _digestProvider = 'finviz';
+
+async function loadMarketDigest(provider, force = false) {
+    if (provider) _digestProvider = provider;
+    const body = document.getElementById('digestBody');
+    const meta = document.getElementById('digestMeta');
+    const btn = document.getElementById('digestRefreshBtn');
+    if (!body) return;
+
+    const url = `/api/market-digest?provider=${_digestProvider}${force ? '&refresh=1' : ''}`;
+
+    if (force) {
+        body.innerHTML = `<div class="digest-loading"><div class="spinner" style="width:20px;height:20px;border-width:2px"></div><span>Generating digest…</span></div>`;
+        if (btn) btn.disabled = true;
+    }
+
+    try {
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Unknown error');
+        _renderDigest(json.digest);
+        if (meta) meta.textContent = json.cached ? 'Cached · 30m' : 'Just now';
+    } catch (err) {
+        body.innerHTML = `<div class="digest-error">Failed to load digest: ${esc(err.message)}</div>`;
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+function switchDigestProvider(provider) {
+    _digestProvider = provider;
+    document.querySelectorAll('.digest-provider-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.provider === provider);
+    });
+    loadMarketDigest(provider, false);
+}
+
+function _renderDigest(text) {
+    const body = document.getElementById('digestBody');
+    if (!body) return;
+
+    const hi = s => s
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+    const parts = [];
+    const pending = [];  // bullet accumulator
+
+    const flushBullets = () => {
+        if (!pending.length) return;
+        parts.push(`<ul class="digest-list">${pending.splice(0).map(b => `<li>${b}</li>`).join('')}</ul>`);
+    };
+
+    for (const raw of text.split('\n')) {
+        const line = raw.trim();
+        if (!line) continue;
+        if (/^[•\-\*] /.test(line)) {
+            pending.push(hi(line.slice(2).trim()));
+        } else {
+            flushBullets();
+            const cls = /^\*\*|^#/.test(line) ? 'digest-headline' : 'digest-para';
+            parts.push(`<div class="${cls}">${hi(line)}</div>`);
+        }
+    }
+    flushBullets();
+
+    body.innerHTML = parts.join('');
 }
 

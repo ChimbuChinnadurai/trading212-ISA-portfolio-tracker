@@ -9,6 +9,8 @@ from collections import defaultdict
 from datetime import date, timedelta
 
 from flask import Flask, jsonify, redirect, render_template, request
+import finviz_data as fvd
+import ai_digest as _ai_digest
 
 from cache import (
     TTL_DIV, TTL_NEWS, init_db, kv_age, kv_get, kv_set,
@@ -360,6 +362,29 @@ def stock_activity(pid, ticker):
 
 
 
+@app.route("/api/pcombined/daily-history")
+def portfolio_daily_history():
+    """Daily portfolio value history (end-of-day snapshots) for the last 60 days."""
+    pid_daily = {}
+    for pid in API_KEYS:
+        snaps = snapshot_get(pid, hours=1440)  # 60 days = 1440 hours
+        by_day = {}
+        for s in snaps:
+            day = date.fromtimestamp(s["ts"]).isoformat()
+            if day not in by_day or s["ts"] > by_day[day][0]:
+                by_day[day] = (s["ts"], s["value"])
+        pid_daily[pid] = by_day
+
+    all_days = sorted(set().union(*[set(d.keys()) for d in pid_daily.values()]))
+    result = []
+    for day in all_days:
+        total = sum(pid_daily[pid][day][1] for pid in API_KEYS if day in pid_daily[pid])
+        ts = next((pid_daily[pid][day][0] for pid in API_KEYS if day in pid_daily[pid]), 0)
+        if total > 0:
+            result.append({"date": day, "ts": int(ts), "value": round(total, 2)})
+    return jsonify({"status": "ok", "data": result})
+
+
 @app.route("/api/pcombined/top-performers")
 def top_performers_combined():
     """Return Top 5 performers across all portfolios."""
@@ -571,6 +596,7 @@ def market_indicators():
     result = {}
     configs = [
         ("^GSPC", "S&P 500", 125),
+        ("^IXIC", "NASDAQ",   50),
         ("^VIX",  "VIX",      50),
     ]
     for symbol, label, ma_period in configs:
@@ -601,7 +627,7 @@ def market_indicators():
                 for i in range(len(c_list))
             ]
 
-            n = 90  # display last 90 trading days
+            n = 252  # display last 252 trading days (~1 year)
             c_out  = [round(v, 2) for v in c_list[-n:]]
             ma_out = [round(m, 2) if m is not None else None for m in ma_list[-n:]]
             current    = c_out[-1]
@@ -713,6 +739,7 @@ def stock_tickers_api():
                 "change_pct":    round(change_pct, 4) if change_pct is not None else None,
                 "currency":      currency,
                 "current_value": row.get("current_value"),
+                "sector":        row.get("sector", "Other"),
             }
             # Only cache when we have complete data; otherwise it retries next refresh
             if change is not None and change_pct is not None:
@@ -1150,6 +1177,7 @@ def _home_data_inner(force):
 
     # ── 3. Top performers ──────────────────────────────────────────────────────
     performers_data = []
+    under_performers_data = []
     try:
         combined_rows_map = {}
         for pid, key in API_KEYS.items():
@@ -1173,6 +1201,7 @@ def _home_data_inner(force):
             r["returns_pct"] = (r["total_returns"] / r["invested"] * 100) if r["invested"] > 0 else 0
         consolidated.sort(key=lambda x: x["total_returns"], reverse=True)
         performers_data = consolidated[:5]
+        under_performers_data = list(reversed(consolidated[-5:])) if consolidated else []
     except Exception:
         pass
 
@@ -1188,6 +1217,7 @@ def _home_data_inner(force):
         "overview_metadata": overview_metadata,
         "activity":          activity_data,
         "top_performers":    performers_data,
+        "under_performers":  under_performers_data,
         "market_indicators": market_ind_data,
         "fx_rate":           fx_rate,
     })
@@ -1463,6 +1493,122 @@ def upcoming_dividends():
 @app.route("/health")
 def health():
     return jsonify({"status": "healthy"})
+
+
+# ── Finviz routes ──────────────────────────────────────────────────────────────
+
+@app.route("/api/finviz/news")
+def finviz_news():
+    """Market news and blog posts from Finviz (finvizfinance library)."""
+    cache_key = "finviz:news"
+    cached = kv_get(cache_key, 300)  # 5-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached, "cached": True})
+    data = fvd.get_market_news()
+    kv_set(cache_key, data)
+    return jsonify({"status": "ok", "data": data, "cached": False})
+
+
+@app.route("/api/finviz/insider")
+def finviz_insider():
+    """Insider trading data from Finviz.  ?period=latest|top+week|top+owner+trade"""
+    period = request.args.get("period", "latest")
+    if period not in ("latest", "top week", "top owner trade"):
+        period = "latest"
+    cache_key = f"finviz:insider:{period.replace(' ', '_')}"
+    cached = kv_get(cache_key, 1800)  # 30-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached, "period": period, "cached": True})
+    data = fvd.get_insider_trading(period)
+    kv_set(cache_key, data)
+    return jsonify({"status": "ok", "data": data, "period": period, "cached": False})
+
+
+@app.route("/api/finviz/signals")
+def finviz_signals():
+    """Market screener signals from Finviz.
+    ?type=gainers|losers|volume|newhighs|newlows|upgrades|downgrades|oversold|overbought
+    """
+    signal_type = request.args.get("type", "gainers")
+    cache_key = f"finviz:signals:{signal_type}"
+    cached = kv_get(cache_key, 300)  # 5-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached, "signal": signal_type, "cached": True})
+    data = fvd.get_market_signals(signal_type, limit=15)
+    kv_set(cache_key, data)
+    return jsonify({"status": "ok", "data": data, "signal": signal_type, "cached": False})
+
+
+@app.route("/api/finviz/sp500-heatmap")
+def finviz_sp500_heatmap():
+    """All S&P 500 stocks with sector, change %, price, market cap for the heatmap.
+    Cached for 5 minutes — first call may be slow (scrapes ~500 stocks across pages).
+    """
+    cache_key = "finviz:sp500heatmap"
+    cached = kv_get(cache_key, 300)  # 5-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached, "cached": True})
+    data = fvd.get_sp500_heatmap()
+    if data:
+        kv_set(cache_key, data)
+    return jsonify({"status": "ok", "data": data, "cached": False})
+
+
+@app.route("/api/finviz/stock/<ticker>")
+def finviz_stock_details(ticker):
+    """Fundamentals, signals, analyst ratings and insider activity for one stock."""
+    ticker = ticker.upper().strip()
+    cache_key = f"finviz:stock:{ticker}"
+    cached = kv_get(cache_key, 600)  # 10-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached, "cached": True})
+    data = fvd.get_stock_details(ticker)
+    kv_set(cache_key, data)
+    return jsonify({"status": "ok", "data": data, "cached": False})
+
+
+# ── AI Market Digest ──────────────────────────────────────────────────────────
+
+@app.route("/api/market-digest")
+def market_digest():
+    """AI-generated daily market digest.
+    ?provider=claude|gemini|perplexity  (default: claude)
+    ?refresh=1  — bypass cache and regenerate
+    """
+    provider = request.args.get("provider", "finviz").lower()
+    if provider not in ("finviz", "claude"):
+        return jsonify({"status": "error", "message": f"Unknown provider '{provider}'"}), 400
+
+    force = request.args.get("refresh", "0") == "1"
+    cache_key = f"ai_digest:{provider}"
+    TTL_DIGEST = 1800  # 30 minutes
+
+    if not force:
+        cached = kv_get(cache_key, TTL_DIGEST)
+        if cached is not None:
+            return jsonify({"status": "ok", "provider": provider, "digest": cached, "cached": True})
+
+    # Build context from existing caches (non-blocking reads — all already warm)
+    indicators = kv_get("market_indicators", TTL_DIGEST) or {}
+    gainers    = kv_get("finviz:signals:gainers", 600) or []
+    losers     = kv_get("finviz:signals:losers",  600) or []
+    news_raw   = kv_get("news", TTL_NEWS) or []
+
+    context = {
+        "indicators": indicators,
+        "gainers":    gainers[:10],
+        "losers":     losers[:10],
+        "news":       news_raw[:8],
+    }
+
+    try:
+        text = _ai_digest.generate_digest(provider, context)
+    except Exception as exc:
+        logger.error("AI digest failed (provider=%s): %s", provider, exc)
+        return jsonify({"status": "error", "message": str(exc)}), 500
+
+    kv_set(cache_key, text)
+    return jsonify({"status": "ok", "provider": provider, "digest": text, "cached": False})
 
 
 # ── Background portfolio refresh ──────────────────────────────────────────────

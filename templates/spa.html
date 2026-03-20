@@ -216,6 +216,12 @@
           <span class="nav-label">Calendar</span>
         </a>
 
+        <!-- Market -->
+        <a class="nav-item" data-route="market" onclick="navigate('market')">
+          <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
+          <span class="nav-label">Market</span>
+        </a>
+
         <!-- News -->
         <a class="nav-item" data-route="news" onclick="navigate('news')">
           <span class="material-symbols-outlined nav-icon">newspaper</span>
@@ -286,10 +292,13 @@
 
         <!-- ═══ VIEW: HOME ═══ -->
         <div id="view-home" class="spa-view">
-          <div class="view-main">
+          <div class="home-body">
 
-            <div class="overview-section">
-              <div class="overview-grid">
+            <!-- ── Left main column ───────────────────────────────────────── -->
+            <div class="home-main">
+
+              <!-- Row 1: Portfolio cards -->
+              <div class="home-cards-row">
 
                 <!-- Portfolio 1 -->
                 <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
@@ -378,94 +387,125 @@
                   </div>
                 </div>
 
-                <!-- Heatmap — spans 2 cols -->
-                <div class="ov-card ov-card-heatmap">
-                  <div class="ov-header">
-                    <span class="ov-label">Stocks Heatmap</span>
-                    <span class="rc-label-wrap">
-                      <span style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
-                      <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="60"></span>
-                    </span>
-                  </div>
-                  <div id="heatmapContainer" class="heatmap-container">
-                    <div class="hm-skel"></div>
+              </div><!-- /home-cards-row -->
+
+              <!-- Row 2: Stocks Heatmap -->
+              <div class="ov-card home-heatmap-card">
+                <div class="ov-header">
+                  <span class="ov-label">Stocks Heatmap</span>
+                  <span class="rc-label-wrap">
+                    <span style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
+                    <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="60"></span>
+                  </span>
+                </div>
+                <div id="heatmapContainer" class="heatmap-container">
+                  <div class="hm-skel"></div>
+                </div>
+              </div>
+
+              <!-- Row 3: Latest Trade Signals -->
+              <div class="ov-card home-activity-card">
+                <div class="ov-header">
+                  <span class="ov-label">Latest Trade Signals</span>
+                  <span style="font-size:0.72rem;color:var(--text-muted);font-style:italic">Upcoming feature</span>
+                </div>
+                <div id="homeActivityList" class="home-activity-list">
+                  <div class="home-activity-placeholder">
+                    <span class="material-symbols-outlined" style="font-size:32px;opacity:0.25">candlestick_chart</span>
+                    <span>AI-powered trade signals coming soon</span>
                   </div>
                 </div>
+              </div>
 
-                <!-- Fear & Greed -->
-                <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()" style="cursor:pointer">
-                  <div class="ov-header">
-                    <span class="ov-label">Fear &amp; Greed Index</span>
-                    <span class="rc-label-wrap">
-                      <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
-                      <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span>
-                    </span>
-                  </div>
-                  <div class="fg-body">
-                    <div class="fg-gauge-wrap">
-                      <canvas id="fg-gauge"></canvas>
-                      <div class="fg-score-wrap">
-                        <span class="fg-score" id="fg-score">—</span>
-                        <span class="fg-rating" id="fg-rating">Loading…</span>
-                      </div>
+            </div><!-- /home-main -->
+
+            <!-- ── Right sidebar ───────────────────────────────────────────── -->
+            <div class="home-sidebar">
+
+              <!-- Fear & Greed -->
+              <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()" style="cursor:pointer">
+                <div class="ov-header">
+                  <span class="ov-label">Fear &amp; Greed Index</span>
+                  <span class="rc-label-wrap">
+                    <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
+                    <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span>
+                  </span>
+                </div>
+                <div class="fg-body">
+                  <div class="fg-gauge-wrap">
+                    <canvas id="fg-gauge"></canvas>
+                    <div class="fg-score-wrap">
+                      <span class="fg-score" id="fg-score">—</span>
+                      <span class="fg-rating" id="fg-rating">Loading…</span>
                     </div>
-                    <div class="fg-history" id="fg-history">
-                      <div class="skel-item" style="padding:6px 0">
-                        <div class="skel-body">
-                          <div class="skel skel-line" style="width:55%"></div>
-                        </div>
-                        <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="fg-history" id="fg-history">
+                    <div class="skel-item" style="padding:6px 0">
+                      <div class="skel-body">
+                        <div class="skel skel-line skel-w-55"></div>
                       </div>
-                      <div class="skel-item" style="padding:6px 0">
-                        <div class="skel-body">
-                          <div class="skel skel-line" style="width:50%"></div>
-                        </div>
-                        <div class="skel skel-amount"></div>
+                      <div class="skel skel-amount"></div>
+                    </div>
+                    <div class="skel-item" style="padding:6px 0">
+                      <div class="skel-body">
+                        <div class="skel skel-line skel-w-50"></div>
                       </div>
-                      <div class="skel-item" style="padding:6px 0">
-                        <div class="skel-body">
-                          <div class="skel skel-line" style="width:55%"></div>
-                        </div>
-                        <div class="skel skel-amount"></div>
+                      <div class="skel skel-amount"></div>
+                    </div>
+                    <div class="skel-item" style="padding:6px 0">
+                      <div class="skel-body">
+                        <div class="skel skel-line skel-w-55"></div>
                       </div>
+                      <div class="skel skel-amount"></div>
                     </div>
                   </div>
                 </div>
+              </div>
 
-              </div><!-- /overview-grid -->
-            </div><!-- /overview-section -->
-
-            <!-- Home widgets row -->
-            <div class="home-widgets">
-
-              <!-- Top Performers -->
-              <section class="widget-panel widget-performers">
-                <div class="panel-header">
-                  <h3 class="panel-title">Top Performers</h3>
-                </div>
-                <div id="performerList" class="activity-list-home">
-                  <div class="skel-item">
-                    <div class="skel skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skel skel-line" style="width:60%"></div>
-                      <div class="skel skel-line" style="width:40%"></div>
-                    </div>
-                    <div class="skel skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skel skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skel skel-line" style="width:50%"></div>
-                      <div class="skel skel-line" style="width:35%"></div>
-                    </div>
-                    <div class="skel skel-amount"></div>
+              <!-- AI Market Digest -->
+              <div class="ov-card ov-card-digest" id="ov-digest">
+                <div class="ov-header digest-header">
+                  <span class="ov-label">AI Market Digest</span>
+                  <div class="digest-controls">
+                    <span class="digest-source-label">Finviz</span>
+                    <span class="digest-meta" id="digestMeta"></span>
+                    <button class="digest-refresh-btn" id="digestRefreshBtn" onclick="loadMarketDigest(null, true)"
+                      title="Regenerate digest">
+                      <span class="material-symbols-outlined" style="font-size:16px">refresh</span>
+                    </button>
                   </div>
                 </div>
-              </section>
+                <div class="digest-body" id="digestBody">
+                  <div class="digest-loading">
+                    <div class="spinner" style="width:20px;height:20px;border-width:2px"></div>
+                    <span>Generating digest…</span>
+                  </div>
+                </div>
+              </div>
 
-            </div><!-- /home-widgets -->
+              <!-- Top + Under performers -->
+              <div class="home-performers-row">
+                <div class="ov-card home-performers-card">
+                  <div class="ov-header"><span class="ov-label">Top Performers</span></div>
+                  <div id="homeTopPerformers" class="home-performers-list">
+                    <div class="activity-loading">
+                      <div class="table-loading-spinner"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="ov-card home-performers-card">
+                  <div class="ov-header"><span class="ov-label">Under Performers</span></div>
+                  <div id="homeUnderPerformers" class="home-performers-list">
+                    <div class="activity-loading">
+                      <div class="table-loading-spinner"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-          </div><!-- /view-main -->
+            </div><!-- /home-sidebar -->
+
+          </div><!-- /home-body -->
         </div><!-- /view-home -->
 
         <!-- ═══ VIEW: PORTFOLIO ═══ -->
@@ -585,16 +625,28 @@
                 <!-- Left: portfolio heatmap -->
                 <div class="portfolio-left">
                   <div class="card portfolio-heatmap-card">
-                    <div class="phm-header">
-                      <span class="chart-card-title">Position Heatmap</span>
+                    <div class="phm-card-header">
+                      <span class="chart-card-title">Allocation</span>
                       <span class="phm-hint">Size = weight · Color = total return</span>
                     </div>
-                    <div id="portfolioHeatmap" class="portfolio-heatmap"></div>
+                    <div class="phm-panels">
+                      <!-- Left panel: by company -->
+                      <div class="phm-panel">
+                        <div class="phm-panel-label">By Company</div>
+                        <div id="portfolioHeatmap" class="portfolio-heatmap"></div>
+                      </div>
+                      <!-- Right panel: by industry -->
+                      <div class="phm-panel">
+                        <div class="phm-panel-label">By Industry</div>
+                        <div id="sectorHeatmap" class="portfolio-heatmap"></div>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Stale banner -->
                   <div id="staleBanner" class="stale-banner" style="display:none">
-                    <span class="material-symbols-outlined" style="font-size:14px;flex-shrink:0;line-height:1;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
+                    <span class="material-symbols-outlined"
+                      style="font-size:14px;flex-shrink:0;line-height:1;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
                     <span id="staleBannerText">Data is over 5 minutes old.</span>
                     <a href="#" onclick="loadPortfolio(true); return false;">Refresh now</a>
                     <button class="stale-close" onclick="document.getElementById('staleBanner').style.display='none'"
@@ -735,25 +787,25 @@
               <div class="news-card skel-news-card">
                 <div class="skel skel-news-img-lg"></div>
                 <div class="skel-news-body">
-                  <div class="skel skel-line" style="width:30%"></div>
-                  <div class="skel skel-line" style="width:90%"></div>
-                  <div class="skel skel-line" style="width:70%"></div>
+                  <div class="skel skel-line skel-w-30"></div>
+                  <div class="skel skel-line skel-w-90"></div>
+                  <div class="skel skel-line skel-w-70"></div>
                 </div>
               </div>
               <div class="news-card skel-news-card">
                 <div class="skel skel-news-img-lg"></div>
                 <div class="skel-news-body">
-                  <div class="skel skel-line" style="width:40%"></div>
-                  <div class="skel skel-line" style="width:85%"></div>
-                  <div class="skel skel-line" style="width:65%"></div>
+                  <div class="skel skel-line skel-w-40"></div>
+                  <div class="skel skel-line skel-w-85"></div>
+                  <div class="skel skel-line skel-w-65"></div>
                 </div>
               </div>
               <div class="news-card skel-news-card">
                 <div class="skel skel-news-img-lg"></div>
                 <div class="skel-news-body">
-                  <div class="skel skel-line" style="width:35%"></div>
-                  <div class="skel skel-line" style="width:80%"></div>
-                  <div class="skel skel-line" style="width:60%"></div>
+                  <div class="skel skel-line skel-w-35"></div>
+                  <div class="skel skel-line skel-w-80"></div>
+                  <div class="skel skel-line skel-w-60"></div>
                 </div>
               </div>
             </div>
@@ -783,16 +835,16 @@
                   <div class="skel-item">
                     <div class="skel skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:55%"></div>
-                      <div class="skel skel-line" style="width:35%"></div>
+                      <div class="skel skel-line skel-w-55"></div>
+                      <div class="skel skel-line skel-w-35"></div>
                     </div>
                     <div class="skel skel-amount"></div>
                   </div>
                   <div class="skel-item">
                     <div class="skel skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:65%"></div>
-                      <div class="skel skel-line" style="width:40%"></div>
+                      <div class="skel skel-line skel-w-65"></div>
+                      <div class="skel skel-line skel-w-40"></div>
                     </div>
                     <div class="skel skel-amount"></div>
                   </div>
@@ -809,16 +861,16 @@
                   <div class="skel-item">
                     <div class="skel skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:50%"></div>
-                      <div class="skel skel-line" style="width:30%"></div>
+                      <div class="skel skel-line skel-w-50"></div>
+                      <div class="skel skel-line skel-w-30"></div>
                     </div>
                     <div class="skel skel-amount"></div>
                   </div>
                   <div class="skel-item">
                     <div class="skel skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:60%"></div>
-                      <div class="skel skel-line" style="width:40%"></div>
+                      <div class="skel skel-line skel-w-60"></div>
+                      <div class="skel skel-line skel-w-40"></div>
                     </div>
                     <div class="skel skel-amount"></div>
                   </div>
@@ -851,13 +903,9 @@
                 </div>
                 <div id="divCalendarList" class="activity-list-home">
                   <div class="skel-card">
-                    <div class="skel-card-header">
-                      <div class="skel skel-line" style="width:30%"></div>
-                      <div class="skel skel-amount"></div>
-                    </div>
                     <div class="skel-card-row">
-                      <div class="skel skel-line" style="width:45%"></div>
-                      <div class="skel skel-line" style="width:45%"></div>
+                      <div class="skel skel-line skel-w-45"></div>
+                      <div class="skel skel-line skel-w-45"></div>
                     </div>
                   </div>
                 </div>
@@ -872,12 +920,12 @@
                 <div id="earningsList" class="activity-list-home">
                   <div class="skel-card">
                     <div class="skel-card-header">
-                      <div class="skel skel-line" style="width:30%"></div>
+                      <div class="skel skel-line skel-w-30"></div>
                       <div class="skel skel-amount"></div>
                     </div>
                     <div class="skel-card-row">
-                      <div class="skel skel-line" style="width:25%"></div>
-                      <div class="skel skel-line" style="width:20%"></div>
+                      <div class="skel skel-line skel-w-25"></div>
+                      <div class="skel skel-line skel-w-20"></div>
                     </div>
                   </div>
                 </div>
@@ -887,6 +935,235 @@
 
           </div><!-- /view-main -->
         </div><!-- /view-calendar -->
+
+        <!-- ═══ VIEW: MARKET ═══ -->
+        <div id="view-market" class="spa-view" style="display:none">
+          <div class="view-main">
+
+            <div class="cal-view-header">
+              <div class="cal-view-title-block">
+                <h1 class="cal-view-title">Market</h1>
+                <p class="cal-view-subtitle">S&amp;P 500 chart, sector performance, signals and insider activity</p>
+              </div>
+            </div>
+
+            <!-- Market body: 3-column × 2-row grid -->
+            <div class="market-body">
+
+              <!-- Row 1, Col 1: S&P 500 Chart -->
+              <div class="market-chart-card widget-panel">
+                <div class="panel-header">
+                  <div class="mkt-chart-title-group">
+                    <h3 class="panel-title">S&amp;P 500</h3>
+                    <div class="mkt-chart-stats">
+                      <span id="mktSpPrice" class="mkt-sp-price">—</span>
+                      <span id="mktSpChange" class="mkt-sp-change">—</span>
+                    </div>
+                  </div>
+                  <div class="mkt-range-tabs" id="mktRangeTabs">
+                    <button class="mkt-range-tab" data-range="1W">1W</button>
+                    <button class="mkt-range-tab" data-range="1M">1M</button>
+                    <button class="mkt-range-tab active" data-range="3M">3M</button>
+                    <button class="mkt-range-tab" data-range="1Y">1Y</button>
+                  </div>
+                </div>
+                <div class="mkt-chart-wrap">
+                  <canvas id="mktChart"></canvas>
+                  <div id="mktChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="mkt-chart-footer">
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Range chg</span>
+                    <span id="mktRangePct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">vs 125d MA</span>
+                    <span id="mktVsMa" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">VIX</span>
+                    <span id="mktVix" class="mkt-footer-val">—</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Row 1, Col 2: Portfolio vs S&P 500 -->
+              <div class="market-chart-card widget-panel">
+                <div class="panel-header">
+                  <div class="mkt-chart-title-group">
+                    <h3 class="panel-title">Portfolio vs S&amp;P 500</h3>
+                    <div class="mkt-pvs-legend">
+                      <span class="pvs-leg-dot" style="background:#3b82f6"></span><span
+                        class="pvs-leg-label">S&amp;P</span>
+                      <span class="pvs-leg-dot" style="background:#14b8a6"></span><span
+                        class="pvs-leg-label">Portfolio</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mkt-chart-wrap">
+                  <canvas id="pvsChart"></canvas>
+                  <div id="pvsChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="mkt-chart-footer">
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Portfolio</span>
+                    <span id="pvsPortPct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">S&amp;P 500</span>
+                    <span id="pvsSpPct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Alpha</span>
+                    <span id="pvsAlpha" class="mkt-footer-val">—</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Row 1, Col 3: Market Signals -->
+              <section class="widget-panel widget-signals">
+                <div class="panel-header">
+                  <h3 class="panel-title">Market Signals</h3>
+                  <div class="signal-tabs" id="signalTabs">
+                    <button class="signal-tab active" data-signal="gainers">Gainers</button>
+                    <button class="signal-tab" data-signal="losers">Losers</button>
+                    <button class="signal-tab" data-signal="volume">Volume</button>
+                    <button class="signal-tab" data-signal="newhighs">New Highs</button>
+                    <button class="signal-tab" data-signal="oversold">Oversold</button>
+                  </div>
+                </div>
+                <div id="signalsList" class="signals-list">
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-60"></div>
+                      <div class="skel skel-line skel-w-40"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-50"></div>
+                      <div class="skel skel-line skel-w-35"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-60"></div>
+                      <div class="skel skel-line skel-w-45"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-55"></div>
+                      <div class="skel skel-line skel-w-30"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Row 2, Col 1: NASDAQ Chart -->
+              <div class="market-chart-card widget-panel">
+                <div class="panel-header">
+                  <div class="mkt-chart-title-group">
+                    <h3 class="panel-title">NASDAQ</h3>
+                    <div class="mkt-chart-stats">
+                      <span id="nasdaqPrice" class="mkt-sp-price">—</span>
+                      <span id="nasdaqChange" class="mkt-sp-change">—</span>
+                    </div>
+                  </div>
+                  <div class="mkt-range-tabs" id="nasdaqRangeTabs">
+                    <button class="mkt-range-tab" data-range="1W">1W</button>
+                    <button class="mkt-range-tab" data-range="1M">1M</button>
+                    <button class="mkt-range-tab active" data-range="3M">3M</button>
+                    <button class="mkt-range-tab" data-range="1Y">1Y</button>
+                  </div>
+                </div>
+                <div class="mkt-chart-wrap">
+                  <canvas id="nasdaqChart"></canvas>
+                  <div id="nasdaqChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="mkt-chart-footer">
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Range chg</span>
+                    <span id="nasdaqRangePct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">vs 50d MA</span>
+                    <span id="nasdaqVsMa" class="mkt-footer-val">—</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Row 2, Col 2: Sector Performance -->
+              <section class="widget-panel widget-sectors">
+                <div class="panel-header">
+                  <h3 class="panel-title">Sectors</h3>
+                  <span style="font-size:0.7rem;color:var(--text-muted)">Today</span>
+                </div>
+                <div id="sectorBarsList" class="sector-bars-list"></div>
+              </section>
+
+              <!-- Row 2, Col 3: Insider Trading -->
+              <section class="widget-panel widget-insider">
+                <div class="panel-header">
+                  <h3 class="panel-title">Insider Trading</h3>
+                  <div class="signal-tabs" id="insiderTabs">
+                    <button class="signal-tab active" data-period="latest">Latest</button>
+                    <button class="signal-tab" data-period="top week">Top Week</button>
+                  </div>
+                </div>
+                <div id="insiderList" class="insider-list">
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-60"></div>
+                      <div class="skel skel-line skel-w-40"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-50"></div>
+                      <div class="skel skel-line skel-w-35"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-60"></div>
+                      <div class="skel skel-line skel-w-45"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skel skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skel skel-line skel-w-55"></div>
+                      <div class="skel skel-line skel-w-30"></div>
+                    </div>
+                    <div class="skel skel-amount"></div>
+                  </div>
+                </div>
+              </section>
+
+            </div><!-- /market-body -->
+
+          </div><!-- /view-main -->
+        </div><!-- /view-market -->
 
       </div><!-- /view-container -->
 

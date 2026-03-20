@@ -397,6 +397,7 @@ function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
   }
 
   drawPortfolioHeatmap(rows, totalValue);
+  drawSectorHeatmap(rows, totalValue);
 }
 
 /* ─── Country allocation bar ─────────────────────────────────────────────── */
@@ -1601,7 +1602,8 @@ function drawPortfolioHeatmap(rows, totalValue) {
   if (!container || !rows.length) return;
 
   const W = container.clientWidth || 600;
-  const H = Math.max(Math.round(W * 0.42), 220);
+  const H = container.clientHeight || Math.max(Math.round(W * 0.52), 240);
+  if (!container.clientHeight) { requestAnimationFrame(() => drawPortfolioHeatmap(rows, totalValue)); return; }
   container.style.height = H + 'px';
 
   const items = [...rows]
@@ -1640,6 +1642,72 @@ function drawPortfolioHeatmap(rows, totalValue) {
   container.querySelectorAll('.phm-cell').forEach(el => {
     el.onclick = () => openStockPanel(_phmRects[+el.dataset.i].item);
   });
+}
+
+function drawSectorHeatmap(rows, totalValue) {
+  const container = document.getElementById('sectorHeatmap');
+  if (!container || !rows.length) return;
+
+  // Group rows by sector
+  const bySecMap = {};
+  rows.filter(r => r.current_value > 0).forEach(r => {
+    const sec = r.sector || 'Other';
+    if (!bySecMap[sec]) bySecMap[sec] = { value: 0, weightedReturn: 0 };
+    bySecMap[sec].value += r.current_value;
+    bySecMap[sec].weightedReturn += r.current_value * (r.returns_pct || 0);
+  });
+
+  const items = Object.entries(bySecMap)
+    .map(([name, d]) => ({
+      name,
+      value: d.value,
+      avgReturn: d.value > 0 ? d.weightedReturn / d.value : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  const W = container.clientWidth || 300;
+  const H = container.clientHeight || Math.max(Math.round(W * 0.52), 240);
+  if (!container.clientHeight) { requestAnimationFrame(() => drawSectorHeatmap(rows, totalValue)); return; }
+  container.style.height = H + 'px';
+
+  const rects = _computeTreemap(items, W, H);
+  const GAP = 3;
+
+  container.innerHTML = rects.map((rect) => {
+    const r      = rect.item;
+    const pct    = r.avgReturn;
+    const sign   = pct >= 0 ? '+' : '';
+    const weight = totalValue > 0 ? (r.value / totalValue * 100) : 0;
+    const bg     = _pnlColor(pct);
+    const tinyW  = rect.w < 70;
+    const tinyH  = rect.h < 44;
+
+    // Shorten common sector labels for tight cells
+    const shortName = r.name
+      .replace('Communication Services', 'Comms')
+      .replace('Consumer Discretionary', 'Cons. Disc.')
+      .replace('Consumer Staples', 'Cons. Staples')
+      .replace('Information Technology', 'Tech')
+      .replace('Health Care', 'Healthcare')
+      .replace('Real Estate', 'Real Estate')
+      .replace('Index Funds', 'Index');
+
+    const displayName = tinyW ? shortName.split(/[\s/]/)[0] : shortName;
+
+    const inner = tinyW || tinyH
+      ? `<span class="phm-ticker" style="font-size:0.58rem">${esc(displayName)}</span>`
+      : `<span class="phm-ticker" style="font-size:0.72rem;font-weight:600">${esc(displayName)}</span>
+         <span class="phm-weight">${weight.toFixed(1)}%</span>
+         <span class="phm-pct">${sign}${pct.toFixed(1)}%</span>`;
+
+    return `<div class="phm-cell"
+      style="left:${(rect.x + GAP/2).toFixed(1)}px;top:${(rect.y + GAP/2).toFixed(1)}px;
+             width:${(rect.w - GAP).toFixed(1)}px;height:${(rect.h - GAP).toFixed(1)}px;
+             background:${bg}"
+      title="${esc(r.name)} · ${weight.toFixed(1)}% · avg return ${sign}${pct.toFixed(1)}%">
+      ${inner}
+    </div>`;
+  }).join('');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

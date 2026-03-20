@@ -21,6 +21,7 @@ let _stocksActivePid    = null;
 let _newsInitialized        = false;
 let _calendarInitialized    = false;
 let _activityInitialized    = false;
+let _marketInitialized      = false;
 
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
@@ -29,6 +30,12 @@ const _homeTimers = {
     news:    null,
     mkt:     null,
     mktTick: null,
+    digest:  null,
+};
+
+const _marketTimers = {
+    sp500:   null,
+    signals: null,
 };
 
 /* ── View helpers ────────────────────────────────────────────────────────── */
@@ -54,6 +61,7 @@ function _updateBreadcrumb(route) {
         'news':                 'Market News',
         'calendar':             'Market Calendar',
         'activity':             'Activity & History',
+        'market':               'Market',
     };
     el.textContent = map[route] || 'Portfolio Tracker';
 }
@@ -104,6 +112,8 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadCalendarView(true);
     } else if (view === 'activity') {
         btn.onclick = () => loadActivityView(true);
+    } else if (view === 'market') {
+        btn.onclick = () => loadMarketView(true);
     }
 }
 
@@ -181,6 +191,7 @@ function _router() {
     // Deactivate previous view
     if (prev === 'home')                    _deactivateHomeView();
     else if (prev?.startsWith('portfolio/')) _deactivateDetailView();
+    else if (prev === 'market')             _deactivateMarketView();
 
     // Update shared UI
     _updateBreadcrumb(hash);
@@ -268,6 +279,18 @@ function _router() {
             if (typeof loadActivityView === 'function') loadActivityView();
             _activityInitialized = true;
         }
+
+    /* ── Market ── */
+    } else if (hash === 'market') {
+        _showView('market');
+        _updateRefreshBtn('market');
+        document.title = 'Market — Portfolio Tracker';
+        if (!_marketInitialized) {
+            _initMarketView();
+            _marketInitialized = true;
+        } else {
+            _activateMarketView();
+        }
     }
 }
 
@@ -279,14 +302,14 @@ function _portfolioTitle(pid) {
 
 /* ── Home view lifecycle ─────────────────────────────────────────────────── */
 function _initHomeView() {
-    if (typeof initRefreshClocks  === 'function') initRefreshClocks();
-    if (typeof loadHomeData       === 'function') loadHomeData();
-    if (typeof loadHomeWidgets    === 'function') loadHomeWidgets();
-    if (typeof loadSparklines     === 'function') loadSparklines();
-    if (typeof loadFearGreed      === 'function') loadFearGreed();
-    if (typeof loadMarketIndicators==='function') loadMarketIndicators();
-    if (typeof loadMarketStatus   === 'function') loadMarketStatus();
-    if (typeof loadStockTicker    === 'function') loadStockTicker();
+    if (typeof initRefreshClocks   === 'function') initRefreshClocks();
+    if (typeof loadHomeData        === 'function') loadHomeData();
+    if (typeof loadSparklines      === 'function') loadSparklines();
+    if (typeof loadFearGreed       === 'function') loadFearGreed();
+    if (typeof loadMarketIndicators === 'function') loadMarketIndicators();
+    if (typeof loadMarketStatus    === 'function') loadMarketStatus();
+    if (typeof loadStockTicker     === 'function') loadStockTicker();
+    if (typeof loadMarketDigest    === 'function') loadMarketDigest();
     _startHomeTimers();
 }
 
@@ -314,12 +337,45 @@ function _startHomeTimers() {
         setInterval(loadMarketIndicators, 1800000);
     if (typeof loadStockTicker === 'function')
         _homeTimers.heatmap = setInterval(loadStockTicker, 60000);
-    // News has its own view — no background timer on home
+    if (typeof loadMarketDigest === 'function')
+        _homeTimers.digest = setInterval(() => loadMarketDigest(null, false), 1800000);
 }
 
 function _stopHomeTimers() {
     Object.keys(_homeTimers).forEach(k => {
         if (_homeTimers[k]) { clearInterval(_homeTimers[k]); _homeTimers[k] = null; }
+    });
+}
+
+/* ── Market view lifecycle ───────────────────────────────────────────────── */
+function _initMarketView() {
+    if (typeof initFinvizTabs    === 'function') initFinvizTabs();
+    if (typeof loadMarketView    === 'function') loadMarketView();
+    _startMarketTimers();
+}
+
+function _activateMarketView() {
+    if (typeof loadSP500Heatmap   === 'function') loadSP500Heatmap();
+    if (typeof loadMarketSignals  === 'function') loadMarketSignals(_activeSignal);
+    _startMarketTimers();
+}
+
+function _deactivateMarketView() { _stopMarketTimers(); }
+
+function _startMarketTimers() {
+    _stopMarketTimers();
+    if (typeof loadSP500Heatmap === 'function')
+        _marketTimers.sp500 = setInterval(loadSP500Heatmap, 300000);
+    if (typeof loadMarketSignals === 'function')
+        _marketTimers.signals = setInterval(() => {
+            if (typeof _signalsData !== 'undefined') _signalsData = {};
+            loadMarketSignals(typeof _activeSignal !== 'undefined' ? _activeSignal : 'gainers');
+        }, 300000);
+}
+
+function _stopMarketTimers() {
+    Object.keys(_marketTimers).forEach(k => {
+        if (_marketTimers[k]) { clearInterval(_marketTimers[k]); _marketTimers[k] = null; }
     });
 }
 
@@ -361,14 +417,33 @@ function _deactivateDetailView() {
 
 /* ── Bootstrap ───────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
-    const saved = localStorage.getItem('theme') || 'light';
-    document.documentElement.setAttribute('data-theme', saved);
+    // Theme & Glass initialization
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    _updateThemeIcon(savedTheme);
 
     if (typeof applyCurrency === 'function') applyCurrency();
 
     _restoreSidebar();
     _router();
 });
+
+/* ── Theme & Glass Toggles ───────────────────────────────────────────────── */
+function toggleTheme() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') !== 'light';
+    const newTheme = isDark ? 'light' : 'dark';
+    html.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+    _updateThemeIcon(newTheme);
+}
+
+
+function _updateThemeIcon(theme) {
+    const icon = document.getElementById('themeIcon');
+    if (!icon) return;
+    icon.textContent = theme === 'light' ? 'dark_mode' : 'light_mode';
+}
 
 window.addEventListener('hashchange', _router);
 
@@ -377,3 +452,4 @@ window.navigate      = navigate;
 window.toggleSidebar = toggleSidebar;
 window.toggleNavGroup = toggleNavGroup;
 window.switchPid     = switchPid;
+window.toggleTheme   = toggleTheme;
