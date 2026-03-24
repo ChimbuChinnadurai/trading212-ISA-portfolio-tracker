@@ -4,5 +4,3 @@ requests==2.32.3
 python-dotenv==1.0.1
 psycopg2-binary==2.9.9
 finvizfinance==0.14.1
-anthropic>=0.40.0
-google-genai>=1.0.0

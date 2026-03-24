@@ -5,6 +5,9 @@ import os
 import threading
 import time
 import requests
+from dotenv import load_dotenv
+load_dotenv()
+
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -15,7 +18,7 @@ import ai_digest as _ai_digest
 from cache import (
     TTL_DIV, TTL_NEWS, init_db, kv_age, kv_get, kv_set,
     rows_get, rows_set, snapshot_add, snapshot_get,
-    clear_all_cache,
+    clear_all_cache, get_excluded_tickers, set_ticker_excluded
 )
 from fx import get_gbpusd_rate
 from portfolio import TICKER_MAPPING, build_rows
@@ -731,6 +734,8 @@ def stock_tickers_api():
                 if prev and prev != 0:
                     change     = price - prev
                     change_pct = (change / prev) * 100
+            if clean_ticker == "ATO":
+                clean_ticker == "ATO.PA"
             info = {
                 "ticker":        clean_ticker,
                 "company_name":  row.get("company_name", ticker),
@@ -740,6 +745,13 @@ def stock_tickers_api():
                 "currency":      currency,
                 "current_value": row.get("current_value"),
                 "sector":        row.get("sector", "Other"),
+                # Full portfolio fields for stock side panel
+                "quantity":      row.get("quantity"),
+                "avg_price":     row.get("avg_price"),
+                "invested":      row.get("invested"),
+                "total_returns": row.get("total_returns"),
+                "returns_pct":   row.get("returns_pct"),
+                "country":       row.get("country"),
             }
             # Only cache when we have complete data; otherwise it retries next refresh
             if change is not None and change_pct is not None:
@@ -983,88 +995,268 @@ def stock_news(ticker):
 
 @app.route("/api/analyst-ratings")
 def analyst_ratings():
-    """Return latest analyst recommendations for all US-held stocks, cached 24 hours."""
-    if not FINNHUB_TOKEN:
-        app.logger.warning("Finnhub token not configured - skipping analyst ratings")
-        return jsonify({"status": "error", "message": "Finnhub token not configured"}), 503
-
+    """Return analyst recommendations for all held stocks using TradingView data, cached 24 hours."""
     try:
-        # Collect all tickers across US and CA portfolios
-        us_tickers = set()
+        # Collect all unique tickers across both portfolios (all countries)
+        all_tickers = {}
         for pid in ["1", "2"]:
             rows, _, _, _ = fetch_and_cache_portfolio(pid)
             if rows:
                 for r in rows:
                     ticker = r.get("ticker")
-                    country = r.get("country")
-                    if ticker and country in ["US", "CA"]:
-                        us_tickers.add(ticker.upper())
-        
-        if not us_tickers:
+                    sector = (r.get("sector") or "").lower()
+                    # Skip index funds / ETFs — they don't have analyst ratings
+                    if ticker and ticker not in all_tickers and "index" not in sector:
+                        all_tickers[ticker] = r.get("country", "US")
+
+        if not all_tickers:
             return jsonify({"status": "ok", "data": {}})
 
         result = {}
-        for ticker in sorted(us_tickers):
-            cache_key = f"finnhub:rec:{ticker}"
+        for ticker, country in sorted(all_tickers.items()):
+            cache_key = f"tv:analyst:v4:{ticker}"
             data = kv_get(cache_key, TTL_EARNINGS)  # 24h TTL
             if data is None:
-                try:
-                    # Map to Finnhub-friendly symbol if needed
-                    # fetch_ticker = FINNHUB_SYMBOL_MAP.get(ticker, ticker)
-                    url = (
-                        f"https://finnhub.io/api/v1/stock/recommendation"
-                        f"?symbol={ticker}&token={FINNHUB_TOKEN}"
-                    )
-                    resp = requests.get(url, timeout=10)
-                    data = resp.json() if resp.status_code == 200 else []
-                    if not isinstance(data, list):
-                        data = []
-                    kv_set(cache_key, data)
-                    time.sleep(0.12)
-                except Exception:
-                    data = []
+                forecast = _get_tv_forecast(ticker, country)
+                data = forecast or {}
+                kv_set(cache_key, data)
 
-            if not data:
+            rec_text = (data.get("rec_text") or "NEUTRAL").upper()
+            total    = data.get("total", 0)
+
+            # Skip if TradingView has no usable signal for this ticker
+            if not data or (total == 0 and rec_text == "NEUTRAL"):
                 continue
 
-            # Use most recent period (first entry)
-            latest = data[0]
-            strong_buy = latest.get("strongBuy", 0)
-            buy = latest.get("buy", 0)
-            hold = latest.get("hold", 0)
-            sell = latest.get("sell", 0)
-            strong_sell = latest.get("strongSell", 0)
-            total = strong_buy + buy + hold + sell + strong_sell
+            strong_buy  = data.get("strongBuy", 0)
+            buy         = data.get("buy", 0)
+            hold        = data.get("hold", 0)
+            sell        = data.get("sell", 0)
+            strong_sell = data.get("strongSell", 0)
+            has_breakdown = data.get("hasBreakdown", False)
 
-            if total == 0:
-                continue
-
-            score = (strong_buy * 1 + buy * 2 + hold * 3 + sell * 4 + strong_sell * 5) / total
-            if score <= 1.5:
-                consensus = "Strong Buy"
-            elif score <= 2.5:
-                consensus = "Buy"
-            elif score <= 3.5:
-                consensus = "Hold"
-            elif score <= 4.5:
-                consensus = "Sell"
+            # Derive consensus: use weighted score when breakdown available,
+            # otherwise map rec_text directly.
+            if has_breakdown and total > 0:
+                score = (strong_buy*1 + buy*2 + hold*3 + sell*4 + strong_sell*5) / total
+                if score <= 1.5:   consensus = "Strong Buy"
+                elif score <= 2.5: consensus = "Buy"
+                elif score <= 3.5: consensus = "Hold"
+                elif score <= 4.5: consensus = "Sell"
+                else:              consensus = "Strong Sell"
             else:
-                consensus = "Strong Sell"
+                _map = {
+                    "STRONG BUY": "Strong Buy", "BUY": "Buy",
+                    "NEUTRAL": "Hold", "HOLD": "Hold",
+                    "SELL": "Sell", "STRONG SELL": "Strong Sell",
+                }
+                consensus = _map.get(rec_text, "Hold")
 
             result[ticker] = {
-                "strongBuy": strong_buy,
-                "buy": buy,
-                "hold": hold,
-                "sell": sell,
-                "strongSell": strong_sell,
-                "total": total,
-                "period": latest.get("period", ""),
-                "consensus": consensus,
+                "strongBuy":    strong_buy,
+                "buy":          buy,
+                "hold":         hold,
+                "sell":         sell,
+                "strongSell":   strong_sell,
+                "total":        total,
+                "hasBreakdown": has_breakdown,
+                "period":       "past 3 months",
+                "consensus":    consensus,
+                "avgTarget":    data.get("avg"),
+                "highTarget":   data.get("high"),
+                "lowTarget":    data.get("low"),
             }
 
         return jsonify({"status": "ok", "data": result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/watchlist/signals")
+def watchlist_signals():
+    """TradingView analyst targets for any arbitrary ticker (for watchlist use)."""
+    ticker  = request.args.get("ticker", "").strip().upper()
+    country = request.args.get("country", "US").strip().upper()
+    if not ticker:
+        return jsonify({"status": "error", "message": "ticker required"}), 400
+    try:
+        cache_key = f"tv:analyst:v4:{ticker}"
+        data = kv_get(cache_key, TTL_EARNINGS)
+        if data is None:
+            data = _get_tv_forecast(ticker, country) or {}
+            if data:
+                kv_set(cache_key, data)
+        return jsonify({
+            "status": "ok",
+            "data": {
+                "avg":      data.get("avg"),
+                "high":     data.get("high"),
+                "low":      data.get("low"),
+                "rec_text": data.get("rec_text", "NEUTRAL"),
+            }
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+_YF_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
+
+
+def _yf_crumb():
+    """Return (crumb, cookie_str) for Yahoo Finance v10 requests, cached 1 h."""
+    cached = kv_get("yf:crumb:v3", 3600)
+    if cached:
+        return cached["crumb"], cached["cookies"]
+
+    sess = requests.Session()
+    # Hit the consent endpoint so cookies are set
+    sess.get("https://fc.yahoo.com", headers={"User-Agent": _YF_UA}, timeout=8)
+    r = sess.get(
+        "https://query1.finance.yahoo.com/v1/test/getcrumb",
+        headers={"User-Agent": _YF_UA, "Accept": "text/plain"},
+        timeout=8,
+    )
+    r.raise_for_status()
+    crumb   = r.text.strip()
+    cookies = "; ".join(f"{k}={v}" for k, v in sess.cookies.items())
+    kv_set("yf:crumb:v3", {"crumb": crumb, "cookies": cookies})
+    return crumb, cookies
+
+
+def _yf_summary(yf_sym, modules="financialData,defaultKeyStatistics,summaryDetail"):
+    """Fetch Yahoo Finance quoteSummary with crumb auth; retries once on 401."""
+    for attempt in range(2):
+        crumb, cookies = _yf_crumb()
+        resp = requests.get(
+            f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{yf_sym}",
+            params={"modules": modules, "crumb": crumb},
+            headers={"User-Agent": _YF_UA, "Cookie": cookies},
+            timeout=10,
+        )
+        if resp.status_code == 401 and attempt == 0:
+            # Crumb expired — clear cache and retry
+            try:
+                kv_set("yf:crumb:v3", None)
+            except Exception:
+                pass
+            continue
+        resp.raise_for_status()
+        result_list = resp.json().get("quoteSummary", {}).get("result") or []
+        return result_list[0] if result_list else {}
+    return {}
+
+
+@app.route("/api/watchlist/fundamentals")
+def watchlist_fundamentals():
+    """Market cap, LTM revenue, and P/S (revenue multiple) for a ticker. Cached 24h."""
+    ticker  = request.args.get("ticker", "").strip().upper()
+    country = request.args.get("country", "US").strip().upper()
+    if not ticker:
+        return jsonify({"status": "error", "message": "ticker required"}), 400
+    try:
+        cache_key = f"wl:fundamentals:{ticker}:{country}"
+        cached = kv_get(cache_key, TTL_EARNINGS)
+        if cached is not None:
+            return jsonify({"status": "ok", "data": cached})
+
+        suffix       = _COUNTRY_YF_SUFFIX.get(country, "")
+        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+        yf_sym       = f"{clean_ticker}{suffix}"
+
+        summary = _yf_summary(yf_sym)
+        fin     = summary.get("financialData", {})
+        stats   = summary.get("defaultKeyStatistics", {})
+        detail  = summary.get("summaryDetail", {})
+
+        def _raw(d, key):
+            v = d.get(key)
+            return v.get("raw") if isinstance(v, dict) else v
+
+        market_cap    = _raw(stats, "marketCap") or _raw(detail, "marketCap")
+        total_revenue = _raw(fin, "totalRevenue")
+        trailing_pe   = _raw(detail, "trailingPE") or _raw(stats, "trailingPE")
+
+        rev_multiple = None
+        if market_cap and total_revenue and total_revenue > 0:
+            rev_multiple = round(market_cap / total_revenue, 1)
+
+        pe_ratio = round(trailing_pe, 1) if trailing_pe and trailing_pe > 0 else None
+
+        data = {"market_cap": market_cap, "revenue": total_revenue, "rev_multiple": rev_multiple, "pe_ratio": pe_ratio}
+        kv_set(cache_key, data)
+        return jsonify({"status": "ok", "data": data})
+    except Exception as e:
+        logger.warning("watchlist_fundamentals error for %s: %s", ticker, e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/watchlist/price")
+def watchlist_price():
+    """Current price + company name for any arbitrary ticker (for watchlist use), cached 60s."""
+    ticker  = request.args.get("ticker", "").strip()
+    country = request.args.get("country", "US").strip().upper()
+    if not ticker:
+        return jsonify({"status": "error", "message": "ticker required"}), 400
+    try:
+        cache_key = f"wl:price:{ticker}:{country}"
+        cached = kv_get(cache_key, 60)
+        if cached is not None:
+            return jsonify({"status": "ok", "data": cached})
+
+        suffix       = _COUNTRY_YF_SUFFIX.get(country, "")
+        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+        yf_sym       = f"{clean_ticker}{suffix}"
+        resp = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
+            params={"range": "1d", "interval": "1d"},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=8,
+        )
+        resp.raise_for_status()
+        meta       = resp.json()["chart"]["result"][0]["meta"]
+        price      = meta.get("regularMarketPrice")
+        change_pct = meta.get("regularMarketChangePercent")
+        currency   = meta.get("currency", "")
+        company    = meta.get("longName") or meta.get("shortName") or clean_ticker
+        if price is not None and change_pct is None:
+            prev = meta.get("chartPreviousClose") or meta.get("previousClose")
+            if prev and prev != 0:
+                change_pct = ((price - prev) / prev) * 100
+        result = {
+            "ticker":      clean_ticker,
+            "company":     company,
+            "price":       round(price, 4) if price is not None else None,
+            "change_pct":  round(change_pct, 4) if change_pct is not None else None,
+            "currency":    currency,
+        }
+        kv_set(cache_key, result)
+        return jsonify({"status": "ok", "data": result})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+_WL_TTL = 10 * 365 * 24 * 3600  # ~10 years — effectively permanent
+
+
+@app.route("/api/watchlist/tickers", methods=["GET"])
+def get_watchlist_tickers():
+    """Return the persisted watchlist ticker list."""
+    data = kv_get("watchlist_tickers", _WL_TTL) or []
+    return jsonify({"status": "ok", "data": data})
+
+
+@app.route("/api/watchlist/tickers", methods=["POST"])
+def save_watchlist_tickers():
+    """Persist the full watchlist ticker list."""
+    body = request.get_json(silent=True) or {}
+    tickers = body.get("tickers", [])
+    if not isinstance(tickers, list):
+        return jsonify({"status": "error", "message": "tickers must be a list"}), 400
+    kv_set("watchlist_tickers", tickers)
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/fx-rate")
@@ -1495,7 +1687,253 @@ def health():
     return jsonify({"status": "healthy"})
 
 
-# ── Finviz routes ──────────────────────────────────────────────────────────────
+def _get_tv_forecast(ticker, country="US"):
+    import requests, re, time
+    exchange_mapping = {
+        "US": ["NASDAQ", "NYSE", "AMEX", "OTC"],
+        "UK": ["LSE"],
+        "GB": ["LSE"],
+        "DE": ["XETR"],
+        "FR": ["EURONEXT"],
+        "CA": ["TSX", "TSXV", "OTC", "NASDAQ", "NYSE"],
+        "ES": ["LSE", "BME"],
+        "NL": ["EURONEXT"],
+        "IE": ["LSE", "EURONEXT", "MIL"]
+    }
+    
+    clean_ticker = ticker
+    if ticker.endswith("l") and len(ticker) > 1 and ticker[:-1].isupper():
+        clean_ticker = ticker[:-1]
+        
+    exchanges = exchange_mapping.get(country.upper(), ["NASDAQ", "NYSE", "AMEX", "OTC"])
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    html = ""
+    for ex in exchanges:
+        url = f"https://www.tradingview.com/symbols/{ex}-{clean_ticker}/forecast/"
+        for attempt in range(3):
+            try:
+                resp = requests.get(url, headers=headers, timeout=5)
+                if resp.status_code == 200:
+                    html = resp.text
+                    break
+                elif resp.status_code == 429:
+                    time.sleep(0.5 * (attempt + 1))
+                    continue
+                else:
+                    break
+            except Exception:
+                pass
+        if html:
+            break
+            
+    if not html:
+        return None
+        
+    avg_target = None
+    max_target = None
+    min_target = None
+
+    # Pattern 1: prose text "price target is X with a max estimate of Y and a min estimate of Z"
+    m1 = re.search(r'price target is.*?([\d,\.]+).*?with a max estimate of.*?([\d,\.]+).*?and a min estimate of.*?([\d,\.]+)', html, re.IGNORECASE)
+    if m1:
+        avg_target = float(m1.group(1).replace(',', ''))
+        max_target = float(m1.group(2).replace(',', ''))
+        min_target = float(m1.group(3).replace(',', ''))
+
+    # Pattern 2: JSON fields priceTarget / targetPrice in embedded data
+    if avg_target is None:
+        m2 = re.search(r'"priceTarget"\s*:\s*\{[^}]*"mean"\s*:\s*([\d\.]+)[^}]*"high"\s*:\s*([\d\.]+)[^}]*"low"\s*:\s*([\d\.]+)', html, re.DOTALL)
+        if not m2:
+            m2 = re.search(r'"priceTarget"\s*:\s*\{[^}]*"low"\s*:\s*([\d\.]+)[^}]*"mean"\s*:\s*([\d\.]+)[^}]*"high"\s*:\s*([\d\.]+)', html, re.DOTALL)
+        if m2:
+            try:
+                avg_target = float(m2.group(2)) if m2.lastindex == 3 else float(m2.group(1))
+                max_target = float(m2.group(3)) if m2.lastindex == 3 else float(m2.group(2))
+                min_target = float(m2.group(1)) if m2.lastindex == 3 else float(m2.group(3))
+            except Exception:
+                pass
+
+    # Pattern 3: initForecastQuotes fields targetPrice / targetHigh / targetLow / targetMean
+    if avg_target is None:
+        fq_raw = re.search(r'"initForecastQuotes"\s*:\s*\{(.{10,3000})', html, re.DOTALL)
+        if fq_raw:
+            fq_text = fq_raw.group(1)
+            def _gf(pat, t):
+                mm = re.search(pat, t)
+                return float(mm.group(1)) if mm else None
+            avg_target = _gf(r'"targetMean"\s*:\s*([\d\.]+)', fq_text) or _gf(r'"targetPrice"\s*:\s*([\d\.]+)', fq_text)
+            max_target = _gf(r'"targetHigh"\s*:\s*([\d\.]+)', fq_text)
+            min_target = _gf(r'"targetLow"\s*:\s*([\d\.]+)', fq_text)
+        
+    rec_text = "NEUTRAL"
+    m3 = re.search(r'(?i)rating was calculated as\s+([A-Za-z\s]+)\.', html)
+    if m3:
+        rec_text = m3.group(1).strip().upper()
+    else:
+        m2 = re.search(r'"initForecastQuotes":({.*?})', html)
+        if m2:
+            try:
+                mark_match = re.search(r'"recommendation_mark"\s*:\s*([\d\.]+)', m2.group(1))
+                if mark_match:
+                    rec_mark = float(mark_match.group(1))
+                    if rec_mark < 1.5: rec_text = "STRONG BUY"
+                    elif rec_mark < 2.5: rec_text = "BUY"
+                    elif rec_mark < 3.5: rec_text = "HOLD"
+                    elif rec_mark < 4.5: rec_text = "SELL"
+                    else: rec_text = "STRONG SELL"
+            except Exception:
+                pass
+            
+    # Extract analyst counts from initForecastQuotes section
+    strong_buy = buy_count = hold_count = sell_count = strong_sell = 0
+    # Extract analyst count and individual breakdown from initForecastQuotes
+    # TradingView embeds recommendation_mark (1-5) and recommendation_total in the page HTML.
+    # Individual counts (strongBuy/buy/hold/sell/strongSell) are NOT in the HTML — they're
+    # loaded dynamically, so we only have the aggregate mark + total.
+    analyst_total = 0
+    strong_buy = buy_count = hold_count = sell_count = strong_sell = 0
+    fq_match = re.search(r'"initForecastQuotes"\s*:\s*\{(.{10,2000})', html, re.DOTALL)
+    if fq_match:
+        fq = fq_match.group(1)
+        def _gi(pat, t):
+            mm = re.search(pat, t)
+            return int(mm.group(1)) if mm else 0
+        analyst_total = _gi(r'"recommendation_total"\s*:\s*(\d+)', fq)
+        # Individual counts — may be 0 if TradingView doesn't include them in HTML
+        strong_buy  = _gi(r'"strongBuy"\s*:\s*(\d+)', fq)
+        buy_count   = _gi(r'"buy"\s*:\s*(\d+)', fq)
+        hold_count  = _gi(r'"hold"\s*:\s*(\d+)', fq)
+        sell_count  = _gi(r'"sell"\s*:\s*(\d+)', fq)
+        strong_sell = _gi(r'"strongSell"\s*:\s*(\d+)', fq)
+
+    counts_total = strong_buy + buy_count + hold_count + sell_count + strong_sell
+    return {
+        "ticker":      ticker,
+        "avg":         avg_target,
+        "high":        max_target,
+        "low":         min_target,
+        "rec_text":    rec_text,
+        "strongBuy":   strong_buy,
+        "buy":         buy_count,
+        "hold":        hold_count,
+        "sell":        sell_count,
+        "strongSell":  strong_sell,
+        # counts_total > 0 when individual breakdown is available; fall back to analyst_total
+        "total":       counts_total if counts_total > 0 else analyst_total,
+        "hasBreakdown": counts_total > 0,
+    }
+
+@app.route("/api/trade-signals")
+def trade_signals():
+    """Fetch actionable AI trade signals using TradingView technical analysis for held stocks."""
+    force_refresh = request.args.get("refresh", "0") == "1"
+    cache_key = "trade_signals:v2"
+    
+    if not force_refresh:
+        cached = kv_get(cache_key, 43200)  # 12 hour cache
+        if cached is not None and len(cached) > 0:
+            return jsonify({"status": "ok", "data": cached, "cached": True})
+
+    # Gather unique tickers from cached portfolios
+    excluded = get_excluded_tickers()
+    unique_rows = {}
+    for pid in API_KEYS:
+        rows, _ = rows_get(pid)
+        if rows:
+            for r in rows:
+                ticker = r["ticker"]
+                if ticker not in unique_rows and ticker not in excluded:
+                    unique_rows[ticker] = {
+                        "company_name": r["company_name"],
+                        "country": r.get("country", "US"),
+                        "price": r.get("native_price", r.get("current_price") or (r.get("current_value", 0) / r.get("quantity", 1) if r.get("quantity") else 0)),
+                        "currency": r.get("native_currency", r.get("currency_code", "USD"))
+                    }
+                    
+    results = []
+    
+    def process_ticker(ticker):
+        info = unique_rows[ticker]
+        forecast = _get_tv_forecast(ticker, info["country"])
+        if forecast and forecast.get("avg") is not None:
+            rec = forecast["rec_text"]
+            
+            # Map recommendation
+            signal_text = rec
+            # if rec == "BUY":
+            #     signal_text = "ADD"
+            # elif rec == "SELL":
+            #     signal_text = "REDUCE"
+                
+            conviction = "HIGH" if "STRONG" in rec else "MEDIUM" if rec in ("BUY", "SELL", "ADD", "REDUCE") else "LOW"
+            
+            entry = info.get("price")
+            target = forecast["avg"]
+            stop = forecast["low"] if "BUY" in rec or "ADD" in rec else forecast["high"]
+            
+            exp_return = None
+            if entry and target:
+                val = ((target - entry) / entry) * 100
+                if "SELL" in rec: val = -val  # shorting logic or downside
+                exp_return = round(val, 2)
+            
+            weight = 5.0 if "STRONG" in rec else 2.5 if "BUY" in rec or "SELL" in rec else 0.0
+            
+            return {
+                "ticker": ticker,
+                "company_name": info["company_name"],
+                "currency": info["currency"],
+                "signal": signal_text,
+                "conviction": conviction,
+                "entry": round(entry, 2) if entry else None,
+                "target": round(target, 2) if target else None,
+                "max_target": round(forecast["high"], 2) if forecast.get("high") else None,
+                "min_target": round(forecast["low"], 2) if forecast.get("low") else None,
+                "stop": round(stop, 2) if stop else None,
+                "exp_return": exp_return,
+                "suggested_weight": weight,
+                "timeframe": "12 months",
+            }
+        return None
+
+    # Fetch top signals in parallel
+    tickers = list(unique_rows.keys())
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        for res in ex.map(process_ticker, tickers):
+            if res:
+                results.append(res)
+                
+    # Sort by expected return (positive logic)
+    results.sort(key=lambda x: -(x["exp_return"] or 0))
+    
+    kv_set(cache_key, results)
+    return jsonify({"status": "ok", "data": results, "cached": False})
+
+
+@app.route("/api/trade-signals/exclude", methods=["POST"])
+def trade_signals_exclude():
+    """Toggle exclusion of a ticker from trade signals."""
+    data = request.json or {}
+    ticker = data.get("ticker")
+    excluded = data.get("excluded", True)
+    if not ticker:
+        return jsonify({"status": "error", "message": "Missing ticker"}), 400
+    
+    set_ticker_excluded(ticker, excluded)
+    # Wipe the trade signals cache to reflect the change immediately
+    kv_set("trade_signals:v2", [])
+    return jsonify({"status": "ok", "ticker": ticker, "excluded": excluded})
+
+
+@app.route("/api/trade-signals/excluded")
+def trade_signals_excluded_list():
+    """Return a list of all current ticker exclusions."""
+    return jsonify({"status": "ok", "data": get_excluded_tickers()})
+
+
 
 @app.route("/api/finviz/news")
 def finviz_news():
@@ -1567,16 +2005,16 @@ def finviz_stock_details(ticker):
     return jsonify({"status": "ok", "data": data, "cached": False})
 
 
-# ── AI Market Digest ──────────────────────────────────────────────────────────
+# ── Market Digest ─────────────────────────────────────────────────────────────
 
 @app.route("/api/market-digest")
 def market_digest():
-    """AI-generated daily market digest.
+    """Daily market digest from Finviz.
     ?provider=claude|gemini|perplexity  (default: claude)
     ?refresh=1  — bypass cache and regenerate
     """
     provider = request.args.get("provider", "finviz").lower()
-    if provider not in ("finviz", "claude"):
+    if provider not in ("finviz", "claude", "gemini"):
         return jsonify({"status": "error", "message": f"Unknown provider '{provider}'"}), 400
 
     force = request.args.get("refresh", "0") == "1"
@@ -1623,7 +2061,7 @@ def _background_refresh():
             if not key:
                 continue
             try:
-                rows, _ = fetch_and_cache_portfolio(pid, force=True)
+                rows, _, _, _ = fetch_and_cache_portfolio(pid, force=True)
                 if rows:
                     total_value = sum(r.get("current_value", 0) for r in rows)
                     snapshot_add(pid, total_value)

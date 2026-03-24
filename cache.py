@@ -108,6 +108,11 @@ def _init_sqlite() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_snap_pid_ts ON portfolio_snapshots (pid, ts)"
         )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS excluded_tickers (
+                ticker TEXT PRIMARY KEY
+            )
+        """)
 
 
 def _init_pg() -> None:
@@ -146,6 +151,11 @@ def _init_pg() -> None:
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_snap_pid_ts ON portfolio_snapshots (pid, ts)"
         )
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS excluded_tickers (
+                ticker TEXT PRIMARY KEY
+            )
+        """)
 
 
 # ── Computed portfolio rows ────────────────────────────────────────────────────
@@ -215,6 +225,33 @@ def kv_age(key: str, pid: str = None) -> int | None:
             "SELECT fetched_at FROM kv_cache WHERE key = ?", (full_key,)
         ).fetchone()
     return int(time.time() - row["fetched_at"]) if row else None
+
+
+# ── Ticker Exclusions (Trade Signals) ──────────────────────────────────────────
+
+def get_excluded_tickers() -> list[str]:
+    """Return a list of all tickers excluded from trade signals."""
+    with _db() as conn:
+        rows = conn.execute("SELECT ticker FROM excluded_tickers").fetchall()
+    return [r["ticker"] for r in rows]
+
+
+def set_ticker_excluded(ticker: str, excluded: bool) -> None:
+    """Add or remove a ticker from the exclusion list."""
+    with _db() as conn:
+        if excluded:
+            if _USE_PG:
+                conn.execute(
+                    "INSERT INTO excluded_tickers (ticker) VALUES (?) ON CONFLICT DO NOTHING",
+                    (ticker,)
+                )
+            else:
+                conn.execute(
+                    "INSERT OR IGNORE INTO excluded_tickers (ticker) VALUES (?)",
+                    (ticker,)
+                )
+        else:
+            conn.execute("DELETE FROM excluded_tickers WHERE ticker = ?", (ticker,))
 
 
 # ── Portfolio value snapshots (for sparkline charts) ──────────────────────────

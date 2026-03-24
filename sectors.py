@@ -10,13 +10,13 @@ SECTORS = {
     "KRKNF": "Industrials",
     "AVGO":  "Information Technology",
     "BMNR":  "Information Technology",
-    "IAGl":  "Industrials",
+    "IAGl":  "Airlines",
     "BARCl": "Financials",
     "NFLX":  "Communication Services",
     "LLOYl": "Financials",
     "CRWV":  "Information Technology",
     "PLTR":  "Information Technology",
-    "ATOp":  "Information Technology",
+    "ATO":  "Information Technology",
     "KULR":  "Industrials",
 
     # Major Tech
@@ -51,7 +51,7 @@ COMPANY_KEYWORDS = {
     "health": "Health Care",
     "pharma": "Health Care",
     "retail": "Consumer Discretionary",
-    "airline": "Industrials",
+    "airline": "Airlines",
 }
 
 def get_sector(ticker: str, company_name: str) -> str:

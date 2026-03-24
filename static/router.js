@@ -22,6 +22,7 @@ let _newsInitialized        = false;
 let _calendarInitialized    = false;
 let _activityInitialized    = false;
 let _marketInitialized      = false;
+let _watchlistInitialized   = false;
 
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
@@ -52,18 +53,26 @@ function _updateBreadcrumb(route) {
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
     const map = {
         'home':                 'Overview',
-        'portfolio/1':          `Portfolio · ${names['1'] || 'Portfolio 1'}`,
-        'portfolio/2':          `Portfolio · ${names['2'] || 'Portfolio 2'}`,
-        'portfolio/combined':   'Portfolio · Combined',
-        'stocks/1':             `Stocks · ${names['1'] || 'Portfolio 1'}`,
-        'stocks/2':             `Stocks · ${names['2'] || 'Portfolio 2'}`,
-        'stocks/combined':      'Stocks · Combined',
+        'portfolio/1':          `${names['1'] || 'Portfolio 1'}`,
+        'portfolio/2':          `${names['2'] || 'Portfolio 2'}`,
+        'portfolio/combined':   'Combined',
+        'stocks/1':             `Holdings Table · ${names['1'] || 'Portfolio 1'}`,
+        'stocks/2':             `Holdings Table · ${names['2'] || 'Portfolio 2'}`,
+        'stocks/combined':      'Holdings Table · Combined',
         'news':                 'Market News',
         'calendar':             'Market Calendar',
         'activity':             'Activity & History',
         'market':               'Market',
+        'watchlist':            'Watchlist',
     };
     el.textContent = map[route] || 'Portfolio Tracker';
+
+    // Hide breadcrumb value when not on portfolio view
+    const bcv = document.getElementById('breadcrumbValue');
+    if (bcv && !route.startsWith('portfolio/')) {
+        bcv.style.display = 'none';
+        bcv.textContent = '';
+    }
 }
 
 /* ── Pid switcher ────────────────────────────────────────────────────────── */
@@ -72,27 +81,24 @@ function _updatePidSwitcher(route) {
     const btnCombined = document.getElementById('pidBtnCombined');
     if (!switcher) return;
 
-    if (route.startsWith('portfolio/') || route.startsWith('stocks/')) {
-        switcher.style.display = '';
-        // Show Combined button for both portfolio and stocks
-        if (btnCombined) btnCombined.style.display = '';
+    // Always visible — clear active state on non-portfolio/stocks routes
+    if (btnCombined) btnCombined.style.display = '';
+    document.querySelectorAll('.pid-btn').forEach(b => b.classList.remove('active'));
 
+    if (route.startsWith('portfolio/') || route.startsWith('stocks/')) {
         const pid = route.split('/')[1];
-        document.querySelectorAll('.pid-btn').forEach(b => b.classList.remove('active'));
         const activeBtn = document.getElementById(
             pid === 'combined' ? 'pidBtnCombined' :
             pid === '1'        ? 'pidBtn1'        : 'pidBtn2'
         );
         if (activeBtn) activeBtn.classList.add('active');
-    } else {
-        switcher.style.display = 'none';
     }
 }
 
-/* Switch pid within the same view type (portfolio/* or stocks/*) */
+/* Switch pid — stays in same view type, defaults to portfolio from other routes */
 function switchPid(pid) {
-    if (!_currentRoute) return;
-    const viewType = _currentRoute.startsWith('stocks/') ? 'stocks' : 'portfolio';
+    const route = _currentRoute || '';
+    const viewType = route.startsWith('stocks/') ? 'stocks' : 'portfolio';
     navigate(`${viewType}/${pid}`);
 }
 
@@ -114,6 +120,8 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadActivityView(true);
     } else if (view === 'market') {
         btn.onclick = () => loadMarketView(true);
+    } else if (view === 'watchlist') {
+        btn.onclick = () => loadWatchlistView();
     }
 }
 
@@ -127,24 +135,15 @@ function _updateSidebarActive(route) {
     const exact = document.querySelector(`.nav-item[data-route="${route}"]`);
     if (exact) exact.classList.add('active');
 
-    // Auto-expand parent group
-    if (route.startsWith('portfolio/')) _openNavGroup('portfolio');
-    if (route.startsWith('stocks/'))    _openNavGroup('stocks');
-}
-
-function _openNavGroup(name) {
-    const items  = document.getElementById(`navGroup${_cap(name)}Items`);
-    const header = document.querySelector(`#navGroup${_cap(name)} .nav-group-header`);
-    if (items)  items.classList.add('open');
-    if (header) header.classList.add('open');
-}
-
-function toggleNavGroup(name) {
-    const items  = document.getElementById(`navGroup${_cap(name)}Items`);
-    const header = document.querySelector(`#navGroup${_cap(name)} .nav-group-header`);
-    if (!items) return;
-    const isOpen = items.classList.toggle('open');
-    if (header) header.classList.toggle('open', isOpen);
+    // Highlight group header when a sub-route is active
+    if (route.startsWith('portfolio/')) {
+        const header = document.querySelector('#navGroupPortfolio .nav-group-header');
+        if (header) header.classList.add('active');
+    }
+    if (route.startsWith('stocks/')) {
+        const header = document.querySelector('#navGroupStocks .nav-group-header');
+        if (header) header.classList.add('active');
+    }
 }
 
 function _cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -290,6 +289,16 @@ function _router() {
             _marketInitialized = true;
         } else {
             _activateMarketView();
+        }
+
+    /* ── Watchlist ── */
+    } else if (hash === 'watchlist') {
+        _showView('watchlist');
+        _updateRefreshBtn('watchlist');
+        document.title = 'Watchlist — Portfolio Tracker';
+        if (!_watchlistInitialized) {
+            if (typeof loadWatchlistView === 'function') loadWatchlistView();
+            _watchlistInitialized = true;
         }
     }
 }
