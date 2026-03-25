@@ -1,13 +1,14 @@
-import collections
 import concurrent.futures
 import logging
 import os
+import re
 import threading
 import time
 import requests
 from dotenv import load_dotenv
 load_dotenv()
 
+import collections
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -54,10 +55,6 @@ def index():
     # SPA shell — all views (home, portfolio 1/2/combined) rendered client-side via hash routing
     return render_template("spa.html", names=PORTFOLIO_NAMES)
 
-
-@app.route("/terminal")
-def terminal():
-    return render_template("terminal.html")
 
 
 @app.route("/portfolio/<pid>")
@@ -367,10 +364,10 @@ def stock_activity(pid, ticker):
 
 @app.route("/api/pcombined/daily-history")
 def portfolio_daily_history():
-    """Daily portfolio value history (end-of-day snapshots) for the last 60 days."""
+    """Daily portfolio value history (end-of-day snapshots) for the last 365 days."""
     pid_daily = {}
     for pid in API_KEYS:
-        snaps = snapshot_get(pid, hours=1440)  # 60 days = 1440 hours
+        snaps = snapshot_get(pid, hours=8760)  # 365 days = 8760 hours
         by_day = {}
         for s in snaps:
             day = date.fromtimestamp(s["ts"]).isoformat()
@@ -1676,7 +1673,7 @@ def upcoming_dividends():
     return jsonify({
         "status":       "ok",
         "data":         all_entries,
-        "last_refresh": last_refresh,   # unix timestamp of last background refresh
+        "last_refresh": last_refresh,
         "cached":       len(ticker_info) - len(missing),
         "total":        len(ticker_info),
     })
@@ -2075,7 +2072,7 @@ _refresh_thread.start()
 
 
 # ── Background dividend refresh ────────────────────────────────────────────────
-_DIV_REFRESH_INTERVAL = int(os.environ.get("DIV_REFRESH_SECONDS", 43200))  # 12 hours
+_DIV_REFRESH_INTERVAL   = int(os.environ.get("DIV_REFRESH_SECONDS", 43200))  # 12 hours
 _MASSIVE_LAST_REFRESH_KEY = "massive:div:last_refresh"
 
 

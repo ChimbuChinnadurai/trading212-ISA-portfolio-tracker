@@ -58,6 +58,7 @@
     }
 
     @media (max-width: 768px) {
+
       html,
       body {
         height: auto;
@@ -271,15 +272,15 @@
           </button>
           <div class="topbar-breadcrumb">
             <span class="topbar-title" id="breadcrumbText">Overview</span>
-            <span class="topbar-breadcrumb-value" id="breadcrumbValue" style="display:none"></span>
+            <!-- <span class="topbar-breadcrumb-value" id="breadcrumbValue" style="display:none"></span> -->
           </div>
           <!-- Pid switcher — always visible -->
-          <div class="pid-switcher" id="pidSwitcher">
+          <!-- <div class="pid-switcher" id="pidSwitcher">
             <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
             <button class="pid-btn" id="pidBtn2" onclick="switchPid('2')">{{ names['2'] }}</button>
             <button class="pid-btn pid-btn-combined" id="pidBtnCombined"
               onclick="switchPid('combined')">Combined</button>
-          </div>
+          </div> -->
         </div>
         <div class="topbar-right">
           <div class="mkt-status-wrap">
@@ -439,17 +440,26 @@
                 <div id="tradeSignalsList" class="trade-signals-list">
                   <div class="skel-item">
                     <div class="skeleton skel-dot"></div>
-                    <div class="skel-body"><div class="skeleton skel-line skel-w-60"></div><div class="skeleton skel-line skel-w-40"></div></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
+                    </div>
                     <div class="skeleton skel-amount"></div>
                   </div>
                   <div class="skel-item">
                     <div class="skeleton skel-dot"></div>
-                    <div class="skel-body"><div class="skeleton skel-line skel-w-50"></div><div class="skeleton skel-line skel-w-35"></div></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-50"></div>
+                      <div class="skeleton skel-line skel-w-35"></div>
+                    </div>
                     <div class="skeleton skel-amount"></div>
                   </div>
                   <div class="skel-item">
                     <div class="skeleton skel-dot"></div>
-                    <div class="skel-body"><div class="skeleton skel-line skel-w-55"></div><div class="skeleton skel-line skel-w-30"></div></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                      <div class="skeleton skel-line skel-w-30"></div>
+                    </div>
                     <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
@@ -469,33 +479,31 @@
                     <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span>
                   </span>
                 </div>
-                <div class="fg-body">
-                  <div class="fg-gauge-wrap">
-                    <canvas id="fg-gauge"></canvas>
-                    <div class="fg-score-wrap">
-                      <span class="fg-score" id="fg-score">—</span>
-                      <span class="fg-rating" id="fg-rating">Loading…</span>
-                    </div>
+                <div class="fg-gauge-wrap">
+                  <canvas id="fg-gauge"></canvas>
+                  <div class="fg-score-wrap">
+                    <span class="fg-score" id="fg-score">—</span>
+                    <span class="fg-rating" id="fg-rating">Loading…</span>
                   </div>
-                  <div class="fg-history" id="fg-history">
-                    <div class="skel-item" style="padding:6px 0">
-                      <div class="skel-body">
-                        <div class="skeleton skel-line skel-w-55"></div>
-                      </div>
-                      <div class="skeleton skel-amount"></div>
+                </div>
+                <div class="fg-history" id="fg-history">
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
                     </div>
-                    <div class="skel-item" style="padding:6px 0">
-                      <div class="skel-body">
-                        <div class="skeleton skel-line skel-w-50"></div>
-                      </div>
-                      <div class="skeleton skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-50"></div>
                     </div>
-                    <div class="skel-item" style="padding:6px 0">
-                      <div class="skel-body">
-                        <div class="skeleton skel-line skel-w-55"></div>
-                      </div>
-                      <div class="skeleton skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
                     </div>
+                    <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
               </div>
@@ -509,12 +517,18 @@
                 <div id="upcomingEventsList" class="upcoming-events-body">
                   <div class="skel-item">
                     <div class="skeleton skel-dot"></div>
-                    <div class="skel-body"><div class="skeleton skel-line skel-w-55"></div><div class="skeleton skel-line skel-w-35"></div></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                      <div class="skeleton skel-line skel-w-35"></div>
+                    </div>
                     <div class="skeleton skel-amount"></div>
                   </div>
                   <div class="skel-item">
                     <div class="skeleton skel-dot"></div>
-                    <div class="skel-body"><div class="skeleton skel-line skel-w-60"></div><div class="skeleton skel-line skel-w-40"></div></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
+                    </div>
                     <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
@@ -757,7 +771,7 @@
             <!-- Full-width holdings table -->
             <div class="table-wrapper card" id="stocksTableWrapper" style="display:none">
               <div class="panel-header">
-                <h3 class="panel-title" id="stocksTableTitle">Holdings</h3>
+                <!-- <h3 class="panel-title" id="stocksTableTitle">Holdings</h3> -->
                 <div class="filter-bar" id="filterBar"></div>
               </div>
               <div class="table-toolbar">
@@ -862,14 +876,7 @@
         <!-- ═══ VIEW: ACTIVITY ═══ -->
         <div id="view-activity" class="spa-view" style="display:none">
           <div class="view-main">
-
-            <div class="act-view-header">
-              <div class="act-view-title-block">
-                <h1 class="act-view-title">Activity &amp; History</h1>
-                <p class="act-view-subtitle">Recent trades and dividend payments across all portfolios</p>
-              </div>
-            </div>
-
+            <p class="act-view-subtitle">Recent trades and dividend payments across all portfolios</p>
             <div class="act-layout">
 
               <!-- Left: Recent Activity -->
@@ -932,13 +939,7 @@
         <!-- ═══ VIEW: CALENDAR ═══ -->
         <div id="view-calendar" class="spa-view" style="display:none">
           <div class="view-main">
-
-            <div class="cal-view-header">
-              <div class="cal-view-title-block">
-                <h1 class="cal-view-title">Market Calendar</h1>
-                <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
-              </div>
-            </div>
+            <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
 
             <div class="calendar-layout">
 
@@ -986,49 +987,53 @@
         <!-- ═══ VIEW: MARKET ═══ -->
         <div id="view-market" class="spa-view" style="display:none">
           <div class="view-main">
+            <p class="cal-view-subtitle">Sector performance, signals and insider activity</p>
 
-            <div class="cal-view-header">
+            <!-- <div class="cal-view-header">
               <div class="cal-view-title-block">
                 <h1 class="cal-view-title">Market</h1>
-                <p class="cal-view-subtitle">Sector performance, signals and insider activity</p>
               </div>
-            </div>
+            </div> -->
 
             <!-- Market body: 3-column × 2-row grid -->
             <div class="market-body">
 
-              <!-- Row 1, Col 1: Portfolio vs S&P 500 -->
-              <div class="market-chart-card widget-panel">
-                <div class="panel-header">
-                  <div class="mkt-chart-title-group">
-                    <h3 class="panel-title">Portfolio vs S&amp;P 500</h3>
-                    <div class="mkt-pvs-legend">
-                      <span class="pvs-leg-dot" style="background:#60a5fa"></span><span
-                        class="pvs-leg-label">S&amp;P</span>
-                      <span class="pvs-leg-dot" style="background:#f59e0b"></span><span
-                        class="pvs-leg-label">Portfolio</span>
+              <!-- Row 1, Col 1: Performance chart -->
+              <div class="market-chart-card widget-panel pvs-perf-card">
+                <div class="pvs-perf-header">
+                  <div class="pvs-perf-header-top">
+                    <h3 class="panel-title">Performance</h3>
+                    <div class="pvs-header-right">
+                      <div class="mkt-range-tabs pvs-range-tabs" id="pvsRangeTabs">
+                        <button class="mkt-range-tab" data-range="1M">1M</button>
+                        <button class="mkt-range-tab" data-range="3M">3M</button>
+                        <button class="mkt-range-tab" data-range="6M">6M</button>
+                        <button class="mkt-range-tab active" data-range="1Y">1Y</button>
+                        <button class="mkt-range-tab" data-range="ALL">All</button>
+                      </div>
+                      <button class="pvs-chart-type-btn" id="pvsChartTypeBtn" title="Toggle chart type"
+                        data-type="line">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <polyline points="1,13 5,7 9,10 15,3" stroke="currentColor" stroke-width="1.5"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                      </button>
                     </div>
+                  </div>
+                  <div class="pvs-legend-row">
+                    <label class="pvs-leg-check" id="pvsLegSP" data-series="sp">
+                      <span class="pvs-leg-checkbox pvs-leg-checked" style="--chk-color:#ec4899"></span>
+                      <span class="pvs-leg-label-text">S&amp;P 500</span>
+                    </label>
+                    <label class="pvs-leg-check" id="pvsLegPvs" data-series="pvs">
+                      <span class="pvs-leg-checkbox pvs-leg-checked" style="--chk-color:#3b82f6"></span>
+                      <span class="pvs-leg-label-text">My Portfolio</span>
+                    </label>
                   </div>
                 </div>
                 <div class="mkt-chart-wrap">
                   <canvas id="pvsChart"></canvas>
                   <div id="pvsChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
-                </div>
-                <div class="mkt-chart-footer mkt-chart-footer-sm">
-                  <span class="mkt-footer-stat">
-                    <span class="mkt-footer-label">Portfolio</span>
-                    <span id="pvsPortPct" class="mkt-footer-val">—</span>
-                  </span>
-                  <span class="mkt-footer-divider"></span>
-                  <span class="mkt-footer-stat">
-                    <span class="mkt-footer-label">S&amp;P 500</span>
-                    <span id="pvsSpPct" class="mkt-footer-val">—</span>
-                  </span>
-                  <span class="mkt-footer-divider"></span>
-                  <span class="mkt-footer-stat">
-                    <span class="mkt-footer-label">Alpha</span>
-                    <span id="pvsAlpha" class="mkt-footer-val">—</span>
-                  </span>
                 </div>
               </div>
 
@@ -1039,14 +1044,46 @@
                   <span style="font-size:0.7rem;color:var(--text-muted)">Today</span>
                 </div>
                 <div id="sectorBarsList" class="sector-bars-list">
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
-                  <div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
                 </div>
               </section>
 
@@ -1098,8 +1135,38 @@
                 </div>
               </section>
 
+              <!-- Portfolio Gain widget -->
+              <section class="widget-panel pvs-gain-widget">
+                <div class="pvs-gain-accent"></div>
+                <div class="panel-header">
+                  <h3 class="panel-title">Portfolio Gain</h3>
+                </div>
+                <div id="pvsGainList" class="pvs-gain-list">
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">1-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain1M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">6-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain6M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">12-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain12M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">YTD Return</span>
+                    <span class="pvs-gain-val" id="pvsGainYTD">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">Total Return</span>
+                    <span class="pvs-gain-val" id="pvsGainTotal">—</span>
+                  </div>
+                </div>
+              </section>
+
               <!-- Row 2, Col 1-2: Inline Trade Signals (spans 2 columns) -->
-              <section class="widget-panel widget-trade-signals">
+              <!-- <section class="widget-panel widget-trade-signals">
                 <div class="panel-header">
                   <h3 class="panel-title">Trade Signals</h3>
                   <span style="font-size:0.7rem;color:var(--text-muted)">Portfolio holdings · TradingView</span>
@@ -1127,7 +1194,7 @@
                     <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
-              </section>
+              </section> -->
 
               <!-- Row 2, Col 3: Insider Trading -->
               <section class="widget-panel widget-insider">
@@ -1274,8 +1341,8 @@
                   id="spSector">Sector</span></div>
               <div class="sp-metric"><span class="sp-metric-label">Breakeven</span><span class="sp-metric-value"
                   id="spBreakeven">—</span></div>
-              <div class="sp-metric sp-metric-wide"><span class="sp-metric-label">Held Since</span><span
-                  class="sp-metric-value" id="spHeldSince">—</span></div>
+              <!-- <div class="sp-metric sp-metric-wide"><span class="sp-metric-label">Held Since</span><span
+                  class="sp-metric-value" id="spHeldSince">—</span></div> -->
             </div>
           </div>
           <div id="spAnalystRatingsSection" style="display:none">
@@ -1354,17 +1421,26 @@
         <div class="side-panel-content" id="fgPanelContent">
           <div class="skel-item">
             <div class="skeleton skel-dot"></div>
-            <div class="skel-body"><div class="skeleton skel-line skel-w-60"></div><div class="skeleton skel-line skel-w-40"></div></div>
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-60"></div>
+              <div class="skeleton skel-line skel-w-40"></div>
+            </div>
             <div class="skeleton skel-amount"></div>
           </div>
           <div class="skel-item">
             <div class="skeleton skel-dot"></div>
-            <div class="skel-body"><div class="skeleton skel-line skel-w-50"></div><div class="skeleton skel-line skel-w-35"></div></div>
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-50"></div>
+              <div class="skeleton skel-line skel-w-35"></div>
+            </div>
             <div class="skeleton skel-amount"></div>
           </div>
           <div class="skel-item">
             <div class="skeleton skel-dot"></div>
-            <div class="skel-body"><div class="skeleton skel-line skel-w-55"></div><div class="skeleton skel-line skel-w-30"></div></div>
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-55"></div>
+              <div class="skeleton skel-line skel-w-30"></div>
+            </div>
             <div class="skeleton skel-amount"></div>
           </div>
         </div>

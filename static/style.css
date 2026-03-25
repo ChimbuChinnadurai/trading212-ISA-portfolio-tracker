@@ -75,29 +75,29 @@ html[data-theme="dark"] {
 html[data-theme="dark"] #ov1 {
   background: #0f1629;
   border: 1px solid #1e2d4a;
-  border-left: 4px solid #3b82f6;
+  /* border-left: 4px solid #3b82f6; */
 }
 
 html[data-theme="dark"] #ov2 {
   background: #0f1629;
   border: 1px solid #1e2d4a;
-  border-left: 4px solid #8b5cf6;
+  /* border-left: 4px solid #8b5cf6; */
 }
 
 html[data-theme="dark"] .ov-card-combined {
   background: #0f1629;
   border: 1px solid #1e2d4a;
-  border-left: 4px solid #14b8a6;
+  /* border-left: 4px solid #14b8a6; */
 }
 
 html[data-theme="dark"] .ov-card-fg {
-  border-left: 4px solid rgba(139, 92, 246, 0.7);
+  /* border-left: 4px solid rgba(139, 92, 246, 0.7); */
 }
 
 html[data-theme="dark"] .ov-card-heatmap {
   background: #0f1629;
   border: 1px solid #1e2d4a;
-  border-left: 4px solid #25b433;
+  /* border-left: 4px solid #25b433; */
 }
 
 html[data-theme="dark"] .widget-activity {
@@ -3462,7 +3462,6 @@ html[data-theme="dark"] .ticker-chip {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  padding: 16px 24px 24px;
   flex: 1;
   min-height: 0;
 }
@@ -3496,7 +3495,6 @@ html[data-theme="dark"] .ticker-chip {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-  padding: 16px 24px 24px;
   flex: 1;
   min-height: 0;
 }
@@ -3560,7 +3558,7 @@ html[data-theme="dark"] .ticker-chip {
   padding: 0;
   display: flex;
   flex-direction: column;
-  height: 600px;
+  height: 400px;
   /* Default height for scrolling pages */
   min-height: 0;
   overflow: hidden;
@@ -3732,21 +3730,97 @@ html[data-theme="dark"] .ticker-chip {
 
 .div-tl-amount-block {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }
 
-.div-tl-value {
-  display: block;
+/* ── Yield badge ── */
+.div-tl-yield-badge {
   font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--text-primary);
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+  border-radius: 5px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.div-tl-item--paid .div-tl-yield-badge {
+  color: var(--text-muted);
+  background: var(--bg-row-alt);
+}
+
+/* ── Expected payout ── */
+.div-tl-expected {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap;
+}
+
+/* ── Metrics row (DPS · payout · 5Y growth) ── */
+.div-tl-metrics-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.div-tl-metric {
+  font-size: 0.67rem;
+  font-weight: 600;
+  color: var(--text-secondary);
   font-family: 'JetBrains Mono', monospace;
 }
 
-.div-tl-per-share {
-  display: block;
-  font-size: 0.59rem;
+.div-tl-metric-label {
+  font-size: 0.58rem;
+  font-weight: 400;
   color: var(--text-muted);
-  text-align: right;
+}
+
+.div-tl-metric--muted {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-family: inherit;
+}
+
+.div-tl-metric--green {
+  color: #10b981;
+}
+
+.div-tl-metric--red {
+  color: var(--red);
+}
+
+/* ── Exchange pill ── */
+.div-tl-exchange {
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  background: var(--bg-row-alt);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+/* ── Date badge variant: no dates announced ── */
+.div-tl-date-badge--nodates {
+  background: var(--bg-hover);
+  border: 1px dashed var(--border);
+  opacity: 0.6;
+}
+
+/* ── Relative label variant: holds (no upcoming date) ── */
+.div-tl-relative--holds {
+  color: var(--text-muted);
 }
 
 /* Bottom: dates + status badge */
@@ -3792,6 +3866,21 @@ html[data-theme="dark"] .ticker-chip {
   border-radius: 5px;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.div-tl-value {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.div-tl-per-share {
+  display: block;
+  font-size: 0.59rem;
+  color: var(--text-muted);
+  text-align: right;
 }
 
 .div-tl-status-col {
@@ -7019,7 +7108,6 @@ html[data-theme="dark"] .nav-item.active {
   grid-template-columns: 1fr 1fr 280px;
   grid-template-rows: 1fr 1fr;
   gap: 12px;
-  padding: 0 24px 24px;
   flex: 1;
   min-height: 500px;
 }
@@ -7029,7 +7117,7 @@ html[data-theme="dark"] .nav-item.active {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  height: 300px;
+  height: 400px;
 }
 
 /* Portfolio vs S&P legend */
@@ -7144,6 +7232,173 @@ html[data-theme="dark"] .nav-item.active {
   color: var(--text-muted);
 }
 
+/* ── Performance chart header ──────────────────────────────────────────── */
+.pvs-perf-card {
+  height: 400px;
+}
+
+.pvs-perf-header {
+  padding: 10px 14px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pvs-perf-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pvs-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pvs-range-tabs {
+  margin-left: 0;
+}
+
+.pvs-chart-type-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.pvs-chart-type-btn:hover,
+.pvs-chart-type-btn[data-type="bar"] {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pvs-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pvs-leg-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pvs-leg-checkbox {
+  width: 13px;
+  height: 13px;
+  border-radius: 3px;
+  border: 2px solid var(--chk-color, #888);
+  flex-shrink: 0;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.pvs-leg-checkbox.pvs-leg-checked {
+  background: var(--chk-color, #888);
+}
+
+.pvs-leg-checkbox.pvs-leg-checked::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 0px;
+  width: 5px;
+  height: 8px;
+  border: 2px solid #fff;
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg);
+}
+
+.pvs-leg-label-text {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* ── Portfolio Gain widget ──────────────────────────────────────────────── */
+.pvs-gain-widget {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.pvs-gain-accent {
+  height: 3px;
+  background: linear-gradient(to right, #f59e0b 45%, var(--border) 45%);
+  margin: 0 -1px;
+  border-radius: 0;
+}
+
+.pvs-gain-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 4px;
+}
+
+.pvs-gain-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+
+.pvs-gain-row:last-child {
+  border-bottom: none;
+}
+
+.pvs-gain-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.pvs-gain-val {
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pvs-gain-val.pos {
+  color: var(--green);
+}
+
+.pvs-gain-val.neg {
+  color: var(--red);
+}
+
+.pvs-gain-arrow {
+  font-size: 0.65rem;
+}
+
+.pvs-gain-arrow.pos {
+  color: var(--green);
+}
+
+.pvs-gain-arrow.neg {
+  color: var(--red);
+}
+
 .mkt-tt-price {
   font-size: 0.82rem;
   font-weight: 700;
@@ -7205,7 +7460,7 @@ html[data-theme="dark"] .nav-item.active {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 300px;
+  height: 400px;
 }
 
 .widget-sectors .sector-bars-list {
@@ -7226,6 +7481,7 @@ html[data-theme="dark"] .nav-item.active {
   grid-template-columns: 72px 1fr 52px;
   align-items: center;
   gap: 6px;
+  padding: 6px;
 }
 
 .sector-bar-name {
@@ -7270,7 +7526,7 @@ html[data-theme="dark"] .nav-item.active {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  height: 300px;
+  height: 400px;
 }
 
 .signals-list,
@@ -7678,10 +7934,6 @@ div#sectorBarsList {
 
 
 /* ── Widget: Market Signals ──────────────────────────────────────────────── */
-.widget-signals {
-  border-top: 4px solid var(--accent);
-}
-
 html[data-theme="dark"] .widget-signals {
   background: #0f1629;
   border: 1px solid #1e2d4a;
@@ -7689,9 +7941,6 @@ html[data-theme="dark"] .widget-signals {
 }
 
 /* ── Widget: Insider Trading ─────────────────────────────────────────────── */
-.widget-insider {
-  border-top: 4px solid #8b5cf6;
-}
 
 html[data-theme="dark"] .widget-insider {
   background: #0f1629;
@@ -7738,7 +7987,6 @@ html[data-theme="dark"] .widget-insider {
   flex: 1;
   overflow-y: auto;
   padding: 6px 12px 12px;
-  display: flex;
   flex-direction: column;
   gap: 2px;
 }

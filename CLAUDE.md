@@ -64,7 +64,6 @@ style.css        — All styles, dark/light theme, responsive
 | `static/currency.js` | `setCurrency()`, `formatValue()`, GBP↔USD display conversion | small |
 | `static/style.css` | Dark/light CSS vars, all component styles, responsive breakpoints | ~4750 |
 | `templates/spa.html` | SPA shell — all views rendered client-side via hash routing (Jinja: `names`) | ~870 |
-| `templates/terminal.html` | Terminal/debug page (minimal) | small |
 
 ---
 
@@ -76,7 +75,6 @@ style.css        — All styles, dark/light theme, responsive
 |-------|----------|-----------|
 | `GET /` | `spa.html` | `names` dict `{"1": "Chimbu", "2": "Poornima"}` |
 | `GET /portfolio/<pid>` | — | Redirects to `/#portfolio/<pid>` (backward compat) |
-| `GET /terminal` | `terminal.html` | — |
 
 ### API Endpoints (all return JSON)
 

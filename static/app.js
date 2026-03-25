@@ -2318,7 +2318,7 @@ async function loadStocksView(force = false) {
     if (titleEl) {
       const label = PORTFOLIO_ID === 'combined' ? 'Combined'
         : (names[PORTFOLIO_ID] || `Portfolio ${PORTFOLIO_ID}`);
-      titleEl.textContent = `Holdings · ${label}`;
+      // titleEl.textContent = `Holdings · ${label}`;
     }
 
     renderCountryFilters(allRows);

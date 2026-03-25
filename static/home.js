@@ -12,6 +12,10 @@ let _mktChartData = null;  // market-indicators API data
 let _mktActiveRange = '3M'; // 1W | 1M | 3M | 1Y
 let _nasdaqActiveRange = '3M';
 let _portfolioVsData = null; // [{date, ts, value}] from /api/pcombined/daily-history
+let _pvsActiveRange = '1Y';  // 1M | 3M | 6M | 1Y | ALL
+let _pvsChartType = 'line';  // line | bar
+let _pvsShowSP = true;
+let _pvsShowPvs = true;
 let _signalsData = {};        // cache per signal type
 let _insiderData = {};
 let _tradeSignalsData = null;
@@ -114,7 +118,7 @@ async function loadHomeData(refresh = false) {
         }
 
         // Home performers
-        _topPerformersData   = data.top_performers   || [];
+        _topPerformersData = data.top_performers || [];
         _underPerformersData = data.under_performers || [];
         _renderHomeTopUnder(_topPerformersData, _underPerformersData);
 
@@ -1343,13 +1347,17 @@ function _initChartHoverGeneric(canvas, tooltipId) {
 // ── Portfolio vs S&P 500 overlay chart ──────────────────────────────────────
 
 async function loadPortfolioVsMarket() {
-    if (_portfolioVsData) { _drawPortfolioVsChart(); return; }
+    _initPvsRangeTabs();
+    _initPvsChartTypeToggle();
+    _initPvsLegendToggle();
+    if (_portfolioVsData) { _drawPortfolioVsChart(); _renderPortfolioGain(); return; }
     try {
         const res = await fetch('/api/pcombined/daily-history');
         const json = await res.json();
         if (json.status === 'ok') {
             _portfolioVsData = json.data;
             _drawPortfolioVsChart();
+            _renderPortfolioGain();
         }
     } catch (err) { console.warn('[portfolioVs]', err); }
 }
@@ -1372,7 +1380,6 @@ function _drawPortfolioVsChart() {
         ctx.font = '12px system-ui,sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('Collecting portfolio history…', W / 2, H / 2);
-        _updatePortfolioVsStats(null, null);
         return;
     }
 
@@ -1386,13 +1393,17 @@ function _drawPortfolioVsChart() {
     for (const pt of _portfolioVsData) pvsByDate[pt.date] = pt.value;
 
     const allDates = Object.keys(spByDate).filter(d => pvsByDate[d]).sort();
-    const dates = allDates.slice(-60);
+
+    // Apply range filter
+    const rangeDays = { '1M': 22, '3M': 66, '6M': 132, '1Y': 252, 'ALL': 99999 };
+    const maxDays = rangeDays[_pvsActiveRange] || 252;
+    const dates = allDates.slice(-maxDays);
+
     if (dates.length < 2) {
         ctx.fillStyle = 'rgba(255,255,255,0.25)';
         ctx.font = '12px system-ui,sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('Not enough data yet', W / 2, H / 2);
-        _updatePortfolioVsStats(null, null);
         return;
     }
 
@@ -1401,14 +1412,24 @@ function _drawPortfolioVsChart() {
     const spVals = dates.map(d => ((spByDate[d] / spBase) - 1) * 100);
     const pvsVals = dates.map(d => ((pvsByDate[d] / pvsBase) - 1) * 100);
 
-    const PAD = { top: 16, right: 14, bottom: 28, left: 48 };
+    const spColor = '#ec4899';   // pink
+    const pvsColor = '#3b82f6';  // blue
+
+    // Right padding accounts for end-of-line labels
+    const PAD = { top: 18, right: 58, bottom: 28, left: 48 };
     const cW = W - PAD.left - PAD.right;
     const cH = H - PAD.top - PAD.bottom;
 
-    const allVals = [...spVals, ...pvsVals];
+    const activeSeries = [];
+    if (_pvsShowSP) activeSeries.push({ vals: spVals, color: spColor });
+    if (_pvsShowPvs) activeSeries.push({ vals: pvsVals, color: pvsColor });
+
+    const allVals = activeSeries.flatMap(s => s.vals);
+    if (!allVals.length) { ctx.clearRect(0, 0, W, H); return; }
+
     const minV = Math.min(...allVals);
     const maxV = Math.max(...allVals);
-    const vPad = (maxV - minV) * 0.12 || 1;
+    const vPad = (maxV - minV) * 0.15 || 2;
     const minVP = minV - vPad, maxVP = maxV + vPad;
     const vRng = maxVP - minVP;
 
@@ -1416,16 +1437,13 @@ function _drawPortfolioVsChart() {
     const yOf = v => PAD.top + (1 - (v - minVP) / vRng) * cH;
     const y0 = Math.min(Math.max(yOf(0), PAD.top), PAD.top + cH);
 
-    const spColor  = '#60a5fa';  // blue-400
-    const pvsColor = '#f59e0b';  // amber-500
-
-    // Smooth bezier curve path helper
+    // Smooth bezier path helper
     function smoothPath(vals) {
         ctx.beginPath();
         ctx.moveTo(xOf(0), yOf(vals[0]));
         for (let i = 1; i < vals.length; i++) {
             const x1 = xOf(i - 1), y1 = yOf(vals[i - 1]);
-            const x2 = xOf(i),     y2 = yOf(vals[i]);
+            const x2 = xOf(i), y2 = yOf(vals[i]);
             const cpX = (x1 + x2) / 2;
             ctx.bezierCurveTo(cpX, y1, cpX, y2, x2, y2);
         }
@@ -1447,7 +1465,7 @@ function _drawPortfolioVsChart() {
 
     // Zero baseline
     if (minVP < 0 && maxVP > 0) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
         ctx.beginPath(); ctx.moveTo(PAD.left, y0); ctx.lineTo(W - PAD.right, y0); ctx.stroke();
@@ -1458,61 +1476,81 @@ function _drawPortfolioVsChart() {
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.38)';
     ctx.font = '9.5px system-ui,sans-serif';
-    const xCount = Math.min(6, dates.length);
+    const xCount = Math.min(7, dates.length);
     for (let i = 0; i < xCount; i++) {
         const idx = Math.round(i / (xCount - 1) * (dates.length - 1));
         const d = new Date(dates[idx] + 'T12:00:00');
-        ctx.fillText(d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }), xOf(idx), H - 7);
+        const label = d.toLocaleDateString('en-GB', { month: 'short', year: _pvsActiveRange === '1M' ? undefined : '2-digit' });
+        ctx.fillText(label, xOf(idx), H - 7);
     }
 
-    // S&P gradient fill
-    smoothPath(spVals);
-    ctx.lineTo(xOf(spVals.length - 1), y0);
-    ctx.lineTo(xOf(0), y0);
-    ctx.closePath();
-    const spGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
-    spGrad.addColorStop(0, 'rgba(96,165,250,0.25)');
-    spGrad.addColorStop(1, 'rgba(96,165,250,0.02)');
-    ctx.fillStyle = spGrad;
-    ctx.fill();
+    if (_pvsChartType === 'bar') {
+        // Bar chart rendering
+        const barW = Math.max(1, cW / dates.length - 1);
+        for (const { vals, color } of activeSeries) {
+            for (let i = 0; i < vals.length; i++) {
+                const v = vals[i];
+                const bx = xOf(i) - barW / 2;
+                const by = v >= 0 ? yOf(v) : y0;
+                const bh = Math.abs(yOf(v) - y0);
+                ctx.fillStyle = color + (v >= 0 ? 'cc' : '99');
+                ctx.fillRect(bx, by, barW, bh);
+            }
+        }
+    } else {
+        // Line chart rendering with subtle fills
+        for (const { vals, color } of activeSeries) {
+            smoothPath(vals);
+            ctx.lineTo(xOf(vals.length - 1), y0);
+            ctx.lineTo(xOf(0), y0);
+            ctx.closePath();
+            const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+            grad.addColorStop(0, color + '22');
+            grad.addColorStop(1, color + '04');
+            ctx.fillStyle = grad;
+            ctx.fill();
+        }
 
-    // Portfolio gradient fill
-    smoothPath(pvsVals);
-    ctx.lineTo(xOf(pvsVals.length - 1), y0);
-    ctx.lineTo(xOf(0), y0);
-    ctx.closePath();
-    const pvsGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
-    pvsGrad.addColorStop(0, 'rgba(245,158,11,0.25)');
-    pvsGrad.addColorStop(1, 'rgba(245,158,11,0.02)');
-    ctx.fillStyle = pvsGrad;
-    ctx.fill();
+        // Draw lines on top
+        for (const { vals, color } of activeSeries) {
+            smoothPath(vals);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.setLineDash([]);
+            ctx.stroke();
+        }
 
-    // S&P line
-    smoothPath(spVals);
-    ctx.strokeStyle = spColor;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    ctx.setLineDash([]);
-    ctx.stroke();
+        // End-cap dots
+        for (const { vals, color } of activeSeries) {
+            const lx = xOf(vals.length - 1), ly = yOf(vals[vals.length - 1]);
+            ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+            ctx.fillStyle = color + '30'; ctx.fill();
+            ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2);
+            ctx.fillStyle = color; ctx.fill();
+        }
+    }
 
-    // Portfolio line (slightly thicker to stand out)
-    smoothPath(pvsVals);
-    ctx.strokeStyle = pvsColor;
-    ctx.lineWidth = 2.5;
-    ctx.lineJoin = 'round';
-    ctx.stroke();
-
-    // End-cap dots on last data point for both lines
-    for (const [vals, col] of [[spVals, spColor], [pvsVals, pvsColor]]) {
-        const lx = xOf(vals.length - 1), ly = yOf(vals[vals.length - 1]);
-        ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2);
-        ctx.fillStyle = col + '35'; ctx.fill();
-        ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = col; ctx.fill();
+    // End-of-line % labels on the right
+    ctx.font = 'bold 10px "JetBrains Mono",monospace';
+    ctx.textAlign = 'left';
+    for (const { vals, color } of activeSeries) {
+        const lastVal = vals[vals.length - 1];
+        const ly = Math.min(Math.max(yOf(lastVal), PAD.top + 6), PAD.top + cH - 6);
+        const lx = xOf(vals.length - 1) + 6;
+        // Background pill
+        const labelTxt = (lastVal >= 0 ? '+' : '') + lastVal.toFixed(2) + '%';
+        const metrics = ctx.measureText(labelTxt);
+        ctx.fillStyle = color + '25';
+        ctx.beginPath();
+        ctx.roundRect(lx - 2, ly - 8, metrics.width + 6, 13, 3);
+        ctx.fill();
+        ctx.fillStyle = color;
+        ctx.fillText(labelTxt, lx, ly + 1);
     }
 
     // Store state for hover
-    canvas._pvs = { dates, spVals, pvsVals, PAD, cW, cH, minVP, vRng, spColor, pvsColor, W, H, y0 };
+    canvas._pvs = { dates, spVals: _pvsShowSP ? spVals : null, pvsVals: _pvsShowPvs ? pvsVals : null, PAD, cW, cH, minVP, vRng, spColor, pvsColor, W, H, y0 };
     _initPvsHover(canvas);
 
     _updatePortfolioVsStats(spVals, pvsVals);
@@ -1563,7 +1601,7 @@ function _initPvsHover(canvas) {
         if (tooltip) {
             const d = new Date(dates[idx] + 'T12:00:00')
                 .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            const spTxt  = (spVals[idx]  >= 0 ? '+' : '') + spVals[idx].toFixed(2)  + '%';
+            const spTxt = (spVals[idx] >= 0 ? '+' : '') + spVals[idx].toFixed(2) + '%';
             const pvsTxt = (pvsVals[idx] >= 0 ? '+' : '') + pvsVals[idx].toFixed(2) + '%';
             tooltip.innerHTML =
                 `<span class="mkt-tt-date">${d}</span>` +
@@ -1582,23 +1620,58 @@ function _initPvsHover(canvas) {
     });
 }
 
-function _updatePortfolioVsStats(spVals, pvsVals) {
-    const portEl = document.getElementById('pvsPortPct');
-    const spEl = document.getElementById('pvsSpPct');
-    const alphaEl = document.getElementById('pvsAlpha');
-    if (!portEl) return;
-    if (!spVals || !pvsVals) {
-        [portEl, spEl, alphaEl].forEach(el => { if (el) el.textContent = '—'; el?.classList.remove('pos', 'neg'); });
-        return;
+function _updatePortfolioVsStats(_spVals, _pvsVals) {
+    // Nothing to update in footer now — footer was removed
+    _renderPortfolioGain();
+}
+
+function _renderPortfolioGain() {
+    if (!_portfolioVsData?.length) return;
+    const data = _portfolioVsData;
+    const today = new Date();
+    const latestVal = data[data.length - 1].value;
+
+    function valOnOrBefore(targetDate) {
+        const td = targetDate.toISOString().slice(0, 10);
+        let best = null;
+        for (const pt of data) {
+            if (pt.date <= td) best = pt;
+        }
+        return best;
     }
-    const portPct = pvsVals[pvsVals.length - 1];
-    const spPct = spVals[spVals.length - 1];
-    const alphaPct = portPct - spPct;
-    const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-    const cls = v => v >= 0 ? 'pos' : 'neg';
-    portEl.textContent = fmt(portPct); portEl.className = 'mkt-footer-val ' + cls(portPct);
-    spEl.textContent = fmt(spPct); spEl.className = 'mkt-footer-val ' + cls(spPct);
-    alphaEl.textContent = fmt(alphaPct); alphaEl.className = 'mkt-footer-val ' + cls(alphaPct);
+
+    function returnPct(pt) {
+        if (!pt || pt.value === 0) return null;
+        return ((latestVal / pt.value) - 1) * 100;
+    }
+
+    const d1M = new Date(today); d1M.setMonth(d1M.getMonth() - 1);
+    const d6M = new Date(today); d6M.setMonth(d6M.getMonth() - 6);
+    const d12M = new Date(today); d12M.setFullYear(d12M.getFullYear() - 1);
+    const dYTD = new Date(today.getFullYear(), 0, 1);
+
+    const pt1M = valOnOrBefore(d1M);
+    const pt6M = valOnOrBefore(d6M);
+    const pt12M = valOnOrBefore(d12M);
+    const ptYTD = valOnOrBefore(dYTD);
+    const ptFirst = data[0];
+
+    const metrics = [
+        { id: 'pvsGain1M', pct: returnPct(pt1M) },
+        { id: 'pvsGain6M', pct: returnPct(pt6M) },
+        { id: 'pvsGain12M', pct: returnPct(pt12M) },
+        { id: 'pvsGainYTD', pct: returnPct(ptYTD) },
+        { id: 'pvsGainTotal', pct: returnPct(ptFirst) },
+    ];
+
+    for (const { id, pct } of metrics) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        if (pct === null) { el.textContent = '—'; el.className = 'pvs-gain-val'; continue; }
+        const pos = pct >= 0;
+        el.innerHTML = `<span class="pvs-gain-arrow ${pos ? 'pos' : 'neg'}">${pos ? '▲' : '▼'}</span>${Math.abs(pct).toFixed(2)}%`;
+        el.className = 'pvs-gain-val ' + (pos ? 'pos' : 'neg');
+    }
 }
 
 function _initChartRangeTabs() {
@@ -1632,6 +1705,57 @@ function _initNasdaqRangeTabs() {
 }
 
 function _initSP500Tabs() { /* replaced by _initChartRangeTabs */ }
+
+function _initPvsRangeTabs() {
+    const tabs = document.getElementById('pvsRangeTabs');
+    if (!tabs || tabs._pvsInit) return;
+    tabs._pvsInit = true;
+    tabs.addEventListener('click', e => {
+        const btn = e.target.closest('.mkt-range-tab');
+        if (!btn) return;
+        tabs.querySelectorAll('.mkt-range-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _pvsActiveRange = btn.dataset.range;
+        _drawPortfolioVsChart();
+    });
+}
+
+function _initPvsChartTypeToggle() {
+    const btn = document.getElementById('pvsChartTypeBtn');
+    if (!btn || btn._pvsTypeInit) return;
+    btn._pvsTypeInit = true;
+    btn.addEventListener('click', () => {
+        _pvsChartType = _pvsChartType === 'line' ? 'bar' : 'line';
+        btn.dataset.type = _pvsChartType;
+        // Update icon
+        if (_pvsChartType === 'bar') {
+            btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="9" width="3" height="6" rx="1" fill="currentColor"/><rect x="6" y="5" width="3" height="10" rx="1" fill="currentColor"/><rect x="11" y="2" width="3" height="13" rx="1" fill="currentColor"/></svg>`;
+        } else {
+            btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><polyline points="1,13 5,7 9,10 15,3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        }
+        _drawPortfolioVsChart();
+    });
+}
+
+function _initPvsLegendToggle() {
+    ['pvsLegSP', 'pvsLegPvs'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el || el._pvsLegInit) return;
+        el._pvsLegInit = true;
+        el.addEventListener('click', () => {
+            const series = el.dataset.series;
+            const chk = el.querySelector('.pvs-leg-checkbox');
+            if (series === 'sp') {
+                _pvsShowSP = !_pvsShowSP;
+                chk.classList.toggle('pvs-leg-checked', _pvsShowSP);
+            } else {
+                _pvsShowPvs = !_pvsShowPvs;
+                chk.classList.toggle('pvs-leg-checked', _pvsShowPvs);
+            }
+            _drawPortfolioVsChart();
+        });
+    });
+}
 
 
 /* ─── Trade Signals (AI) ─────────────────────────────────────────────────── */
@@ -2527,7 +2651,7 @@ function _renderHomeDividends(data) {
 let _divCalEntries = [];
 
 // sessionStorage key — persists across same-tab page navigations
-const _DIV_CAL_CACHE_KEY = 'divCal:v2';
+const _DIV_CAL_CACHE_KEY = 'divCal:v6';
 const _DIV_CAL_TTL_MS = 43200 * 1000; // 12 hours — matches server DIV_REFRESH_INTERVAL
 
 function _divCalSave(entries, lastRefresh) {
@@ -2627,14 +2751,11 @@ function _renderDividendCalendar(data) {
 
     const items = data.map((d, i) => {
         const payDate = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
-        const exDate = new Date(d.ex_dividend_date + 'T00:00:00');
         const diff = Math.round((payDate - today) / 86400000);
-        const exDiff = Math.round((exDate - today) / 86400000);
 
         const isPaid = diff < 0;
         let status, statusClass;
         if (isPaid) { status = 'Paid'; statusClass = 'div-tl-status--paid'; }
-        // else if (exDiff < 0) { status = 'Pending Payout'; statusClass = 'div-tl-status--pending'; }
         else { status = 'Pending Payout'; statusClass = 'div-tl-status--pending'; }
 
         let relLabel;
@@ -2646,7 +2767,7 @@ function _renderDividendCalendar(data) {
         const month = payDate.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
         const day = payDate.getDate();
         const perShare = d.amount_per_share > 0 ? `$${d.amount_per_share.toFixed(4)}` : '—';
-        const payout = d.expected_payout > 0 ? `Est. $${d.expected_payout.toFixed(2)} total` : '';
+        const payout = d.expected_payout > 0 ? `Est. $${d.expected_payout.toFixed(2)}` : '';
         const isLast = i === data.length - 1;
 
         return `
@@ -2664,11 +2785,10 @@ function _renderDividendCalendar(data) {
               <span class="div-tl-ticker">${esc(d.ticker)}</span>
               <div class="div-tl-company-block">
                 <span class="div-tl-company">${esc(d.company_name)}</span>
-                ${payout ? `<span class="div-tl-type">${esc(payout)}</span>` : ''}
+                ${payout ? `<span class="div-tl-type">${perShare} per share</span>` : ''}
               </div>
               <div class="div-tl-amount-block">
-                <span class="div-tl-value">${perShare}</span>
-                <span class="div-tl-per-share">per share</span>
+                <span class="div-tl-value">${esc(payout)}</span>
               </div>
             </div>
             <div class="div-tl-card-bottom">
@@ -2705,7 +2825,7 @@ async function loadUpcomingEvents() {
     function toYMD(d) {
         return d.toISOString().slice(0, 10);
     }
-    const todayStr  = toYMD(today);
+    const todayStr = toYMD(today);
     const cutoffStr = toYMD(cutoff);
 
     try {
@@ -2723,7 +2843,7 @@ async function loadUpcomingEvents() {
             const d = e.date || '';
             if (d < todayStr || d > cutoffStr) continue;
             const q = e.quarter ? `Q${e.quarter}` : '';
-            const y = e.year    ? `${e.year}`     : '';
+            const y = e.year ? `${e.year}` : '';
             const label = [q, y].filter(Boolean).join(' ') + ' Earnings';
             events.push({ date: d, ticker: e.symbol || '—', company: e._company_name || e.symbol, type: 'earnings', label });
         }
@@ -2732,10 +2852,10 @@ async function loadUpcomingEvents() {
         const divData = (divResult.status === 'fulfilled' && divResult.value.status === 'ok')
             ? (divResult.value.data || []) : [];
         for (const d of divData) {
-            const exDate  = d.ex_dividend_date || '';
-            const payDate = d.payment_date     || '';
-            if (exDate  >= todayStr && exDate  <= cutoffStr) {
-                events.push({ date: exDate,  ticker: d.ticker, company: d.company_name || d.ticker, type: 'ex-date',  label: 'Ex-Dividend' });
+            const exDate = d.ex_dividend_date || '';
+            const payDate = d.payment_date || '';
+            if (exDate >= todayStr && exDate <= cutoffStr) {
+                events.push({ date: exDate, ticker: d.ticker, company: d.company_name || d.ticker, type: 'ex-date', label: 'Ex-Dividend' });
             }
             if (payDate >= todayStr && payDate <= cutoffStr) {
                 events.push({ date: payDate, ticker: d.ticker, company: d.company_name || d.ticker, type: 'pay-date', label: 'Dividend Pay' });
@@ -2758,7 +2878,7 @@ function _renderUpcomingEvents(events) {
         return;
     }
 
-    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     function fmtDate(dateStr) {
         const d = new Date(dateStr + 'T00:00:00');
         const day = String(d.getDate()).padStart(2, '0');
@@ -2779,16 +2899,16 @@ function _renderUpcomingEvents(events) {
             <span class="ue-col-event">Event</span>
         </div>
         ${events.map(ev => {
-            const todayCls = isToday(ev.date) ? ' ue-row-today' : '';
-            const badgeCls = ev.type === 'earnings' ? 'ue-badge-earnings'
-                           : ev.type === 'ex-date'  ? 'ue-badge-exdate'
-                           : 'ue-badge-paydate';
-            return `<div class="ue-row${todayCls}">
+        const todayCls = isToday(ev.date) ? ' ue-row-today' : '';
+        const badgeCls = ev.type === 'earnings' ? 'ue-badge-earnings'
+            : ev.type === 'ex-date' ? 'ue-badge-exdate'
+                : 'ue-badge-paydate';
+        return `<div class="ue-row${todayCls}">
                 <span class="ue-col-date">${fmtDate(ev.date)}</span>
                 <span class="ue-col-ticker" title="${esc(ev.company)}">${esc(ev.ticker)}</span>
                 <span class="ue-col-event"><span class="ue-badge ${badgeCls}">${esc(ev.label)}</span></span>
             </div>`;
-        }).join('')}
+    }).join('')}
     </div>`;
 }
 
@@ -3397,8 +3517,8 @@ function _renderWatchlistTable(list) {
 function _fmtMarketVal(v) {
     if (v == null) return '—';
     if (v >= 1e12) return '$' + (v / 1e12).toFixed(2) + 'T';
-    if (v >= 1e9)  return '$' + (v / 1e9).toFixed(1)  + 'B';
-    if (v >= 1e6)  return '$' + (v / 1e6).toFixed(0)  + 'M';
+    if (v >= 1e9) return '$' + (v / 1e9).toFixed(1) + 'B';
+    if (v >= 1e6) return '$' + (v / 1e6).toFixed(0) + 'M';
     return '$' + v.toLocaleString();
 }
 
@@ -3462,8 +3582,8 @@ async function _loadWatchlistRow(ticker, country) {
         const d = fundRes.value.data;
         const capEl = document.getElementById(`wl-mktcap-${ticker}`);
         const revEl = document.getElementById(`wl-rev-${ticker}`);
-        const psEl  = document.getElementById(`wl-ps-${ticker}`);
-        const peEl  = document.getElementById(`wl-pe-${ticker}`);
+        const psEl = document.getElementById(`wl-ps-${ticker}`);
+        const peEl = document.getElementById(`wl-pe-${ticker}`);
         if (capEl) capEl.textContent = _fmtMarketVal(d.market_cap);
         if (revEl) revEl.textContent = _fmtMarketVal(d.revenue);
         if (psEl && d.rev_multiple != null) {
