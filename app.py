@@ -67,7 +67,7 @@ def fetch_and_cache_portfolio(pid, force=False):
     """Fetch data for a single portfolio and cache the result."""
     api_key = API_KEYS.get(pid)
     if not api_key:
-        return None, 0.0, 0.0, 0
+        return None, 0.0, 0.0
 
     # 1. Try cache if not forcing
     if not force:
@@ -75,8 +75,7 @@ def fetch_and_cache_portfolio(pid, force=False):
         if cached_rows is not None:
             total_div  = kv_get("total_dividends", TTL_DIV, pid=pid) or 0.0
             pai        = kv_get("pai", TTL_DIV, pid=pid) or 0.0
-            div_score  = kv_get("div_score", TTL_DIV, pid=pid) or 0
-            return cached_rows, total_div, pai, div_score
+            return cached_rows, total_div, pai
 
     # 2. Fetch fresh data
     positions   = get_portfolio(api_key, pid)
@@ -86,30 +85,16 @@ def fetch_and_cache_portfolio(pid, force=False):
 
     total_div = round(sum(dividends.values()), 2)
     rows = build_rows(positions, instruments, dividends, gbpusd)
-    
+
     # 3. Calculate Projected Annual Income (PAI)
-    # This is an estimate based on trailing dividends
     pai = sum(r.get("dividends", 0) for r in rows)
-    
-    # 4. Calculate Diversification Score (0-100)
-    # Simple logic: higher score for more holdings and more even weight distribution
-    total_value = sum(r.get("current_value", 0) for r in rows)
-    if total_value > 0 and len(rows) > 0:
-        # Calculate Herfindahl-Hirschman Index (HHI) for concentration
-        # Lower HHI = better diversification
-        hhi = sum(((r.get("current_value", 0) / total_value) * 100)**2 for r in rows)
-        # Map 10000 (1 holding) to 0, and ~500 (20 equal holdings) to ~95
-        div_score = max(0, min(100, round(100 - (hhi / 100))))
-    else:
-        div_score = 0
 
     # Update cache
     rows_set(rows, pid=pid)
     kv_set("total_dividends", total_div, pid=pid)
     kv_set("pai", pai, pid=pid)
-    kv_set("div_score", div_score, pid=pid)
-    
-    return rows, total_div, pai, div_score
+
+    return rows, total_div, pai
 
 
 def _top_sector(rows):
@@ -132,7 +117,7 @@ def overview():
     force = request.args.get("refresh", "0") == "1"
 
     for pid in API_KEYS:
-        rows, _, p_pai, p_div_score = fetch_and_cache_portfolio(pid, force=force)
+        rows, _, p_pai = fetch_and_cache_portfolio(pid, force=force)
 
         if rows:
             p_val = sum(r["current_value"] for r in rows)
@@ -148,7 +133,6 @@ def overview():
                 "returns":     round(p_val - p_inv, 2),
                 "returns_pct": round(((p_val / p_inv) - 1) * 100, 2) if p_inv > 0 else 0,
                 "pai":         round(p_pai, 2),
-                "div_score":   p_div_score,
                 "invested":    round(p_inv, 2),
                 "positions":   len(rows),
                 "top_sector":  _top_sector(rows),
@@ -161,18 +145,11 @@ def overview():
         if r:
             all_combined_rows.extend(r)
 
-    # Calculate combined Diversification Score
-    combined_div_score = 0
-    if total_value > 0 and all_combined_rows:
-        hhi = sum(((r.get("current_value", 0) / total_value) * 100)**2 for r in all_combined_rows)
-        combined_div_score = max(0, min(100, round(100 - (hhi / 100))))
-
     res["combined"] = {
         "value":       round(total_value, 2),
         "returns":     round(total_returns, 2),
         "returns_pct": round(((total_value / total_invested) - 1) * 100, 2) if total_invested > 0 else 0,
         "pai":         round(sum(p["pai"] for p in res.values() if isinstance(p, dict) and "pai" in p), 2),
-        "div_score":   combined_div_score,
         "invested":    round(total_invested, 2),
         "positions":   sum(p["positions"] for p in res.values() if isinstance(p, dict) and "positions" in p),
         "top_sector":  _top_sector(all_combined_rows),
@@ -234,16 +211,11 @@ def portfolio_combined():
         combined_rows = list(combined_rows_map.values())
         total_p_value = sum(r["current_value"] for r in combined_rows)
         
-        # Calculate combined PAI and Div Score
+        # Calculate combined PAI
         combined_pai = 0.0
         for pid in API_KEYS:
             if API_KEYS[pid]:
                 combined_pai += kv_get("pai", TTL_DIV, pid=pid) or 0.0
-        
-        combined_div_score = 0
-        if total_p_value > 0 and combined_rows:
-            hhi = sum(((r.get("current_value", 0) / total_p_value) * 100)**2 for r in combined_rows)
-            combined_div_score = max(0, min(100, round(100 - (hhi / 100))))
 
         # Final pass: Recalculate weights, returns_pct, yoc, div_yield across combined
         for r in combined_rows:
@@ -255,9 +227,8 @@ def portfolio_combined():
         # Note: combined is always "cached" from sub-portfolios for speed
         return jsonify({
             "status": "ok", "data": combined_rows, "cached": True,
-            "cache_age": 0, "total_dividends": round(total_div, 2), 
+            "cache_age": 0, "total_dividends": round(total_div, 2),
             "pai": round(combined_pai, 2),
-            "div_score": combined_div_score,
             "warning": None,
             "freshness": {"gbpusd": kv_age("gbpusd")}
         })
@@ -451,20 +422,19 @@ def portfolio(pid):
     api_key = API_KEYS[pid]
     try:
         force = request.args.get("force", "0") == "1"
-        rows, total_div, p_pai, p_div_score = fetch_and_cache_portfolio(pid, force=force)
-        
+        rows, total_div, p_pai = fetch_and_cache_portfolio(pid, force=force)
+
         if rows is None:
             return jsonify({"status": "error", "message": "Portfolio not found"}), 404
 
         _, age = rows_get(pid)
-        
+
         return jsonify({
             "status": "ok", "data": rows,
-            "cached": True if not force else False, 
+            "cached": True if not force else False,
             "cache_age": age or 0,
-            "total_dividends": total_div, 
+            "total_dividends": total_div,
             "pai": round(p_pai, 2),
-            "div_score": p_div_score,
             "warning": None,
             "freshness": {
                 "instruments": kv_age("instruments"),
@@ -481,7 +451,7 @@ def portfolio(pid):
 def pai_details(pid):
     """Detailed stock-level breakdown of Projected Annual Income."""
     try:
-        rows, total_div, pai, _ = fetch_and_cache_portfolio(pid)
+        rows, total_div, pai = fetch_and_cache_portfolio(pid)
         if rows is None:
             return jsonify({"status": "error", "message": "Portfolio not found"}), 404
 
@@ -513,19 +483,19 @@ def pai_details(pid):
 
 @app.route("/api/p<pid>/diversification-details")
 def diversification_details(pid):
-    """Detailed rationale and breakdown for Diversification Score."""
+    """Sector and concentration breakdown for a portfolio."""
     try:
-        rows, _, _, div_score = fetch_and_cache_portfolio(pid)
+        rows, _, _ = fetch_and_cache_portfolio(pid)
         if rows is None:
             return jsonify({"status": "error", "message": "Portfolio not found"}), 404
 
         total_value = sum(r.get("current_value", 0) for r in rows)
-        
+
         # Sector breakdown
         sectors = defaultdict(float)
         for r in rows:
             sectors[r.get("sector", "Other")] += r.get("current_value", 0)
-        
+
         sector_breakdown = []
         for s, val in sectors.items():
             sector_breakdown.append({
@@ -544,25 +514,13 @@ def diversification_details(pid):
                 "weight": round((r.get("current_value", 0) / total_value * 100), 2) if total_value > 0 else 0
             })
 
-        # Generate Rationale & Recommendations
-        rationale = f"Your diversification score of {div_score}/100 is based on the Herfindahl-Hirschman Index (HHI), which measures portfolio concentration."
+        # Recommendations based on concentration
         recommendations = []
-        
-        if div_score < 40:
-            recommendations.append("Your portfolio is highly concentrated. Consider adding more positions to reduce risk.")
-        elif div_score < 70:
-            recommendations.append("Good diversification, but some positions may still have outsized influence.")
-        else:
-            recommendations.append("Excellent diversification! Your risk is well-spread across many holdings.")
-
-        # Sector specific advice
         if sector_breakdown and sector_breakdown[0]["percentage"] > 40:
             recommendations.append(f"High concentration in {sector_breakdown[0]['sector']}. Consider diversifying into other sectors.")
-
         if top_holdings and top_holdings[0]["weight"] > 20:
             recommendations.append(f"Your position in {top_holdings[0]['ticker']} is over 20%. Consider trimming or balancing.")
 
-        # Collect freshness metadata
         metadata = {
             "freshness": {
                 "prices": kv_age(f"{pid}:rows") or 0,
@@ -574,8 +532,6 @@ def diversification_details(pid):
         return jsonify({
             "status": "ok",
             "data": {
-                "score": div_score,
-                "rationale": rationale,
                 "recommendations": recommendations,
                 "sector_breakdown": sector_breakdown,
                 "top_holdings": top_holdings
@@ -682,7 +638,7 @@ def stock_tickers_api():
     """Live price + today's change for all held stocks, per-ticker cache 60s."""
     all_rows = []
     for pid in API_KEYS:
-        rows, _, _, _ = fetch_and_cache_portfolio(pid)
+        rows, _, _ = fetch_and_cache_portfolio(pid)
         if rows:
             all_rows.extend(rows)
 
@@ -997,7 +953,7 @@ def analyst_ratings():
         # Collect all unique tickers across both portfolios (all countries)
         all_tickers = {}
         for pid in ["1", "2"]:
-            rows, _, _, _ = fetch_and_cache_portfolio(pid)
+            rows, _, _ = fetch_and_cache_portfolio(pid)
             if rows:
                 for r in rows:
                     ticker = r.get("ticker")
@@ -1302,7 +1258,7 @@ def _home_data_inner(force):
     overview_res = {}
     total_value = total_returns = total_invested = 0.0
     for pid in API_KEYS:
-        rows, _, p_pai, p_div_score = fetch_and_cache_portfolio(pid, force=force)
+        rows, _, p_pai = fetch_and_cache_portfolio(pid, force=force)
         if rows:
             p_val = sum(r["current_value"] for r in rows)
             p_inv = sum(r["invested"] for r in rows)
@@ -1315,7 +1271,6 @@ def _home_data_inner(force):
                 "returns":     round(p_val - p_inv, 2),
                 "returns_pct": round(((p_val / p_inv) - 1) * 100, 2) if p_inv > 0 else 0,
                 "pai":         round(p_pai, 2),
-                "div_score":   p_div_score,
                 "invested":    round(p_inv, 2),
                 "positions":   len(rows),
                 "top_sector":  _top_sector(rows),
@@ -1325,16 +1280,11 @@ def _home_data_inner(force):
         r, _ = rows_get(pid)
         if r:
             all_combined_rows.extend(r)
-    combined_div_score = 0
-    if total_value > 0 and all_combined_rows:
-        hhi = sum(((r.get("current_value", 0) / total_value) * 100) ** 2 for r in all_combined_rows)
-        combined_div_score = max(0, min(100, round(100 - (hhi / 100))))
     overview_res["combined"] = {
         "value":       round(total_value, 2),
         "returns":     round(total_returns, 2),
         "returns_pct": round(((total_value / total_invested) - 1) * 100, 2) if total_invested > 0 else 0,
         "pai":         round(sum(p["pai"] for p in overview_res.values() if isinstance(p, dict) and "pai" in p), 2),
-        "div_score":   combined_div_score,
         "invested":    round(total_invested, 2),
         "positions":   sum(p["positions"] for p in overview_res.values() if isinstance(p, dict) and "positions" in p),
         "top_sector":  _top_sector(all_combined_rows),
@@ -2016,7 +1966,7 @@ def market_digest():
 
     force = request.args.get("refresh", "0") == "1"
     cache_key = f"ai_digest:{provider}"
-    TTL_DIGEST = 1800  # 30 minutes
+    TTL_DIGEST = 300  # 5 minutes
 
     if not force:
         cached = kv_get(cache_key, TTL_DIGEST)
@@ -2058,7 +2008,7 @@ def _background_refresh():
             if not key:
                 continue
             try:
-                rows, _, _, _ = fetch_and_cache_portfolio(pid, force=True)
+                rows, _, _ = fetch_and_cache_portfolio(pid, force=True)
                 if rows:
                     total_value = sum(r.get("current_value", 0) for r in rows)
                     snapshot_add(pid, total_value)

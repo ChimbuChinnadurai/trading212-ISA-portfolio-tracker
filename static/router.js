@@ -27,6 +27,7 @@ let _watchlistInitialized   = false;
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
     heatmap: null,
+    hmScan:  null,
     fg:      null,
     news:    null,
     mkt:     null,
@@ -47,25 +48,47 @@ function _showView(name) {
 }
 
 /* ── Breadcrumb ──────────────────────────────────────────────────────────── */
+function _formatTopbarDate() {
+    const now = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()] + ' ' + now.getFullYear();
+}
+
 function _updateBreadcrumb(route) {
-    const el = document.getElementById('breadcrumbText');
-    if (!el) return;
+    const greetEl = document.getElementById('greetingText');
+    const subtitleEl = document.getElementById('breadcrumbText');
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
     const map = {
-        'home':                 'Overview',
         'portfolio/1':          `${names['1'] || 'Portfolio 1'}`,
         'portfolio/2':          `${names['2'] || 'Portfolio 2'}`,
         'portfolio/combined':   'Combined',
-        'stocks/1':             `Holdings Table · ${names['1'] || 'Portfolio 1'}`,
-        'stocks/2':             `Holdings Table · ${names['2'] || 'Portfolio 2'}`,
-        'stocks/combined':      'Holdings Table · Combined',
+        'stocks/1':             `Holdings · ${names['1'] || 'Portfolio 1'}`,
+        'stocks/2':             `Holdings · ${names['2'] || 'Portfolio 2'}`,
+        'stocks/combined':      'Holdings · Combined',
         'news':                 'Market News',
         'calendar':             'Market Calendar',
         'activity':             'Activity & History',
         'market':               'Market',
         'watchlist':            'Watchlist',
     };
-    el.textContent = map[route] || 'Portfolio Tracker';
+
+    if (route === 'home') {
+        // Two-line greeting mode
+        if (subtitleEl) subtitleEl.style.display = '';
+        if (subtitleEl) subtitleEl.textContent = _formatTopbarDate() + ' \u00B7 Portfolio overview';
+        // Restore greeting (in case user navigated away and back)
+        if (greetEl) {
+            const h = new Date().getHours();
+            const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+            const name = (typeof PORTFOLIO_NAMES !== 'undefined' && PORTFOLIO_NAMES['1']) || 'there';
+            greetEl.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
+        }
+    } else {
+        // Single-line page title mode
+        if (subtitleEl) subtitleEl.style.display = 'none';
+        if (greetEl) greetEl.textContent = map[route] || 'Portfolio Tracker';
+    }
 
     // Hide breadcrumb value when not on portfolio view
     const bcv = document.getElementById('breadcrumbValue');
@@ -344,10 +367,19 @@ function _startHomeTimers() {
     }
     if (typeof loadMarketIndicators === 'function')
         setInterval(loadMarketIndicators, 1800000);
-    if (typeof loadStockTicker === 'function')
-        _homeTimers.heatmap = setInterval(loadStockTicker, 60000);
+    if (typeof loadStockTicker === 'function') {
+        _homeTimers.heatmap = setInterval(loadStockTicker, 30000);
+        _homeTimers.hmScan  = setInterval(() => {
+            const c = document.querySelector('.heatmap-container');
+            if (!c) return;
+            c.classList.remove('hm-scanning');
+            void c.offsetWidth;
+            c.classList.add('hm-scanning');
+            setTimeout(() => c.classList.remove('hm-scanning'), 900);
+        }, 2000);
+    }
     if (typeof loadMarketDigest === 'function')
-        _homeTimers.digest = setInterval(() => loadMarketDigest(null, false), 1800000);
+        _homeTimers.digest = setInterval(() => loadMarketDigest(null, false), 300000);
 }
 
 function _stopHomeTimers() {
@@ -426,8 +458,8 @@ function _deactivateDetailView() {
 
 /* ── Bootstrap ───────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
-    // Theme & Glass initialization
-    const savedTheme = localStorage.getItem('theme') || 'light';
+    // Theme initialization
+    const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
     _updateThemeIcon(savedTheme);
 

@@ -10,7 +10,6 @@ let activeCountry = null;
 let _recommendations = {};
 let _lastTotalDividends = null;
 let _lastPAI = 0;
-let _lastDivScore = 0;
 let _activityData = null;
 let _dividendData = null;
 let _monthlyData = null;
@@ -214,9 +213,8 @@ async function loadPortfolio(force = false) {
 
     _lastTotalDividends = json.total_dividends ?? null;
     _lastPAI = json.pai ?? 0;
-    _lastDivScore = json.div_score ?? 0;
 
-    renderSummary(allRows, _lastTotalDividends, _lastPAI, _lastDivScore);
+    renderSummary(allRows, _lastTotalDividends, _lastPAI);
     if (_returnsMode === 'today') _loadTodayReturns();
     document.getElementById('dashboard').style.display = '';
     document.getElementById('stateError').style.display = 'none';
@@ -325,7 +323,7 @@ function hideSkeletons() {
 }
 
 /* ─── Summary cards ───────────────────────────────────────────────────────── */
-function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
+function renderSummary(rows, allTimeDividends = null, pai = 0) {
   const totalValue = rows.reduce((s, r) => s + r.current_value, 0);
   const totalReturns = rows.reduce((s, r) => s + r.total_returns, 0);
   const totalDividends = allTimeDividends != null
@@ -351,16 +349,6 @@ function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
 
   // Card 4: PAI
   set('totalPAI', fmt.currency(pai));
-
-  // Card 5: Div Score
-  set('divScore', divScore);
-  const meaningEl = document.getElementById('divScoreMeaning');
-  if (meaningEl) {
-    if (divScore >= 80) meaningEl.textContent = 'Excellent diversification';
-    else if (divScore >= 60) meaningEl.textContent = 'Good diversification';
-    else if (divScore >= 40) meaningEl.textContent = 'Moderate concentration';
-    else meaningEl.textContent = 'High concentration';
-  }
 
   const topDivEl = document.getElementById('topDivStock');
   if (topDiv && topDiv.dividends > 0) {
@@ -1036,7 +1024,7 @@ function hideTooltip() {
 /* ─── Currency re-render ─────────────────────────────────────────────────── */
 function onCurrencyChange() {
   if (allRows.length === 0) return;
-  renderSummary(allRows, _lastTotalDividends, _lastPAI, _lastDivScore);
+  renderSummary(allRows, _lastTotalDividends, _lastPAI);
   renderTable(allRows);
   if (_activityData) _renderActivity(_activityData);
   if (_dividendData) _renderDividends(_dividendData);
@@ -1961,11 +1949,10 @@ async function openDiversificationDetails() {
     const json = await res.json();
     if (json.status !== 'ok') throw new Error(json.message);
 
-    const { rationale, recommendations, sector_breakdown, top_holdings } = json.data;
+    const { recommendations, sector_breakdown, top_holdings } = json.data;
 
     let html = `
       <div class="sm-section">
-        <div class="sm-rationale">${esc(rationale)}</div>
         <div class="recommendations-box">
           ${recommendations.map(msg => `
             <div class="sm-recommendation">
@@ -2311,7 +2298,6 @@ async function loadStocksView(force = false) {
 
     _lastTotalDividends = json.total_dividends ?? null;
     _lastPAI = json.pai ?? 0;
-    _lastDivScore = json.div_score ?? 0;
 
     const titleEl = document.getElementById('stocksTableTitle');
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};

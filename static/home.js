@@ -224,12 +224,8 @@ function updateCard(prefix, stats) {
         paiEl.textContent = `${fmt.currency(stats.pai)} / yr`;
 
     if (posEl && stats.positions != null) {
-        const score = stats.div_score ?? 0;
-        const bg = score >= 70 ? '#4caf50' : score >= 50 ? '#ffb74d' : '#e57373';
         const sector = stats.top_sector ? ` · ${stats.top_sector}` : '';
-        posEl.innerHTML =
-            `<span class="ov-mini-badge" style="background:${bg}">${score}</span>` +
-            `${stats.positions} positions${esc(sector)}`;
+        posEl.textContent = `${stats.positions} positions${sector}`;
     }
 }
 
@@ -548,6 +544,18 @@ function _renderHeatmap(items) {
         }
     }
     container.innerHTML = html.join('');
+
+    // Randomise each cell's phase within the 10s cycle so they pulse out of sync
+    container.querySelectorAll('.hm-cell').forEach(cell => {
+        const delay = (-Math.random() * 10).toFixed(2); // random start point in -10..0s
+        cell.style.setProperty('--hm-delay', `${delay}s`);
+    });
+
+    // Scan-line sweep to signal fresh data
+    container.classList.remove('hm-scanning');
+    void container.offsetWidth; // force reflow so animation restarts cleanly
+    container.classList.add('hm-scanning');
+    setTimeout(() => container.classList.remove('hm-scanning'), 900);
 
     if (!container._hmClickBound) {
         container._hmClickBound = true;
@@ -3275,12 +3283,18 @@ async function loadMarketDigest(provider, force = false) {
 
         _renderDigest(json.digest, body); // Pass body to render
 
+        // Also render into the inline Market News widget on the Market page
+        const inlineEl = document.getElementById('marketDigestInline');
+        if (inlineEl) _renderDigest(json.digest, inlineEl);
+
         if (meta) {
-            const timeStr = json.cached ? `Cached · ${json.last_refresh_ago || '30m'}` : 'Just now';
+            const timeStr = json.cached ? `Cached · ${json.last_refresh_ago || '5m'}` : 'Just now';
             meta.innerHTML = `<a href="https://www.finviz.com/" target="_blank">Finviz</a> · ${timeStr}`;
         }
     } catch (err) {
         body.innerHTML = `<div class="digest-error">Failed to load digest: ${esc(err.message)}</div>`;
+        const inlineEl = document.getElementById('marketDigestInline');
+        if (inlineEl) inlineEl.innerHTML = `<div class="digest-error">Failed to load: ${esc(err.message)}</div>`;
     }
 }
 
