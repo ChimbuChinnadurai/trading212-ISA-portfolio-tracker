@@ -3168,7 +3168,6 @@ th.sort-desc .sort-icon::before {
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  justify-content: center;
 }
 
 .fg-hist-row {
@@ -6038,7 +6037,9 @@ html[data-theme="dark"] .nav-item.active {
   transform: rotate(180deg);
 }
 
-.nav-group-items, .nav-sub, .nav-sub-icon {
+.nav-group-items,
+.nav-sub,
+.nav-sub-icon {
   display: none !important;
 }
 
@@ -6142,7 +6143,6 @@ html[data-theme="dark"] .nav-item.active {
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 12px;
   min-width: 0;
   flex: 1;
 }
@@ -6708,7 +6708,7 @@ html[data-theme="dark"] .nav-item.active {
   .sidebar.mobile-open .nav-label {
     display: block !important;
   }
-  
+
   .sidebar.mobile-open .nav-item,
   .sidebar.mobile-open .nav-group-header {
     flex-direction: row;
@@ -6720,16 +6720,16 @@ html[data-theme="dark"] .nav-item.active {
     width: calc(100% - 12px);
     margin: 4px 6px;
   }
-  
+
   .sidebar.mobile-open .nav-label {
     font-size: 14px;
     text-align: left;
   }
-  
+
   .sidebar.mobile-open .nav-sub {
     padding-left: 44px;
   }
-  
+
   .sidebar.mobile-open .nav-sub-dot {
     margin-bottom: 0;
     margin-right: 12px;
@@ -8057,6 +8057,71 @@ html[data-theme="dark"] .widget-signals {
   background: #0f1629;
   border: 1px solid #1e2d4a;
   border-top: 4px solid var(--accent);
+}
+
+/* ── Drawdown Analysis widget ────────────────────────────────────────────── */
+.drawdown-widget {
+  min-height: 0;
+}
+
+.drawdown-chart-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.drawdown-chart-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.drawdown-stat-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 7px 10px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 6px;
+}
+
+.drawdown-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.drawdown-stat-label {
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.drawdown-stat-val {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text-secondary);
+}
+
+.drawdown-stat-val.neg {
+  color: var(--red);
+}
+
+.drawdown-stat-val.pos {
+  color: var(--green);
+}
+
+.drawdown-stat-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  flex-shrink: 0;
 }
 
 /* ── Widget: Insider Trading ─────────────────────────────────────────────── */

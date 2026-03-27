@@ -12,33 +12,33 @@
  */
 
 /* ── State ──────────────────────────────────────────────────────────────── */
-let _currentRoute       = null;
-let _homeInitialized    = false;
-let _detailInitialized  = false;
-let _detailActivePid    = null;
-let _stocksInitialized  = false;
-let _stocksActivePid    = null;
-let _newsInitialized        = false;
-let _calendarInitialized    = false;
-let _activityInitialized    = false;
-let _marketInitialized      = false;
-let _watchlistInitialized   = false;
-let _aiInitialized          = false;
+let _currentRoute = null;
+let _homeInitialized = false;
+let _detailInitialized = false;
+let _detailActivePid = null;
+let _stocksInitialized = false;
+let _stocksActivePid = null;
+let _newsInitialized = false;
+let _calendarInitialized = false;
+let _activityInitialized = false;
+let _marketInitialized = false;
+let _watchlistInitialized = false;
+let _aiInitialized = false;
 
 
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
     heatmap: null,
-    hmScan:  null,
-    fg:      null,
-    news:    null,
-    mkt:     null,
+    hmScan: null,
+    fg: null,
+    news: null,
+    mkt: null,
     mktTick: null,
-    digest:  null,
+    digest: null,
 };
 
 const _marketTimers = {
-    sp500:   null,
+    sp500: null,
     signals: null,
 };
 
@@ -62,17 +62,23 @@ function _updateBreadcrumb(route) {
     const subtitleEl = document.getElementById('breadcrumbText');
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
     const map = {
-        'portfolio/1':          `${names['1'] || 'Portfolio 1'}`,
-        'portfolio/2':          `${names['2'] || 'Portfolio 2'}`,
-        'portfolio/combined':   'Combined',
-        'stocks/1':             `Holdings · ${names['1'] || 'Portfolio 1'}`,
-        'stocks/2':             `Holdings · ${names['2'] || 'Portfolio 2'}`,
-        'stocks/combined':      'Holdings · Combined',
-        'news':                 'Market News',
-        'calendar':             'Market Calendar',
-        'activity':             'Activity & History',
-        'market':               'Market',
-        'watchlist':            'Watchlist',
+        // 'portfolio/1': `${names['1'] || 'Portfolio 1'}`,
+        // 'portfolio/2': `${names['2'] || 'Portfolio 2'}`,
+        // 'portfolio/combined': 'Combined',
+        // 'stocks/1': `Holdings · ${names['1'] || 'Portfolio 1'}`,
+        // 'stocks/2': `Holdings · ${names['2'] || 'Portfolio 2'}`,
+        // 'stocks/combined': 'Holdings · Combined',
+        'portfolio/1': '',
+        'portfolio/2': '',
+        'portfolio/combined': '',
+        'stocks/1': '',
+        'stocks/2': '',
+        'stocks/combined': '',
+        'news': 'Market News',
+        'calendar': 'Market Calendar',
+        'activity': 'Activity & History',
+        'market': 'Market',
+        'watchlist': 'Watchlist',
     };
 
     if (route === 'home') {
@@ -89,7 +95,7 @@ function _updateBreadcrumb(route) {
     } else {
         // Single-line page title mode
         if (subtitleEl) subtitleEl.style.display = 'none';
-        if (greetEl) greetEl.textContent = map[route] || 'Portfolio Tracker';
+        if (greetEl) greetEl.textContent = map[route] || '';
     }
 
     // Hide breadcrumb value when not on portfolio view
@@ -102,7 +108,7 @@ function _updateBreadcrumb(route) {
 
 /* ── Pid switcher ────────────────────────────────────────────────────────── */
 function _updatePidSwitcher(route) {
-    const switcher  = document.getElementById('pidSwitcher');
+    const switcher = document.getElementById('pidSwitcher');
     const btnCombined = document.getElementById('pidBtnCombined');
     if (!switcher) return;
 
@@ -116,7 +122,7 @@ function _updatePidSwitcher(route) {
         const pid = route.split('/')[1];
         const activeBtn = document.getElementById(
             pid === 'combined' ? 'pidBtnCombined' :
-            pid === '1'        ? 'pidBtn1'        : 'pidBtn2'
+                pid === '1' ? 'pidBtn1' : 'pidBtn2'
         );
         if (activeBtn) activeBtn.classList.add('active');
     }
@@ -151,7 +157,7 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadWatchlistView();
     } else if (view === 'ai-intelligence') {
         // AI view has its own refresh buttons per section
-        btn.style.display = 'none'; 
+        btn.style.display = 'none';
     }
 
 }
@@ -182,7 +188,7 @@ function _cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 /* ── Sidebar collapse ────────────────────────────────────────────────────── */
 function toggleSidebar() {
     const sidebar = document.getElementById('sidebar');
-    const scrim   = document.getElementById('sidebarScrim');
+    const scrim = document.getElementById('sidebarScrim');
     if (!sidebar) return;
 
     const isMobile = window.innerWidth <= 768;
@@ -219,9 +225,9 @@ function _router() {
     _currentRoute = hash;
 
     // Deactivate previous view
-    if (prev === 'home')                    _deactivateHomeView();
+    if (prev === 'home') _deactivateHomeView();
     else if (prev?.startsWith('portfolio/')) _deactivateDetailView();
-    else if (prev === 'market')             _deactivateMarketView();
+    else if (prev === 'market') _deactivateMarketView();
 
     // Update shared UI
     _updateBreadcrumb(hash);
@@ -230,7 +236,7 @@ function _router() {
 
     // Close mobile sidebar on navigation
     const sidebar = document.getElementById('sidebar');
-    const scrim   = document.getElementById('sidebarScrim');
+    const scrim = document.getElementById('sidebarScrim');
     if (sidebar?.classList.contains('mobile-open')) {
         sidebar.classList.remove('mobile-open');
         scrim?.classList.remove('active');
@@ -248,7 +254,7 @@ function _router() {
             _activateHomeView();
         }
 
-    /* ── Portfolio ── */
+        /* ── Portfolio ── */
     } else if (hash.startsWith('portfolio/')) {
         const pid = hash.split('/')[1] || 'combined';
         _showView('portfolio');
@@ -257,14 +263,14 @@ function _router() {
         window.PORTFOLIO_ID = pid;
 
         if (!_detailInitialized || _detailActivePid !== pid) {
-            _detailActivePid   = pid;
+            _detailActivePid = pid;
             _detailInitialized = true;
             _resetDetailView();
             if (typeof loadPortfolio === 'function') loadPortfolio(false);
         }
         _activateDetailView();
 
-    /* ── Stocks ── */
+        /* ── Stocks ── */
     } else if (hash.startsWith('stocks/')) {
         const pid = hash.split('/')[1] || 'combined';
         _showView('stocks');
@@ -273,14 +279,14 @@ function _router() {
         window.PORTFOLIO_ID = pid;
 
         if (!_stocksInitialized || _stocksActivePid !== pid) {
-            _stocksActivePid   = pid;
+            _stocksActivePid = pid;
             _stocksInitialized = true;
             _resetStocksView();
             if (typeof loadStocksView === 'function') loadStocksView(false);
         }
         _activateDetailView(); // market status shared
 
-    /* ── News ── */
+        /* ── News ── */
     } else if (hash === 'news') {
         _showView('news');
         _updateRefreshBtn('news');
@@ -290,7 +296,7 @@ function _router() {
             _newsInitialized = true;
         }
 
-    /* ── Calendar ── */
+        /* ── Calendar ── */
     } else if (hash === 'calendar') {
         _showView('calendar');
         _updateRefreshBtn('calendar');
@@ -300,7 +306,7 @@ function _router() {
             _calendarInitialized = true;
         }
 
-    /* ── Activity ── */
+        /* ── Activity ── */
     } else if (hash === 'activity') {
         _showView('activity');
         _updateRefreshBtn('activity');
@@ -310,7 +316,7 @@ function _router() {
             _activityInitialized = true;
         }
 
-    /* ── Market ── */
+        /* ── Market ── */
     } else if (hash === 'market') {
         _showView('market');
         _updateRefreshBtn('market');
@@ -322,7 +328,7 @@ function _router() {
             _activateMarketView();
         }
 
-    /* ── Watchlist ── */
+        /* ── Watchlist ── */
     } else if (hash === 'watchlist') {
         _showView('watchlist');
         _updateRefreshBtn('watchlist');
@@ -332,7 +338,7 @@ function _router() {
             _watchlistInitialized = true;
         }
 
-    /* ── AI Intelligence ── */
+        /* ── AI Intelligence ── */
     } else if (hash === 'ai-intelligence') {
         _showView('ai-intelligence');
         _updateRefreshBtn('ai-intelligence');
@@ -352,20 +358,20 @@ function _portfolioTitle(pid) {
 
 /* ── Home view lifecycle ─────────────────────────────────────────────────── */
 function _initHomeView() {
-    if (typeof initRefreshClocks   === 'function') initRefreshClocks();
-    if (typeof loadHomeData        === 'function') loadHomeData();
-    if (typeof loadSparklines      === 'function') loadSparklines();
-    if (typeof loadFearGreed       === 'function') loadFearGreed();
+    if (typeof initRefreshClocks === 'function') initRefreshClocks();
+    if (typeof loadHomeData === 'function') loadHomeData();
+    if (typeof loadSparklines === 'function') loadSparklines();
+    if (typeof loadFearGreed === 'function') loadFearGreed();
     if (typeof loadMarketIndicators === 'function') loadMarketIndicators();
-    if (typeof loadMarketStatus    === 'function') loadMarketStatus();
-    if (typeof loadStockTicker     === 'function') loadStockTicker();
-    if (typeof loadMarketDigest    === 'function') loadMarketDigest();
+    if (typeof loadMarketStatus === 'function') loadMarketStatus();
+    if (typeof loadStockTicker === 'function') loadStockTicker();
+    if (typeof loadMarketDigest === 'function') loadMarketDigest();
     _startHomeTimers();
 }
 
 function _activateHomeView() {
     if (typeof loadStockTicker === 'function') loadStockTicker();
-    if (typeof loadFearGreed   === 'function') loadFearGreed();
+    if (typeof loadFearGreed === 'function') loadFearGreed();
     _startHomeTimers();
 }
 
@@ -387,7 +393,7 @@ function _startHomeTimers() {
         setInterval(loadMarketIndicators, 1800000);
     if (typeof loadStockTicker === 'function') {
         _homeTimers.heatmap = setInterval(loadStockTicker, 30000);
-        _homeTimers.hmScan  = setInterval(() => {
+        _homeTimers.hmScan = setInterval(() => {
             const c = document.querySelector('.heatmap-container');
             if (!c) return;
             c.classList.remove('hm-scanning');
@@ -408,14 +414,14 @@ function _stopHomeTimers() {
 
 /* ── Market view lifecycle ───────────────────────────────────────────────── */
 function _initMarketView() {
-    if (typeof initFinvizTabs    === 'function') initFinvizTabs();
-    if (typeof loadMarketView    === 'function') loadMarketView();
+    if (typeof initFinvizTabs === 'function') initFinvizTabs();
+    if (typeof loadMarketView === 'function') loadMarketView();
     _startMarketTimers();
 }
 
 function _activateMarketView() {
-    if (typeof loadSP500Heatmap   === 'function') loadSP500Heatmap();
-    if (typeof loadMarketSignals  === 'function') loadMarketSignals(_activeSignal);
+    if (typeof loadSP500Heatmap === 'function') loadSP500Heatmap();
+    if (typeof loadMarketSignals === 'function') loadMarketSignals(_activeSignal);
     _startMarketTimers();
 }
 
@@ -440,21 +446,21 @@ function _stopMarketTimers() {
 
 /* ── Detail view lifecycle ───────────────────────────────────────────────── */
 function _resetDetailView() {
-    const dash    = document.getElementById('dashboard');
+    const dash = document.getElementById('dashboard');
     const loading = document.getElementById('stateLoading');
-    const search  = document.getElementById('searchInput');
-    if (dash)    dash.style.display   = 'none';
+    const search = document.getElementById('searchInput');
+    if (dash) dash.style.display = 'none';
     if (loading) loading.style.display = 'none';
-    if (search)  search.value          = '';
+    if (search) search.value = '';
 }
 
 function _resetStocksView() {
-    const wrap    = document.getElementById('stocksTableWrapper');
+    const wrap = document.getElementById('stocksTableWrapper');
     const loading = document.getElementById('stocksStateLoading');
-    const tbody   = document.getElementById('tableBody');
-    if (wrap)    wrap.style.display    = 'none';
+    const tbody = document.getElementById('tableBody');
+    if (wrap) wrap.style.display = 'none';
     if (loading) loading.style.display = 'none';
-    if (tbody)   tbody.innerHTML       = '';
+    if (tbody) tbody.innerHTML = '';
 }
 
 function _activateDetailView() {
@@ -470,7 +476,7 @@ function _activateDetailView() {
 }
 
 function _deactivateDetailView() {
-    if (_homeTimers.mkt)     { clearInterval(_homeTimers.mkt);     _homeTimers.mkt     = null; }
+    if (_homeTimers.mkt) { clearInterval(_homeTimers.mkt); _homeTimers.mkt = null; }
     if (_homeTimers.mktTick) { clearInterval(_homeTimers.mktTick); _homeTimers.mktTick = null; }
 }
 
@@ -517,8 +523,8 @@ function toggleNavGroup(groupId, event) {
 }
 
 // Public exports
-window.navigate      = navigate;
+window.navigate = navigate;
 window.toggleSidebar = toggleSidebar;
 window.toggleNavGroup = toggleNavGroup;
-window.switchPid     = switchPid;
-window.toggleTheme   = toggleTheme;
+window.switchPid = switchPid;
+window.toggleTheme = toggleTheme;

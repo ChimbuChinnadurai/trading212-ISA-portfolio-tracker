@@ -52,18 +52,18 @@ style.css        — All styles, dark/light theme, responsive
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `app.py` | Flask app, all API endpoints, background refresh threads | 1565 |
+| `app.py` | Flask app, all API endpoints, background refresh threads | ~1565 |
 | `t212.py` | Trading212 API client, pagination, instrument cache | ~220 |
 | `portfolio.py` | Builds enriched row dicts from raw T212 data | ~64 |
 | `cache.py` | SQLite/Postgres KV store: `kv_get/set`, `rows_get/set`, `snapshot_get/add` | ~107 |
 | `fx.py` | GBP/USD rate (Yahoo), GBX pence→GBP, ISIN→country | ~76 |
 | `sectors.py` | Hardcoded ticker→sector map + keyword fallback | ~76 |
-| `static/app.js` | Detail view: portfolio table, allocation bars, price charts, side panel, CSV export | ~1600 |
-| `static/home.js` | Home view: overview cards, heatmap, sparklines, fear & greed, news, earnings, dividends | ~1550 |
-| `static/router.js` | Hash-based SPA router: view lifecycle, timers, back button, header updates | ~225 |
-| `static/currency.js` | `setCurrency()`, `formatValue()`, GBP↔USD display conversion | small |
-| `static/style.css` | Dark/light CSS vars, all component styles, responsive breakpoints | ~4750 |
-| `templates/spa.html` | SPA shell — all views rendered client-side via hash routing (Jinja: `names`) | ~870 |
+| `static/app.js` | Detail view: portfolio table, allocation bars, price charts, side panel, CSV export | ~2374 |
+| `static/home.js` | Home/market view: overview cards, heatmap, sparklines, fear & greed, market charts, drawdown, signals | ~3800 |
+| `static/router.js` | Hash-based SPA router: view lifecycle, timers, back button, header updates | ~530 |
+| `static/currency.js` | `setCurrency()`, GBP↔USD display conversion | small |
+| `static/style.css` | Dark/light CSS vars, all component styles, responsive breakpoints | ~8100 |
+| `templates/spa.html` | SPA shell — all views rendered client-side via hash routing (Jinja: `names`) | ~1300 |
 
 ---
 
@@ -185,7 +185,7 @@ style.css        — All styles, dark/light theme, responsive
 | `_heatColor(pct)` | Returns bg colour: green gradient (gains) or red gradient (losses) |
 | `loadSparklines()` | 90-day portfolio value sparklines on overview cards with hover tooltip |
 | `loadFearGreed()` | Fetches `/api/market-indicators`, draws gauge canvas + history rows |
-| `loadMarketNews()` | Fetches `/api/news`, renders news items, resets 5m clock |
+| `loadMarketNews()` | Fetches `/api/news`, renders news items into the standalone `#view-news` page |
 | `loadDividendCalendar()` | Fetches upcoming dividends, caches to localStorage (12h TTL) |
 | `loadEarnings()` | Fetches `/api/earnings`, renders upcoming earnings cards |
 | `loadActivity()` | Fetches `/api/pcombined/activity`, renders recent trades |
@@ -193,6 +193,42 @@ style.css        — All styles, dark/light theme, responsive
 | `initRefreshClocks()` | Initialises all `.refresh-clock` elements on DOMContentLoaded |
 | `resetClock(id)` | Resets a specific clock to full after data refresh |
 | `loadMarketStatus()` | Fetches `/api/market-status`, renders NASDAQ/LSE pills with tooltips |
+| `loadPortfolioVsMarket()` | Fetches `/api/pcombined/daily-history`, draws Portfolio vs S&P chart + drawdown chart |
+| `_drawPortfolioVsChart()` | Canvas chart: combined portfolio value vs S&P 500 (indexed, range-filterable) |
+| `_calcDrawdown(data)` | Computes running-peak drawdown series from `[{date, value}]` array |
+| `_drawDrawdownChart()` | Canvas drawdown chart: red fill below 0, Y-axis %, hover crosshair + tooltip |
+| `_initDrawdownRangeTabs()` | Attaches click + hover listeners to `#ddRangeTabs` and `#drawdownChart` |
+| `_renderPortfolioGain()` | Updates 1M/6M/12M/YTD/Total return cells from cached daily-history |
+
+### Market View (`spa.html` + `home.js`)
+
+**Route:** `#market` — loaded via `_initMarketView()` → `loadMarketView()`
+
+**Layout:** `.market-body` — CSS grid `1fr 1fr 280px`, 2 explicit rows + overflow row
+
+| Cell | Widget | Data source |
+|------|--------|-------------|
+| Row 1, Col 1 | Portfolio vs S&P 500 chart (`#pvsChart`) | `/api/pcombined/daily-history` + `/api/market-indicators` |
+| Row 1, Col 2 | Sector Performance bars (`#sectorBarsList`) | `/api/finviz/sp500-heatmap` |
+| Row 1, Col 3 | Market Signals (`#signalsList`) | `/api/finviz/signals?type=…` |
+| Row 2, Col 1–2 | Portfolio Gain stats (`#pvsGain*`) | Same daily-history data, no extra fetch |
+| Row 2, Col 3 | **Drawdown Analysis** (`#drawdownChart`) | Same daily-history data, no extra fetch |
+| Row 3, Col 3 | Insider Trading (`#insiderList`) | `/api/finviz/insider?period=…` |
+
+**Drawdown Analysis widget:**
+- Range tabs: 1M / 3M / 6M / **1Y** (default) / ALL — state in `_ddActiveRange`
+- Chart: canvas filled-area red chart; Y-axis 0% → min drawdown (5% grid steps); X-axis month labels
+- Stat bar: **Max DD** | **Current** | **Days in DD**
+- Hover: crosshair line + dot + tooltip showing date, drawdown %, portfolio value
+- Data: reuses `_portfolioVsData` cached by `loadPortfolioVsMarket()` — no extra API call
+
+**Portfolio vs S&P 500 chart:**
+- Range tabs: 1M / 3M / 6M / **1Y** (default) / ALL
+- Chart types: line or bar (toggle button)
+- Legend toggles: S&P 500 and Portfolio series independently hideable
+- Both series normalised to 100 at range start (indexed % gain)
+
+---
 
 ### Detail View (`spa.html` + `app.js`)
 
@@ -261,7 +297,7 @@ style.css        — All styles, dark/light theme, responsive
 .app.fixed-layout     — Desktop-only: height:100vh, overflow:hidden (undone at ≤768px)
 .landing-page         — CSS grid: 1fr 300px (main + sidebar)
 .dashboard-body       — Left column: summary-row + home-widgets
-.dashboard-news       — Right column: Market News panel
+.dashboard-news       — Right column: Market News panel (home view sidebar)
 .overview-grid        — repeat(3, 1fr), gap 14px
 .home-widgets         — repeat(4, 1fr), gap 14px
 .ov-card              — Portfolio overview card (padding 8px 12px)
@@ -273,6 +309,20 @@ style.css        — All styles, dark/light theme, responsive
 .refresh-clock        — SVG countdown ring wrapper
 .rc-svg / .rc-arc / .rc-track / .rc-text — SVG clock parts
 .side-panel           — Slides in from right (stock detail, PAI, diversification, F&G)
+
+/* Market View */
+.market-body          — CSS grid: 1fr 1fr 280px, 2 rows, gap 12px
+.market-chart-card    — Portfolio vs S&P chart card, height 400px
+.pvs-gain-widget      — Portfolio gain stats card (row 2, cols 1–2)
+.drawdown-widget      — Drawdown Analysis widget (row 2, col 3)
+.drawdown-chart-wrap  — flex:1 canvas container, position:relative
+.drawdown-stat-bar    — Stats footer: Max DD | Current | Days in DD
+.drawdown-stat-item   — Individual stat (label + value stacked)
+.drawdown-stat-val    — Value text; .pos → green, .neg → red
+.drawdown-stat-sep    — 1px vertical divider between stats
+.widget-signals       — Market Signals panel (row 1, col 3), height 400px
+.widget-insider       — Insider Trading panel, height 400px
+.mkt-range-tabs       — Range tab row (.mkt-range-tab buttons, .active state)
 ```
 
 ---
@@ -345,10 +395,10 @@ CACHE_TTL_ORDERS            # Order history TTL (default 300s)
 - **No auth layer** — assumes private/internal deployment
 - **Cache doesn't auto-purge** — stale rows accumulate in SQLite over time
 - **Allocation chart** — pie/donut for sector breakdown (planned)
-- **Benchmark comparison** — portfolio vs FTSE100/S&P500 overlay (planned)
+- **Benchmark comparison vs FTSE100** — Portfolio vs S&P 500 is implemented; FTSE100 overlay not yet added
 - **Tax year summary** — UK Apr–Apr capital gains + dividend income report (planned)
 - **Export to CSV/PDF** — detail page has CSV export; no PDF yet
-- **Mobile: Market News sidebar** — appears below widgets on mobile (≤768px); not a sidebar
+- **Drawdown chart theme redraw** — does not auto-redraw on theme toggle; redraws on next range-tab click or view re-entry
 
 ---
 

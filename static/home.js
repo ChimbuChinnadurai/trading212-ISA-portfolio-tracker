@@ -13,6 +13,7 @@ let _mktActiveRange = '3M'; // 1W | 1M | 3M | 1Y
 let _nasdaqActiveRange = '3M';
 let _portfolioVsData = null; // [{date, ts, value}] from /api/pcombined/daily-history
 let _pvsActiveRange = '1Y';  // 1M | 3M | 6M | 1Y | ALL
+let _ddActiveRange = '1Y';   // drawdown chart range
 let _pvsChartType = 'line';  // line | bar
 let _pvsShowSP = true;
 let _pvsShowPvs = true;
@@ -1358,7 +1359,8 @@ async function loadPortfolioVsMarket() {
     _initPvsRangeTabs();
     _initPvsChartTypeToggle();
     _initPvsLegendToggle();
-    if (_portfolioVsData) { _drawPortfolioVsChart(); _renderPortfolioGain(); return; }
+    _initDrawdownRangeTabs();
+    if (_portfolioVsData) { _drawPortfolioVsChart(); _renderPortfolioGain(); _drawDrawdownChart(); return; }
     try {
         const res = await fetch('/api/pcombined/daily-history');
         const json = await res.json();
@@ -1366,6 +1368,7 @@ async function loadPortfolioVsMarket() {
             _portfolioVsData = json.data;
             _drawPortfolioVsChart();
             _renderPortfolioGain();
+            _drawDrawdownChart();
         }
     } catch (err) { console.warn('[portfolioVs]', err); }
 }
@@ -1765,6 +1768,221 @@ function _initPvsLegendToggle() {
     });
 }
 
+
+/* ─── Drawdown Analysis Chart ────────────────────────────────────────────── */
+
+function _calcDrawdown(data) {
+    let peak = -Infinity;
+    return data.map(pt => {
+        if (pt.value > peak) peak = pt.value;
+        const dd = peak > 0 ? ((pt.value - peak) / peak) * 100 : 0;
+        return { date: pt.date, ts: pt.ts, value: pt.value, drawdown: dd, peak };
+    });
+}
+
+function _drawDrawdownChart() {
+    const canvas = document.getElementById('drawdownChart');
+    if (!canvas) return;
+    if (!canvas.offsetWidth) { requestAnimationFrame(_drawDrawdownChart); return; }
+    if (!_portfolioVsData?.length) {
+        const ctx2 = canvas.getContext('2d');
+        ctx2.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
+    // Filter by range
+    const rangeDays = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, 'ALL': 99999 };
+    const days = rangeDays[_ddActiveRange] || 365;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const raw = _portfolioVsData.filter(pt => pt.date >= cutoffStr);
+    if (raw.length < 2) return;
+
+    const series = _calcDrawdown(raw);
+
+    // Update stats
+    const maxDD = Math.min(...series.map(p => p.drawdown));
+    const current = series[series.length - 1].drawdown;
+
+    // Count days in current drawdown streak (from last peak)
+    let ddDays = 0;
+    for (let i = series.length - 1; i >= 0; i--) {
+        if (series[i].drawdown < -0.01) ddDays++;
+        else break;
+    }
+
+    const fmtDD = v => v.toFixed(2) + '%';
+    const maxEl = document.getElementById('ddMaxDD');
+    const curEl = document.getElementById('ddCurrent');
+    const daysEl = document.getElementById('ddDays');
+    if (maxEl) {
+        maxEl.textContent = fmtDD(maxDD);
+        maxEl.className = 'drawdown-stat-val ' + (maxDD < -0.5 ? 'neg' : 'pos');
+    }
+    if (curEl) {
+        curEl.textContent = fmtDD(current);
+        curEl.className = 'drawdown-stat-val ' + (current < -0.5 ? 'neg' : 'pos');
+    }
+    if (daysEl) daysEl.textContent = ddDays > 0 ? ddDays + 'd' : '—';
+
+    // Canvas setup
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const textCol = isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
+    const gridCol = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const zeroCol = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+    const lineCol = '#ef4444';
+    const fillCol = isDark ? 'rgba(239,68,68,0.18)' : 'rgba(239,68,68,0.12)';
+
+    const PAD = { top: 10, right: 8, bottom: 30, left: 38 };
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Y range: always show 0 at top, scale to min drawdown (with small buffer)
+    const minDD = Math.min(maxDD, -0.5);
+    const yMin = Math.floor(minDD / 5) * 5 - 2; // round to nearest 5, add buffer
+    const yMax = 1; // slight headroom above 0
+    const yRng = yMax - yMin;
+
+    const yOf = v => PAD.top + (1 - (v - yMin) / yRng) * cH;
+    const xOf = i => PAD.left + (i / (series.length - 1)) * cW;
+
+    // Y grid lines and labels
+    ctx.font = `9px system-ui,sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    const ySteps = [];
+    for (let v = 0; v >= yMin; v -= 5) ySteps.push(v);
+
+    for (const v of ySteps) {
+        const y = yOf(v);
+        ctx.strokeStyle = v === 0 ? zeroCol : gridCol;
+        ctx.lineWidth = v === 0 ? 1 : 0.5;
+        ctx.setLineDash(v === 0 ? [3, 3] : []);
+        ctx.beginPath();
+        ctx.moveTo(PAD.left, y);
+        ctx.lineTo(W - PAD.right, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = textCol;
+        ctx.fillText(v + '%', PAD.left - 4, y);
+    }
+
+    // X axis labels (month ticks)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const labelStep = Math.max(1, Math.floor(series.length / 5));
+    for (let i = 0; i < series.length; i += labelStep) {
+        const d = new Date(series[i].date);
+        const label = d.toLocaleDateString('en-GB', { month: 'short', day: undefined });
+        const x = xOf(i);
+        ctx.fillStyle = textCol;
+        ctx.fillText(label, x, H - PAD.bottom + 5);
+    }
+
+    // Fill area
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(0));
+    for (let i = 0; i < series.length; i++) {
+        ctx.lineTo(xOf(i), yOf(series[i].drawdown));
+    }
+    ctx.lineTo(xOf(series.length - 1), yOf(0));
+    ctx.closePath();
+    ctx.fillStyle = fillCol;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.strokeStyle = lineCol;
+    ctx.lineWidth = 1.5;
+    ctx.lineJoin = 'round';
+    for (let i = 0; i < series.length; i++) {
+        if (i === 0) ctx.moveTo(xOf(i), yOf(series[i].drawdown));
+        else ctx.lineTo(xOf(i), yOf(series[i].drawdown));
+    }
+    ctx.stroke();
+
+    // Store metadata for hover
+    canvas._ddMeta = { series, PAD, cW, cH, xOf, yOf, W, H };
+}
+
+function _initDrawdownRangeTabs() {
+    const tabs = document.getElementById('ddRangeTabs');
+    if (!tabs || tabs._ddInit) return;
+    tabs._ddInit = true;
+    tabs.addEventListener('click', e => {
+        const btn = e.target.closest('.mkt-range-tab');
+        if (!btn) return;
+        tabs.querySelectorAll('.mkt-range-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _ddActiveRange = btn.dataset.range;
+        _drawDrawdownChart();
+    });
+
+    // Hover tooltip
+    const canvas = document.getElementById('drawdownChart');
+    if (!canvas) return;
+
+    canvas.addEventListener('mousemove', e => {
+        const m = canvas._ddMeta;
+        if (!m) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const idx = Math.max(0, Math.min(m.series.length - 1,
+            Math.round((mx - m.PAD.left) / m.cW * (m.series.length - 1))));
+        const pt = m.series[idx];
+        if (!pt) return;
+
+        _drawDrawdownChart();
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+        ctx.scale(dpr, dpr);
+
+        // Crosshair
+        const x = m.xOf(idx);
+        const y = m.yOf(pt.drawdown);
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.moveTo(x, m.PAD.top); ctx.lineTo(x, m.H - m.PAD.bottom); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+
+        // Tooltip
+        const tooltip = document.getElementById('drawdownTooltip');
+        if (!tooltip) return;
+        const dateStr = new Date(pt.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' });
+        const fmt = v => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+        tooltip.innerHTML = `
+            <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:2px">${dateStr}</div>
+            <div style="font-size:0.8rem;font-weight:700;color:#ef4444">${fmt(pt.drawdown)}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">Value: £${pt.value.toLocaleString('en-GB', {maximumFractionDigits:0})}</div>`;
+
+        const tx = Math.min(x + 8, m.W - 110);
+        const ty = Math.max(m.PAD.top, y - 40);
+        tooltip.style.cssText = `display:flex;flex-direction:column;gap:2px;left:${tx}px;top:${ty}px`;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        _drawDrawdownChart();
+        const tooltip = document.getElementById('drawdownTooltip');
+        if (tooltip) tooltip.style.display = 'none';
+    });
+}
 
 /* ─── Trade Signals (AI) ─────────────────────────────────────────────────── */
 
