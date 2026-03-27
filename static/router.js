@@ -22,6 +22,7 @@ let _newsInitialized = false;
 let _calendarInitialized = false;
 let _activityInitialized = false;
 let _marketInitialized = false;
+let _metricsInitialized = false;
 let _watchlistInitialized = false;
 let _aiInitialized = false;
 
@@ -78,6 +79,7 @@ function _updateBreadcrumb(route) {
         'calendar': 'Market Calendar',
         'activity': 'Activity & History',
         'market': 'Market',
+        'metrics': 'Metrics',
         'watchlist': 'Watchlist',
     };
 
@@ -153,6 +155,8 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadActivityView(true);
     } else if (view === 'market') {
         btn.onclick = () => loadMarketView(true);
+    } else if (view === 'metrics') {
+        btn.onclick = () => loadMetricsView(true);
     } else if (view === 'watchlist') {
         btn.onclick = () => loadWatchlistView();
     } else if (view === 'ai-intelligence') {
@@ -228,6 +232,7 @@ function _router() {
     if (prev === 'home') _deactivateHomeView();
     else if (prev?.startsWith('portfolio/')) _deactivateDetailView();
     else if (prev === 'market') _deactivateMarketView();
+    else if (prev === 'metrics') _deactivateMetricsView();
 
     // Update shared UI
     _updateBreadcrumb(hash);
@@ -326,6 +331,18 @@ function _router() {
             _marketInitialized = true;
         } else {
             _activateMarketView();
+        }
+
+        /* ── Metrics ── */
+    } else if (hash === 'metrics') {
+        _showView('metrics');
+        _updateRefreshBtn('metrics');
+        document.title = 'Metrics — Portfolio Tracker';
+        if (!_metricsInitialized) {
+            _initMetricsView();
+            _metricsInitialized = true;
+        } else {
+            _activateMetricsView();
         }
 
         /* ── Watchlist ── */
@@ -443,6 +460,17 @@ function _stopMarketTimers() {
         if (_marketTimers[k]) { clearInterval(_marketTimers[k]); _marketTimers[k] = null; }
     });
 }
+
+/* ── Metrics view lifecycle ──────────────────────────────────────────────── */
+function _initMetricsView() {
+    if (typeof loadMetricsView === 'function') loadMetricsView();
+}
+
+function _activateMetricsView() {
+    if (typeof loadMetricsView === 'function') loadMetricsView();
+}
+
+function _deactivateMetricsView() {}
 
 /* ── Detail view lifecycle ───────────────────────────────────────────────── */
 function _resetDetailView() {

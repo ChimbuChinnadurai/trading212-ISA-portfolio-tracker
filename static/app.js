@@ -189,6 +189,8 @@ async function loadPortfolio(force = false) {
   activeCountry = null;
   _todayReturns = null;
   _todayReturnsPct = null;
+  _dynamicsData = null;
+  _dynamicsRange = '12m';
 
   try {
     const url = force ? `/api/p${PORTFOLIO_ID}/portfolio?force=1` : `/api/p${PORTFOLIO_ID}/portfolio`;
@@ -287,7 +289,7 @@ async function loadPortfolio(force = false) {
     // Load portfolio bottom panels
     loadDetailActivity();
     loadMonthlyDividends();
-    loadMonthlyPerformance();
+    loadDynamicsChart();
 
   } catch (err) {
     showState('error', 'Network error: ' + err.message);
@@ -2276,6 +2278,8 @@ function showStocksState(state, msg) {
 /* ── Monthly Performance Heatmap ────────────────────────────────────────── */
 
 let _monthlyPerfData = null;
+let _dynamicsData = null;
+let _dynamicsRange = '12m';
 
 async function loadMonthlyPerformance() {
   const container = document.getElementById('monthlyPerfHeatmap');
@@ -2371,4 +2375,224 @@ function _mphColor(pct) {
   if (pct >= -2) return 'linear-gradient(135deg,#78350f,#b45309)';
   if (pct >= -5) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
   return 'linear-gradient(135deg,#450a0a,#b91c1c)';
+}
+
+/* ── Dynamics of Portfolio Returns ──────────────────────────────────────── */
+
+async function loadDynamicsChart() {
+  const card = document.getElementById('dynamicsCard');
+  if (!card) return;
+  if (_dynamicsData) { _initDynamicsRangeTabs(); _drawDynamicsChart(); return; }
+  try {
+    const res = await fetch(`/api/p${PORTFOLIO_ID}/monthly-returns`);
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+    _dynamicsData = json.data || [];
+    _initDynamicsRangeTabs();
+    _drawDynamicsChart();
+  } catch (err) {
+    const canvas = document.getElementById('dynamicsChart');
+    if (canvas) _showChartEmpty(canvas, 'No data yet — history is building up');
+  }
+}
+
+function _getDynamicsFiltered() {
+  if (!_dynamicsData || !_dynamicsData.length) return [];
+  if (_dynamicsRange === 'all') return _dynamicsData;
+  if (_dynamicsRange === '12m') return _dynamicsData.slice(-12);
+  return _dynamicsData.filter(d => d.month.startsWith(_dynamicsRange));
+}
+
+function _drawDynamicsChart() {
+  const canvas = document.getElementById('dynamicsChart');
+  if (!canvas) return;
+  if (!canvas.offsetWidth) { requestAnimationFrame(_drawDynamicsChart); return; }
+
+  const data = _getDynamicsFiltered();
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  if (!data.length) {
+    _showChartEmpty(canvas);
+    return;
+  }
+  _hideChartEmpty(canvas);
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const textCol = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+  const gridCol = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+  const zeroCol = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)';
+  const posCol  = '#4ade80';
+  const negCol  = '#f87171';
+
+  const PAD = { top: 32, right: 12, bottom: 44, left: 44 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  const vals = data.map(d => d.pct);
+  const maxVal = Math.max(...vals, 1);
+  const minVal = Math.min(...vals, -1);
+  const yMax = Math.ceil(maxVal * 1.25 / 5) * 5;
+  const yMin = Math.floor(minVal * 1.25 / 5) * 5;
+  const yRng = yMax - yMin;
+
+  const yOf     = v => PAD.top + (1 - (v - yMin) / yRng) * cH;
+  const y0      = yOf(0);
+  const barStep = cW / data.length;
+  const barW    = Math.max(6, Math.min(44, barStep * 0.62));
+  const xOf     = i => PAD.left + (i + 0.5) * barStep;
+
+  // Y-axis gridlines + labels
+  const yStep = yRng <= 15 ? 5 : yRng <= 40 ? 10 : 20;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let v = yMin; v <= yMax + 0.01; v += yStep) {
+    const y = yOf(v);
+    ctx.strokeStyle = v === 0 ? zeroCol : gridCol;
+    ctx.lineWidth = v === 0 ? 1.2 : 0.5;
+    ctx.setLineDash(v === 0 ? [] : [4, 4]);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = textCol;
+    ctx.fillText(v + '%', PAD.left - 6, y);
+  }
+
+  const showLabels = barW > 16;
+
+  // Draw bars with rounded outer corners
+  data.forEach((d, i) => {
+    const x   = xOf(i);
+    const pos = d.pct >= 0;
+    const bTop = pos ? yOf(d.pct) : y0;
+    const bH   = Math.max(1, Math.abs(yOf(d.pct) - y0));
+    const r    = Math.min(3, barW / 5);
+
+    ctx.fillStyle = pos ? posCol : negCol;
+    ctx.beginPath();
+    if (pos) {
+      ctx.moveTo(x - barW / 2 + r, bTop);
+      ctx.arcTo(x + barW / 2, bTop, x + barW / 2, bTop + r, r);
+      ctx.lineTo(x + barW / 2, y0);
+      ctx.lineTo(x - barW / 2, y0);
+      ctx.arcTo(x - barW / 2, bTop, x - barW / 2 + r, bTop, r);
+    } else {
+      ctx.moveTo(x - barW / 2, y0);
+      ctx.lineTo(x + barW / 2, y0);
+      ctx.lineTo(x + barW / 2, bTop + bH - r);
+      ctx.arcTo(x + barW / 2, bTop + bH, x + barW / 2 - r, bTop + bH, r);
+      ctx.lineTo(x - barW / 2 + r, bTop + bH);
+      ctx.arcTo(x - barW / 2, bTop + bH, x - barW / 2, bTop + bH - r, r);
+      ctx.lineTo(x - barW / 2, y0);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Value label above/below bar
+    if (showLabels) {
+      const sign = d.pct >= 0 ? '+' : '';
+      const lbl = sign + d.pct.toFixed(1) + '%';
+      ctx.fillStyle = pos ? posCol : negCol;
+      ctx.font = 'bold 10px system-ui,sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = pos ? 'bottom' : 'top';
+      ctx.fillText(lbl, x, pos ? bTop - 3 : bTop + bH + 3);
+    }
+  });
+
+  // X-axis month labels
+  ctx.fillStyle = textCol;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const labelEvery = Math.max(1, Math.ceil(data.length / 18));
+  data.forEach((d, i) => {
+    if (i % labelEvery !== 0 && i !== data.length - 1) return;
+    const [yr, mo] = d.month.split('-');
+    const lbl = new Date(+yr, +mo - 1, 1)
+      .toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    ctx.fillText(lbl, xOf(i), H - PAD.bottom + 6);
+  });
+
+  canvas._dynMeta = { data, xOf, yOf, y0, barW, barStep, PAD, W, H };
+}
+
+function _initDynamicsRangeTabs() {
+  const tabBar = document.getElementById('dynamicsRangeTabs');
+  if (!tabBar || tabBar._dynInit) return;
+  tabBar._dynInit = true;
+
+  // Inject year tabs from data
+  if (_dynamicsData && _dynamicsData.length) {
+    const years = [...new Set(_dynamicsData.map(d => d.month.slice(0, 4)))].sort((a, b) => b - a);
+    years.forEach(yr => {
+      const btn = document.createElement('button');
+      btn.className = 'dyn-tab';
+      btn.dataset.range = yr;
+      btn.dataset.year = yr;
+      btn.textContent = yr;
+      tabBar.appendChild(btn);
+    });
+  }
+
+  tabBar.addEventListener('click', e => {
+    const btn = e.target.closest('.dyn-tab');
+    if (!btn) return;
+    tabBar.querySelectorAll('.dyn-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _dynamicsRange = btn.dataset.range;
+    _drawDynamicsChart();
+  });
+
+  // Hover: column highlight + tooltip
+  const canvas = document.getElementById('dynamicsChart');
+  if (!canvas) return;
+
+  canvas.addEventListener('mousemove', e => {
+    const m = canvas._dynMeta;
+    if (!m || !m.data.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const idx = Math.max(0, Math.min(m.data.length - 1,
+      Math.floor((mx - m.PAD.left) / m.barStep)));
+    const pt = m.data[idx];
+    if (!pt) return;
+
+    _drawDynamicsChart();
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    ctx.scale(dpr, dpr);
+
+    // Column highlight
+    const pos = pt.pct >= 0;
+    ctx.fillStyle = pos ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)';
+    ctx.fillRect(m.xOf(idx) - m.barStep / 2, m.PAD.top, m.barStep, m.H - m.PAD.top - m.PAD.bottom);
+
+    const tooltip = document.getElementById('dynamicsTooltip');
+    if (!tooltip) return;
+    const [yr, mo] = pt.month.split('-');
+    const monthStr = new Date(+yr, +mo - 1, 1)
+      .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const sign = pt.pct >= 0 ? '+' : '';
+    const fmtVal = v => '£' + v.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+    tooltip.innerHTML = `
+      <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:2px">${monthStr}</div>
+      <div style="font-size:0.85rem;font-weight:700;color:${pos ? '#4ade80' : '#f87171'}">${sign}${pt.pct.toFixed(2)}%</div>
+      <div style="font-size:0.7rem;color:var(--text-muted)">Value: ${fmtVal(pt.value)}</div>`;
+    const tx = Math.min(m.xOf(idx) + 10, m.W - 120);
+    const ty = Math.max(m.PAD.top + 4, m.y0 - 60);
+    tooltip.style.cssText = `display:flex;flex-direction:column;gap:2px;left:${tx}px;top:${ty}px`;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    _drawDynamicsChart();
+    const tooltip = document.getElementById('dynamicsTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+  });
 }

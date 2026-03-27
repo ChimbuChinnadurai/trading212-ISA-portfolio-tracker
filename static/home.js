@@ -15,6 +15,39 @@ let _portfolioVsData = null; // [{date, ts, value}] from /api/pcombined/daily-hi
 let _pvsActiveRange = '1Y';  // 1M | 3M | 6M | 1Y | ALL
 let _ddActiveRange = '1Y';   // drawdown chart range
 let _pvsChartType = 'line';  // line | bar
+
+/* ── Shared chart empty-state helpers ──────────────────────────────────────
+ * Pass the canvas element; the overlay is injected into canvas.parentElement.
+ * Works for any chart whose wrap already has position:relative.
+ * ─────────────────────────────────────────────────────────────────────── */
+function _showChartEmpty(canvas, msg = 'No data for this period') {
+    if (!canvas) return;
+    const wrap = canvas.parentElement;
+    if (!wrap) return;
+    canvas.style.opacity = '0';
+    let el = wrap.querySelector('.chart-empty-state');
+    if (!el) {
+        el = document.createElement('div');
+        el.className = 'chart-empty-state';
+        el.innerHTML =
+            '<div class="chart-empty-bars">' +
+            '<div class="chart-empty-bar"></div>'.repeat(7) +
+            '</div>' +
+            '<span class="chart-empty-text"></span>';
+        wrap.appendChild(el);
+    }
+    el.querySelector('.chart-empty-text').textContent = msg;
+    requestAnimationFrame(() => el.classList.add('visible'));
+}
+
+function _hideChartEmpty(canvas) {
+    if (!canvas) return;
+    canvas.style.opacity = '';
+    const wrap = canvas.parentElement;
+    if (!wrap) return;
+    const el = wrap.querySelector('.chart-empty-state');
+    if (el) el.classList.remove('visible');
+}
 let _pvsShowSP = true;
 let _pvsShowPvs = true;
 let _signalsData = {};        // cache per signal type
@@ -773,16 +806,45 @@ async function loadHomeWidgets() {
 async function loadMarketView(force = false) {
     if (force) {
         _sp500Data = [];
-        _portfolioVsData = null;
         _signalsData = {};
         _insiderData = {};
     }
     loadSP500Data();
     loadMarketChart();
-    loadPortfolioVsMarket();
     loadMarketSignals(_activeSignal || 'gainers');
     loadInsiderTrading(_activeInsiderPeriod || 'latest');
     loadInlineTradeSignals();
+    loadMarketMonthlyPerf();
+}
+
+async function loadMarketMonthlyPerf() {
+    const container = document.getElementById('monthlyPerfHeatmap');
+    if (!container) return;
+    container.innerHTML = '<div class="monthly-perf-loading">Loading monthly performance…</div>';
+    try {
+        const res = await fetch('/api/pcombined/monthly-performance');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        window._marketMonthlyPerfData = json.data;
+        if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(json.data);
+    } catch (err) {
+        container.innerHTML = `<div class="monthly-perf-loading">Failed to load: ${err.message}</div>`;
+    }
+}
+
+function setMarketMonthlyPerfView(view, btn) {
+    document.querySelectorAll('#monthlyPerfCard .mpv-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (view === '12m' && window._marketMonthlyPerfData) {
+        if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(window._marketMonthlyPerfData);
+    }
+}
+
+async function loadMetricsView(force = false) {
+    if (force) {
+        _portfolioVsData = null;
+    }
+    loadPortfolioVsMarket();
 }
 
 async function loadInlineTradeSignals() {
@@ -1411,12 +1473,10 @@ function _drawPortfolioVsChart() {
     const dates = allDates.slice(-maxDays);
 
     if (dates.length < 2) {
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '12px system-ui,sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Not enough data yet', W / 2, H / 2);
+        _showChartEmpty(canvas, 'Not enough data yet');
         return;
     }
+    _hideChartEmpty(canvas);
 
     const spBase = spByDate[dates[0]];
     const pvsBase = pvsByDate[dates[0]];
@@ -1785,8 +1845,8 @@ function _drawDrawdownChart() {
     if (!canvas) return;
     if (!canvas.offsetWidth) { requestAnimationFrame(_drawDrawdownChart); return; }
     if (!_portfolioVsData?.length) {
-        const ctx2 = canvas.getContext('2d');
-        ctx2.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        _showChartEmpty(canvas);
         return;
     }
 
@@ -1797,7 +1857,11 @@ function _drawDrawdownChart() {
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
     const raw = _portfolioVsData.filter(pt => pt.date >= cutoffStr);
-    if (raw.length < 2) return;
+    if (raw.length < 2) {
+        _showChartEmpty(canvas, 'Not enough data for this range');
+        return;
+    }
+    _hideChartEmpty(canvas);
 
     const series = _calcDrawdown(raw);
 

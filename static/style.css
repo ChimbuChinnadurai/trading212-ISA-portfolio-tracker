@@ -2519,8 +2519,9 @@ th.sort-desc .sort-icon::before {
     min-height: 320px;
   }
 
-  /* Market body on mobile: restore auto height and single column */
-  .market-body {
+  /* Market/Metrics body on mobile: restore auto height and single column */
+  .market-body,
+  .metrics-body {
     flex: none;
     min-height: 0;
   }
@@ -6253,7 +6254,8 @@ html[data-theme="dark"] .nav-item.active {
 
 #view-activity .view-main,
 #view-calendar .view-main,
-#view-market .view-main {
+#view-market .view-main,
+#view-metrics .view-main {
   flex: 1;
   min-height: 0;
   padding-bottom: 0;
@@ -7224,11 +7226,38 @@ html[data-theme="dark"] .nav-item.active {
 
 .market-body {
   display: grid;
-  grid-template-columns: 1fr 1fr 280px;
-  grid-template-rows: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto 1fr;
   gap: 12px;
   flex: 1;
-  min-height: 500px;
+  min-height: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   METRICS VIEW
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.metrics-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.metrics-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  gap: 4px;
 }
 
 /* ── Chart card (Portfolio vs S&P) ──────────────────────────────────────── */
@@ -7743,14 +7772,9 @@ html[data-theme="dark"] .nav-item.active {
 }
 
 /* Responsive */
-@media (max-width: 1200px) {
-  .market-body {
-    grid-template-columns: 1fr 1fr 260px;
-  }
-}
-
 @media (max-width: 1000px) {
-  .market-body {
+  .market-body,
+  .metrics-body {
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto;
     height: auto;
@@ -7782,7 +7806,8 @@ div#sectorBarsList {
 }
 
 @media (max-width: 700px) {
-  .market-body {
+  .market-body,
+  .metrics-body {
     grid-template-columns: 1fr;
     height: auto;
   }
@@ -8970,10 +8995,157 @@ html[data-theme="dark"] .widget-insider {
   }
 }
 
+/* ── Dynamics of Portfolio Returns ──────────────────────────────────────── */
+.dynamics-returns-card {
+  margin-top: 14px;
+}
+
+.dynamics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 10px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dynamics-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.dynamics-hint {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.dynamics-range-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.dyn-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px 9px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.dyn-tab:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.dyn-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.dynamics-chart-wrap {
+  position: relative;
+  height: 260px;
+  padding: 0 4px;
+}
+
+.dynamics-chart-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Chart empty state overlay (shared across all canvas charts) ─────────── */
+.chart-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 2;
+}
+
+.chart-empty-state.visible {
+  opacity: 1;
+}
+
+.chart-empty-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 36px;
+}
+
+.chart-empty-bar {
+  width: 7px;
+  border-radius: 3px 3px 0 0;
+  background: var(--text-muted);
+  opacity: 0.45;
+  animation: chart-empty-pulse 1.5s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+.chart-empty-bars .chart-empty-bar:nth-child(1) { height: 14px; animation-delay: 0s; }
+.chart-empty-bars .chart-empty-bar:nth-child(2) { height: 24px; animation-delay: 0.18s; }
+.chart-empty-bars .chart-empty-bar:nth-child(3) { height: 10px; animation-delay: 0.36s; }
+.chart-empty-bars .chart-empty-bar:nth-child(4) { height: 30px; animation-delay: 0.54s; }
+.chart-empty-bars .chart-empty-bar:nth-child(5) { height: 18px; animation-delay: 0.72s; }
+.chart-empty-bars .chart-empty-bar:nth-child(6) { height: 22px; animation-delay: 0.9s; }
+.chart-empty-bars .chart-empty-bar:nth-child(7) { height: 8px; animation-delay: 1.08s; }
+
+@keyframes chart-empty-pulse {
+  0%, 100% { transform: scaleY(0.45); opacity: 0.25; }
+  50%       { transform: scaleY(1);    opacity: 0.65; }
+}
+
+.chart-empty-text {
+  font-size: 0.775rem;
+  color: var(--text-muted);
+  letter-spacing: 0.025em;
+  font-weight: 500;
+}
+
+.dynamics-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.dyn-leg-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #4ade80;
+  flex-shrink: 0;
+}
+
+.dyn-leg-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
 /* ── Monthly Performance Heatmap ────────────────────────────────────────── */
 .monthly-perf-card {
   padding: 14px 16px;
   margin-top: 14px;
+}
+
+/* When inside grid (market view), remove margin since grid gap handles spacing */
+.market-body .monthly-perf-card {
+  margin-top: 0;
 }
 
 .monthly-perf-header {

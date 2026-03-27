@@ -1197,6 +1197,63 @@ def portfolio_history(pid):
     return jsonify({"status": "ok", "data": data})
 
 
+@app.route("/api/p<pid>/monthly-returns")
+def monthly_returns_endpoint(pid):
+    """Portfolio-level month-over-month % returns derived from value snapshots."""
+    cache_key = f"monthly_returns:{pid}"
+    cached = kv_get(cache_key, 1800)  # 30-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+
+    HOURS_5Y = 5 * 365 * 24  # fetch up to 5 years of snapshots
+
+    if pid == "combined":
+        pid_daily: dict = {}
+        for p in API_KEYS:
+            snaps = snapshot_get(p, hours=HOURS_5Y)
+            by_day: dict = {}
+            for s in snaps:
+                day = date.fromtimestamp(s["ts"]).isoformat()
+                if day not in by_day or s["ts"] > by_day[day][0]:
+                    by_day[day] = (s["ts"], s["value"])
+            pid_daily[p] = {d: v for d, (_, v) in by_day.items()}
+
+        all_days: set = set()
+        for d in pid_daily.values():
+            all_days.update(d.keys())
+        daily_vals: dict = {}
+        for day in sorted(all_days):
+            total = sum(pd.get(day, 0) for pd in pid_daily.values())
+            if total > 0:
+                daily_vals[day] = round(total, 2)
+    else:
+        snaps = snapshot_get(pid, hours=HOURS_5Y)
+        by_day = {}
+        for s in snaps:
+            d = date.fromtimestamp(s["ts"]).isoformat()
+            if d not in by_day or s["ts"] > by_day[d][0]:
+                by_day[d] = (s["ts"], s["value"])
+        daily_vals = {d: round(v, 2) for d, (_, v) in sorted(by_day.items())}
+
+    # End-of-month value = last snapshot within each calendar month
+    monthly_vals: dict = {}
+    for day in sorted(daily_vals.keys()):
+        monthly_vals[day[:7]] = daily_vals[day]
+
+    # Month-over-month % returns
+    months = sorted(monthly_vals.keys())
+    result = []
+    for i in range(1, len(months)):
+        prev_v = monthly_vals[months[i - 1]]
+        curr_v = monthly_vals[months[i]]
+        if prev_v and prev_v > 0:
+            pct = round((curr_v - prev_v) / prev_v * 100, 2)
+            result.append({"month": months[i], "pct": pct, "value": curr_v})
+
+    kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result})
+
+
 @app.route("/api/p<pid>/monthly-performance")
 def monthly_performance(pid):
     """Monthly % returns for all tickers in the portfolio for the last 12 months."""
