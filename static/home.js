@@ -191,7 +191,8 @@ function renderOverview(data) {
         if (p2Mini) p2Mini.style.opacity = '1';
         updateCard('p2', data["2"]);
     } else {
-        document.getElementById('p2-value').innerText = "Not Configured";
+        const p2Val = document.getElementById('p2-value');
+        if (p2Val) p2Val.innerText = "Not Configured";
     }
 
     if (data["combined"]) updateCard('c', data["combined"]);
@@ -214,14 +215,11 @@ function updateCard(prefix, stats) {
 
     // Mini stats row
     const invEl = document.getElementById(`${prefix}-invested`);
-    const paiEl = document.getElementById(`${prefix}-pai`);
     const posEl = document.getElementById(`${prefix}-positions`);
 
     if (invEl && stats.invested != null)
         invEl.textContent = fmt.currency(stats.invested);
 
-    if (paiEl && stats.pai != null)
-        paiEl.textContent = `${fmt.currency(stats.pai)} / yr`;
 
     if (posEl && stats.positions != null) {
         const sector = stats.top_sector ? ` · ${stats.top_sector}` : '';
@@ -309,18 +307,18 @@ function _initClock(el) {
         remaining = Math.max(0, remaining - 1);
         if (remaining <= 0) remaining = totalSecs;
         arc.style.strokeDashoffset = (circ * (1 - remaining / totalSecs)).toFixed(3);
-        text.textContent = _label();
+        if (text) text.textContent = _label();
     }
 
     arc.style.strokeDashoffset = '0';
-    text.textContent = _label();
+    if (text) text.textContent = _label();
     const timer = setInterval(tick, 1000);
 
     return {
         reset() {
             remaining = totalSecs;
             arc.style.strokeDashoffset = '0';
-            text.textContent = _label();
+            if (text) text.textContent = _label();
         },
         destroy() { clearInterval(timer); }
     };
@@ -628,9 +626,11 @@ function _render24hChange(elId, points) {
     const delta = current.value - ref.value;
     const pct = ref.value > 0 ? (delta / ref.value) * 100 : 0;
     const sign = delta >= 0 ? '+' : '';
-    el.textContent = `${sign}${fmt.currency(delta)} (${sign}${pct.toFixed(2)}%) 24h`;
-    el.className = `ov-24h ${delta >= 0 ? 'pos' : 'neg'}`;
-    el.style.display = '';
+    if (el) {
+        el.textContent = `${sign}${fmt.currency(delta)} (${sign}${pct.toFixed(2)}%) 24h`;
+        el.className = `ov-24h ${delta >= 0 ? 'pos' : 'neg'}`;
+        el.style.display = '';
+    }
 }
 
 function _attachSparkHover(canvasId) {

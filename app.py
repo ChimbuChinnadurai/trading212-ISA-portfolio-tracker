@@ -8,13 +8,14 @@ import requests
 from dotenv import load_dotenv
 load_dotenv()
 
-import collections
 from collections import defaultdict
 from datetime import date, timedelta
 
 from flask import Flask, jsonify, redirect, render_template, request
 import finviz_data as fvd
 import ai_digest as _ai_digest
+import gemini_utils as _gemini
+
 
 from cache import (
     TTL_DIV, TTL_NEWS, init_db, kv_age, kv_get, kv_set,
@@ -23,6 +24,7 @@ from cache import (
 )
 from fx import get_gbpusd_rate
 from portfolio import TICKER_MAPPING, build_rows
+import snowball_dividends as _sdiv
 from t212 import (
     get_dividends, get_dividends_raw, get_instruments,
     get_orders, get_portfolio, get_recent_dividends,
@@ -53,7 +55,8 @@ PORTFOLIO_NAMES = {
 @app.route("/")
 def index():
     # SPA shell — all views (home, portfolio 1/2/combined) rendered client-side via hash routing
-    return render_template("spa.html", names=PORTFOLIO_NAMES)
+    show_ai = os.environ.get("SHOW_AI_FEATURES", "0") == "1"
+    return render_template("spa.html", names=PORTFOLIO_NAMES, show_ai=show_ai)
 
 
 
@@ -67,15 +70,14 @@ def fetch_and_cache_portfolio(pid, force=False):
     """Fetch data for a single portfolio and cache the result."""
     api_key = API_KEYS.get(pid)
     if not api_key:
-        return None, 0.0, 0.0
+        return None, 0.0
 
     # 1. Try cache if not forcing
     if not force:
         cached_rows, _ = rows_get(pid)
         if cached_rows is not None:
             total_div  = kv_get("total_dividends", TTL_DIV, pid=pid) or 0.0
-            pai        = kv_get("pai", TTL_DIV, pid=pid) or 0.0
-            return cached_rows, total_div, pai
+            return cached_rows, total_div
 
     # 2. Fetch fresh data
     positions   = get_portfolio(api_key, pid)
@@ -86,15 +88,11 @@ def fetch_and_cache_portfolio(pid, force=False):
     total_div = round(sum(dividends.values()), 2)
     rows = build_rows(positions, instruments, dividends, gbpusd)
 
-    # 3. Calculate Projected Annual Income (PAI)
-    pai = sum(r.get("dividends", 0) for r in rows)
-
     # Update cache
     rows_set(rows, pid=pid)
     kv_set("total_dividends", total_div, pid=pid)
-    kv_set("pai", pai, pid=pid)
 
-    return rows, total_div, pai
+    return rows, total_div
 
 
 def _top_sector(rows):
@@ -117,7 +115,7 @@ def overview():
     force = request.args.get("refresh", "0") == "1"
 
     for pid in API_KEYS:
-        rows, _, p_pai = fetch_and_cache_portfolio(pid, force=force)
+        rows, _ = fetch_and_cache_portfolio(pid, force=force)
 
         if rows:
             p_val = sum(r["current_value"] for r in rows)
@@ -132,7 +130,6 @@ def overview():
                 "value":       round(p_val, 2),
                 "returns":     round(p_val - p_inv, 2),
                 "returns_pct": round(((p_val / p_inv) - 1) * 100, 2) if p_inv > 0 else 0,
-                "pai":         round(p_pai, 2),
                 "invested":    round(p_inv, 2),
                 "positions":   len(rows),
                 "top_sector":  _top_sector(rows),
@@ -149,7 +146,6 @@ def overview():
         "value":       round(total_value, 2),
         "returns":     round(total_returns, 2),
         "returns_pct": round(((total_value / total_invested) - 1) * 100, 2) if total_invested > 0 else 0,
-        "pai":         round(sum(p["pai"] for p in res.values() if isinstance(p, dict) and "pai" in p), 2),
         "invested":    round(total_invested, 2),
         "positions":   sum(p["positions"] for p in res.values() if isinstance(p, dict) and "positions" in p),
         "top_sector":  _top_sector(all_combined_rows),
@@ -211,12 +207,6 @@ def portfolio_combined():
         combined_rows = list(combined_rows_map.values())
         total_p_value = sum(r["current_value"] for r in combined_rows)
         
-        # Calculate combined PAI
-        combined_pai = 0.0
-        for pid in API_KEYS:
-            if API_KEYS[pid]:
-                combined_pai += kv_get("pai", TTL_DIV, pid=pid) or 0.0
-
         # Final pass: Recalculate weights, returns_pct, yoc, div_yield across combined
         for r in combined_rows:
             r["weight"] = (r["current_value"] / total_p_value * 100) if total_p_value > 0 else 0
@@ -228,7 +218,6 @@ def portfolio_combined():
         return jsonify({
             "status": "ok", "data": combined_rows, "cached": True,
             "cache_age": 0, "total_dividends": round(total_div, 2),
-            "pai": round(combined_pai, 2),
             "warning": None,
             "freshness": {"gbpusd": kv_age("gbpusd")}
         })
@@ -422,7 +411,7 @@ def portfolio(pid):
     api_key = API_KEYS[pid]
     try:
         force = request.args.get("force", "0") == "1"
-        rows, total_div, p_pai = fetch_and_cache_portfolio(pid, force=force)
+        rows, total_div = fetch_and_cache_portfolio(pid, force=force)
 
         if rows is None:
             return jsonify({"status": "error", "message": "Portfolio not found"}), 404
@@ -434,7 +423,6 @@ def portfolio(pid):
             "cached": True if not force else False,
             "cache_age": age or 0,
             "total_dividends": total_div,
-            "pai": round(p_pai, 2),
             "warning": None,
             "freshness": {
                 "instruments": kv_age("instruments"),
@@ -447,45 +435,13 @@ def portfolio(pid):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-@app.route("/api/p<pid>/pai-details")
-def pai_details(pid):
-    """Detailed stock-level breakdown of Projected Annual Income."""
-    try:
-        rows, total_div, pai = fetch_and_cache_portfolio(pid)
-        if rows is None:
-            return jsonify({"status": "error", "message": "Portfolio not found"}), 404
-
-        # Calculate contribution for each stock
-        contributors = []
-        for r in rows:
-            div_amount = r.get("dividends", 0)
-            if div_amount > 0:
-                contributors.append({
-                    "ticker": r["ticker"],
-                    "company_name": r["company_name"],
-                    "income": round(div_amount, 2),
-                    "percentage": round((div_amount / pai * 100), 2) if pai > 0 else 0
-                })
-        
-        # Sort by income descending
-        contributors.sort(key=lambda x: x["income"], reverse=True)
-        
-        return jsonify({
-            "status": "ok",
-            "data": {
-                "total_pai": round(pai, 2),
-                "contributors": contributors
-            }
-        })
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/api/p<pid>/diversification-details")
 def diversification_details(pid):
     """Sector and concentration breakdown for a portfolio."""
     try:
-        rows, _, _ = fetch_and_cache_portfolio(pid)
+        rows, _ = fetch_and_cache_portfolio(pid)
         if rows is None:
             return jsonify({"status": "error", "message": "Portfolio not found"}), 404
 
@@ -638,7 +594,7 @@ def stock_tickers_api():
     """Live price + today's change for all held stocks, per-ticker cache 60s."""
     all_rows = []
     for pid in API_KEYS:
-        rows, _, _ = fetch_and_cache_portfolio(pid)
+        rows, _ = fetch_and_cache_portfolio(pid)
         if rows:
             all_rows.extend(rows)
 
@@ -828,7 +784,6 @@ def recent_dividends(pid):
 
 
 FINNHUB_TOKEN      = os.environ.get("FINNHUB_TOKEN")
-MASSIVE_API_KEY    = os.environ.get("MASSIVE_API_KEY")
 TTL_EARNINGS       = 86400    # 1 day
 TTL_NEWS           = 1800     # 30 minutes
 TTL_DIVIDENDS_CAL  = 86400    # 24 hours
@@ -953,7 +908,7 @@ def analyst_ratings():
         # Collect all unique tickers across both portfolios (all countries)
         all_tickers = {}
         for pid in ["1", "2"]:
-            rows, _, _ = fetch_and_cache_portfolio(pid)
+            rows, _ = fetch_and_cache_portfolio(pid)
             if rows:
                 for r in rows:
                     ticker = r.get("ticker")
@@ -1242,6 +1197,80 @@ def portfolio_history(pid):
     return jsonify({"status": "ok", "data": data})
 
 
+@app.route("/api/p<pid>/monthly-performance")
+def monthly_performance(pid):
+    """Monthly % returns for all tickers in the portfolio for the last 12 months."""
+    from datetime import datetime as _dt
+
+    cache_key = f"monthly_perf:{pid}"
+    cached = kv_get(cache_key, 900)  # 15-min TTL — current month needs fresh price
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+
+    if pid == "combined":
+        all_rows = []
+        for p in API_KEYS:
+            rows, _ = fetch_and_cache_portfolio(p)
+            if rows:
+                all_rows.extend(rows)
+        seen, unique = set(), []
+        for row in all_rows:
+            t = row["ticker"]
+            if t not in seen:
+                seen.add(t)
+                unique.append(row)
+    else:
+        rows, _ = fetch_and_cache_portfolio(pid)
+        unique = rows or []
+
+    def _fetch_monthly(row):
+        ticker = row["ticker"]
+        country = row.get("country", "US")
+        suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
+        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+        yf_sym = f"{clean_ticker}{suffix}"
+        try:
+            resp = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
+                params={"range": "1y", "interval": "1mo"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            result = resp.json()["chart"]["result"][0]
+            timestamps = result.get("timestamp", [])
+            closes = list(result["indicators"]["quote"][0].get("close", []))
+
+            # Yahoo Finance opens a new monthly bar with close = prev month's close
+            # (the bar hasn't "settled" yet), so the current incomplete month always
+            # shows 0%.  Override the last bar with regularMarketPrice to get the
+            # real month-to-date return.
+            current_price = result.get("meta", {}).get("regularMarketPrice")
+            if current_price and closes:
+                closes[-1] = current_price
+
+            monthly = {}
+            for i in range(1, len(timestamps)):
+                if closes[i] is None or closes[i - 1] is None or closes[i - 1] == 0:
+                    continue
+                dt = _dt.utcfromtimestamp(timestamps[i])
+                month_key = dt.strftime("%Y-%m")
+                pct = (closes[i] - closes[i - 1]) / closes[i - 1] * 100
+                monthly[month_key] = round(pct, 2)
+            return clean_ticker, monthly
+        except Exception as exc:
+            logger.warning("monthly_perf failed for %s: %s", yf_sym, exc)
+            return ticker, {}
+
+    result = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, max(1, len(unique)))) as ex:
+        for ticker, monthly in ex.map(_fetch_monthly, unique):
+            result[ticker] = monthly
+
+    kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result})
+
+
 @app.route("/api/home-data")
 def home_data():
     """Single combined endpoint for the landing page: overview + activity + top performers + market indicators + fx rate."""
@@ -1258,7 +1287,7 @@ def _home_data_inner(force):
     overview_res = {}
     total_value = total_returns = total_invested = 0.0
     for pid in API_KEYS:
-        rows, _, p_pai = fetch_and_cache_portfolio(pid, force=force)
+        rows, _ = fetch_and_cache_portfolio(pid, force=force)
         if rows:
             p_val = sum(r["current_value"] for r in rows)
             p_inv = sum(r["invested"] for r in rows)
@@ -1270,7 +1299,6 @@ def _home_data_inner(force):
                 "value":       round(p_val, 2),
                 "returns":     round(p_val - p_inv, 2),
                 "returns_pct": round(((p_val / p_inv) - 1) * 100, 2) if p_inv > 0 else 0,
-                "pai":         round(p_pai, 2),
                 "invested":    round(p_inv, 2),
                 "positions":   len(rows),
                 "top_sector":  _top_sector(rows),
@@ -1284,7 +1312,6 @@ def _home_data_inner(force):
         "value":       round(total_value, 2),
         "returns":     round(total_returns, 2),
         "returns_pct": round(((total_value / total_invested) - 1) * 100, 2) if total_invested > 0 else 0,
-        "pai":         round(sum(p["pai"] for p in overview_res.values() if isinstance(p, dict) and "pai" in p), 2),
         "invested":    round(total_invested, 2),
         "positions":   sum(p["positions"] for p in overview_res.values() if isinstance(p, dict) and "positions" in p),
         "top_sector":  _top_sector(all_combined_rows),
@@ -1519,113 +1546,45 @@ def api_news():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# Sliding-window rate limiter: max 5 calls per 60 s for Massive API
-_massive_call_times: collections.deque = collections.deque(maxlen=5)
-_massive_lock = threading.Lock()
-
-
-def _massive_rate_limited_get(url: str, timeout: int = 12):
-    """Calls requests.get(url) while respecting a 5-req/min sliding window."""
-    _log = logging.getLogger("massive-api")
-    with _massive_lock:
-        now = time.time()
-        if len(_massive_call_times) == 5:
-            oldest = _massive_call_times[0]
-            wait = 61 - (now - oldest)
-            if wait > 0:
-                _log.debug("Rate limit window full — sleeping %.1fs", wait)
-                time.sleep(wait)
-        _massive_call_times.append(time.time())
-    return requests.get(url, timeout=timeout)
-
-
-def _build_ticker_info() -> dict:
-    """Return {ticker: {quantity, company_name, pid}} for all held US stocks."""
-    ticker_info: dict = {}
-    for pid, key in API_KEYS.items():
-        if not key:
-            continue
-        rows, _ = rows_get(pid)
-        if not rows:
-            continue
-        for r in rows:
-            if r.get("country") != "US":
-                continue
-            ticker = r["ticker"].upper()
-            if ticker not in ticker_info:
-                ticker_info[ticker] = {
-                    "quantity": 0.0,
-                    "company_name": r.get("company_name") or ticker,
-                    "pid": pid,
-                }
-            ticker_info[ticker]["quantity"] += r.get("quantity", 0.0)
-    return ticker_info
-
-
-def _format_div_entries(ticker: str, info: dict, entries: list, today_str: str) -> list:
-    """Convert raw Massive API entries into frontend-ready dicts.
-    Keeps entries where pay_date >= today so dividends due today are visible."""
-    qty = info["quantity"]
-    out = []
-    for d in entries:
-        pay_date = d.get("pay_date", "")
-        if not pay_date or pay_date < today_str:
-            continue
-        amount = float(d.get("cash_amount") or 0)
-        out.append({
-            "ticker":           ticker,
-            "company_name":     info["company_name"],
-            "pid":              info["pid"],
-            "ex_dividend_date": d.get("ex_dividend_date", ""),
-            "declaration_date": d.get("declaration_date", ""),
-            "record_date":      d.get("record_date", ""),
-            "payment_date":     pay_date,
-            "amount_per_share": amount,
-            "frequency":        d.get("frequency"),
-            "currency":         d.get("currency", "USD"),
-            "quantity":         round(qty, 4),
-            "expected_payout":  round(amount * qty, 4),
-        })
-    return out
 
 
 @app.route("/api/upcoming-dividends")
 def upcoming_dividends():
-    """Return upcoming dividends for all held US stocks, served entirely from cache.
+    """Return upcoming dividends for all held tickers (US via Massive, UK via Snowball).
     Data is pre-fetched by the background dividend refresh thread every 12 hours."""
     _log = logging.getLogger("upcoming-dividends")
-    if not MASSIVE_API_KEY:
-        _log.warning("MASSIVE_API_KEY not configured — dividend calendar unavailable")
-        return jsonify({"status": "error", "message": "Massive API key not configured"}), 503
+    today_str    = str(date.today())
+    all_entries  = []
+    missing      = []
 
-    today_str = str(date.today())
-    ticker_info = _build_ticker_info()
+    all_ticker_info = {
+        **_sdiv.build_ticker_info(API_KEYS),
+        **_sdiv.build_uk_ticker_info(API_KEYS),
+    }
 
-    if not ticker_info:
-        _log.warning("No US tickers found in portfolio cache — dividend calendar empty")
+    if not all_ticker_info:
+        _log.warning("No tickers found in portfolio cache — dividend calendar empty")
         return jsonify({"status": "ok", "data": [], "last_refresh": None})
 
-    all_entries = []
-    missing = []
-    for ticker, info in ticker_info.items():
-        raw = kv_get(f"massive:div:{ticker}", TTL_DIVIDENDS_CAL)
+    for ticker, info in all_ticker_info.items():
+        raw = kv_get(f"{_sdiv.DIV_CACHE_KEY_PREFIX}:{ticker}", _sdiv.TTL_DIVIDENDS_CAL)
         if raw is None:
             missing.append(ticker)
             continue
-        all_entries.extend(_format_div_entries(ticker, info, raw, today_str))
+        all_entries.extend(_sdiv.format_snowball_entries(ticker, info, raw, today_str))
 
     if missing:
         _log.info("Dividend cache missing for %d tickers: %s", len(missing), ", ".join(missing[:10]))
 
     all_entries.sort(key=lambda d: d.get("payment_date", ""))
 
-    last_refresh = kv_get("massive:div:last_refresh", TTL_DIVIDENDS_CAL)
+    last_refresh = kv_get(_sdiv.LAST_REFRESH_KEY, _sdiv.TTL_DIVIDENDS_CAL)
     return jsonify({
         "status":       "ok",
         "data":         all_entries,
         "last_refresh": last_refresh,
-        "cached":       len(ticker_info) - len(missing),
-        "total":        len(ticker_info),
+        "cached":       len(all_ticker_info) - len(missing),
+        "total":        len(all_ticker_info),
     })
 
 
@@ -2008,7 +1967,7 @@ def _background_refresh():
             if not key:
                 continue
             try:
-                rows, _, _ = fetch_and_cache_portfolio(pid, force=True)
+                rows, _ = fetch_and_cache_portfolio(pid, force=True)
                 if rows:
                     total_value = sum(r.get("current_value", 0) for r in rows)
                     snapshot_add(pid, total_value)
@@ -2022,73 +1981,75 @@ _refresh_thread.start()
 
 
 # ── Background dividend refresh ────────────────────────────────────────────────
-_DIV_REFRESH_INTERVAL   = int(os.environ.get("DIV_REFRESH_SECONDS", 43200))  # 12 hours
-_MASSIVE_LAST_REFRESH_KEY = "massive:div:last_refresh"
-
-
-def _fetch_all_dividends():
-    """Fetch upcoming dividend data from Massive API for every held US ticker.
-    Respects the 5 req/min rate limit. Stores results in kv_cache."""
-    _log = logging.getLogger("div-refresh")
-    if not MASSIVE_API_KEY:
-        _log.warning("MASSIVE_API_KEY not set — skipping dividend refresh")
-        return
-
-    ticker_info = _build_ticker_info()
-    if not ticker_info:
-        _log.warning("No US tickers in portfolio cache yet — skipping dividend refresh")
-        return
-
-    _log.info("Starting dividend refresh for %d tickers", len(ticker_info))
-    success, errors = 0, 0
-
-    for ticker in ticker_info:
-        cache_key = f"massive:div:{ticker}"
-        try:
-            url = (
-                f"https://api.massive.com/stocks/v1/dividends"
-                f"?ticker={ticker}&limit=100&sort=ex_dividend_date.desc"
-                f"&apiKey={MASSIVE_API_KEY}"
-            )
-            resp = _massive_rate_limited_get(url)
-            if resp.status_code == 429:
-                _log.warning("Rate limit hit fetching dividends for %s — will retry next cycle", ticker)
-                errors += 1
-                continue
-            if resp.status_code != 200:
-                _log.warning("HTTP %d fetching dividends for %s", resp.status_code, ticker)
-                errors += 1
-                continue
-            body = resp.json()
-            entries = body.get("results", []) if body.get("status") == "OK" else []
-            if not isinstance(entries, list):
-                entries = []
-            kv_set(cache_key, entries)
-            _log.debug("Cached %d dividend entries for %s", len(entries), ticker)
-            success += 1
-        except Exception as exc:
-            _log.error("Error fetching dividends for %s: %s", ticker, exc)
-            errors += 1
-
-    kv_set(_MASSIVE_LAST_REFRESH_KEY, int(time.time()))
-    _log.info("Dividend refresh complete — %d ok, %d errors", success, errors)
-
 
 def _background_dividend_refresh():
-    """Daemon thread: pre-fetch dividend data every 12 hours."""
+    """Daemon thread: pre-fetch dividend data every 6 hours via Snowball Analytics."""
     _log = logging.getLogger("div-refresh")
-    # Wait for the portfolio refresh to populate the cache first
-    time.sleep(30)
+    time.sleep(30)  # let portfolio cache warm up first
     while True:
         try:
-            _fetch_all_dividends()
+            _sdiv.fetch_all_dividends(API_KEYS)
         except Exception as exc:
             _log.error("Unhandled error in dividend refresh: %s", exc)
-        time.sleep(_DIV_REFRESH_INTERVAL)
+        time.sleep(_sdiv.DIV_REFRESH_INTERVAL)
 
 
 _div_refresh_thread = threading.Thread(target=_background_dividend_refresh, daemon=True, name="div-refresh")
 _div_refresh_thread.start()
+
+
+
+# ── Gemini AI Endpoints ───────────────────────────────────────────────────────
+
+@app.route("/api/ai/market-digest")
+def ai_market_digest():
+    """Daily automated market digest using Gemini."""
+    try:
+        # Fetch current news to provide context to Gemini
+        news_resp = api_news()
+        news_data = news_resp.get_json().get("data", []) if hasattr(news_resp, "get_json") else []
+        
+        digest = _gemini.generate_market_summary(news_data)
+        return jsonify({"status": "ok", "digest": digest})
+    except Exception as e:
+        logger.error("AI Market Digest failed: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/ai/trade-signals")
+def ai_trade_signals():
+    """AI-driven trade signals based on portfolio using Gemini."""
+    try:
+        # Gather portfolio data across all pids
+        all_rows = []
+        for pid in API_KEYS:
+            rows, _ = rows_get(pid)
+            if rows:
+                all_rows.extend(rows)
+        
+        signals = _gemini.generate_trade_signals(all_rows)
+        return jsonify({"status": "ok", "signals": signals})
+    except Exception as e:
+        logger.error("AI Trade Signals failed: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/ai/chat", methods=["POST"])
+def ai_chat():
+    """Interactive chat with Gemini."""
+    try:
+        body = request.get_json()
+        message = body.get("message")
+        history = body.get("history", []) # List of {role, parts}
+        
+        if not message:
+            return jsonify({"status": "error", "message": "Message required"}), 400
+            
+        response = _gemini.chat_with_gemini(message, history)
+        return jsonify({"status": "ok", "response": response})
+    except Exception as e:
+        logger.error("AI Chat failed: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":

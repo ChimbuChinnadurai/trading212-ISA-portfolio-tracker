@@ -27,7 +27,7 @@
       --text-primary: #191c1e;
       --text-secondary: #424754;
       --radius: 12px;
-      --sidebar-w: 180px;
+      --sidebar-w: 72px;
       --topbar-h: 54px;
     }
 
@@ -98,10 +98,7 @@
       transition: width .22s ease;
       overflow: hidden;
       z-index: 200;
-    }
-
-    .sidebar.collapsed {
-      width: 60px
+      border-right: 1px solid var(--border);
     }
 
     /* Main */
@@ -173,7 +170,7 @@
 
     <!-- ═══ SIDEBAR ═══ -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
+      <!-- <div class="sidebar-brand">
         <div class="sidebar-logo" onclick="navigate('home')">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="32" height="32" rx="9" fill="url(#sbLg)" />
@@ -187,8 +184,7 @@
               stroke-linejoin="round" />
           </svg>
         </div>
-        <span class="sidebar-brand-text">Portfolio<br>Tracker</span>
-      </div>
+      </div> -->
 
       <nav class="sidebar-nav">
 
@@ -198,22 +194,11 @@
           <span class="nav-label">Home</span>
         </a>
 
-        <!-- Portfolio group -->
         <div class="nav-group" id="navGroupPortfolio">
           <a class="nav-group-header" data-route="portfolio/combined" onclick="navigate('portfolio/combined')">
             <span class="material-symbols-outlined nav-icon">pie_chart</span>
             <span class="nav-label">Portfolio</span>
           </a>
-          <div class="nav-group-items" id="navGroupPortfolioItems">
-            <a class="nav-item nav-sub" data-route="portfolio/1" onclick="navigate('portfolio/1')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['1'] }}</span>
-            </a>
-            <a class="nav-item nav-sub" data-route="portfolio/2" onclick="navigate('portfolio/2')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['2'] }}</span>
-            </a>
-          </div>
         </div>
 
         <!-- Stocks group -->
@@ -222,16 +207,6 @@
             <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
             <span class="nav-label">Holdings</span>
           </a>
-          <div class="nav-group-items" id="navGroupStocksItems">
-            <a class="nav-item nav-sub" data-route="stocks/1" onclick="navigate('stocks/1')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['1'] }}</span>
-            </a>
-            <a class="nav-item nav-sub" data-route="stocks/2" onclick="navigate('stocks/2')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['2'] }}</span>
-            </a>
-          </div>
         </div>
 
         <!-- Activity -->
@@ -264,18 +239,23 @@
           <span class="nav-label">News</span>
         </a>
 
+        <!-- AI Intelligence -->
+        {% if show_ai %}
+        <a class="nav-item" data-route="ai-intelligence" onclick="navigate('ai-intelligence')">
+          <span class="material-symbols-outlined nav-icon">psychology</span>
+          <span class="nav-label">AI Intelligence</span>
+        </a>
+        {% endif %}
+
       </nav><!-- /sidebar-nav -->
 
-      <!-- <div class="sidebar-footer">
-        <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" onclick="toggleSidebar()" title="Collapse sidebar">
-          <svg class="collapse-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-              clip-rule="evenodd" />
-          </svg>
-          <span class="nav-label">Collapse</span>
-        </button>
-      </div> -->
+      <div class="sidebar-footer">
+        <a class="nav-item sidebar-t212-link" href="https://app.trading212.com/" target="_blank"
+          rel="noopener noreferrer" title="Open Trading212">
+          <span class="material-symbols-outlined nav-icon">open_in_new</span>
+          <span class="nav-label">T212</span>
+        </a>
+      </div>
     </aside>
 
     <!-- Mobile scrim -->
@@ -295,12 +275,12 @@
             <span class="topbar-subtitle" id="breadcrumbText">Portfolio overview</span>
           </div>
           <!-- Pid switcher — always visible -->
-          <!-- <div class="pid-switcher" id="pidSwitcher">
-            <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
-            <button class="pid-btn" id="pidBtn2" onclick="switchPid('2')">{{ names['2'] }}</button>
+          <div class="pid-switcher" id="pidSwitcher">
             <button class="pid-btn pid-btn-combined" id="pidBtnCombined"
               onclick="switchPid('combined')">Combined</button>
-          </div> -->
+            <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
+            <button class="pid-btn" id="pidBtn2" onclick="switchPid('2')">{{ names['2'] }}</button>
+          </div>
         </div>
         <div class="topbar-right">
           <div class="mkt-status-wrap">
@@ -656,27 +636,22 @@
                       </div>
                       <span class="s-card-label">Dividends Received</span>
                     </div>
-                    <span class="s-card-value" id="totalDividends">—</span>
+
+                    <div class="s-card-main">
+                      <div class="s-card-left">
+                        <span class="s-card-value" id="totalDividends">—</span>
+                      </div>
+                      <div class="s-card-right">
+                        <!-- Mini monthly chart -->
+                        <div id="monthlyChart" class="monthly-bars-mini"></div>
+                      </div>
+                    </div>
+
                     <div class="s-card-footer">
                       <span class="s-card-sub" id="topDivStock">—</span>
                       <span class="s-card-sub" id="totalFxImpact">—</span>
                     </div>
                   </div>
-
-                  <div class="s-card s-card-purple" id="cardPAI" onclick="openPaiDetails()" style="cursor:pointer">
-                    <div class="s-card-top">
-                      <div class="s-card-icon">
-                        <span class="material-symbols-outlined">savings</span>
-                      </div>
-                      <span class="s-card-label">Projected Annual Income</span>
-                    </div>
-                    <span class="s-card-value" id="totalPAI">—</span>
-                    <div class="s-card-footer">
-                      <span class="s-card-sub">Estimated trailing 12m</span>
-                    </div>
-                  </div>
-
-
                 </div><!-- /summary-cards -->
               </div><!-- /summary-row -->
 
@@ -705,29 +680,19 @@
                   </div>
 
                   <!-- Stale banner -->
-                  <div id="staleBanner" class="stale-banner" style="display:none">
+                  <!-- <div id="staleBanner" class="stale-banner" style="display:none">
                     <span class="material-symbols-outlined"
                       style="font-size:14px;flex-shrink:0;line-height:1;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
                     <span id="staleBannerText">Data is over 5 minutes old.</span>
                     <a href="#" onclick="loadPortfolio(true); return false;">Refresh now</a>
                     <button class="stale-close" onclick="document.getElementById('staleBanner').style.display='none'"
                       title="Dismiss">✕</button>
-                  </div>
+                  </div> -->
                 </div><!-- /portfolio-left -->
 
                 <!-- Right rail: stacked panels -->
                 <div class="portfolio-right-rail">
 
-                  <!-- Monthly Dividends -->
-                  <div class="card portfolio-panel" id="monthlyDivPanel" style="display:none">
-                    <div class="panel-header">
-                      <h3 class="panel-title">Monthly Dividends</h3>
-                      <div class="panel-badge" id="monthlyDivBadge" style="display:none"></div>
-                    </div>
-                    <div class="monthly-chart-wrap" id="monthlyChart">
-                      <div class="activity-loading">Loading…</div>
-                    </div>
-                  </div>
 
                   <!-- Recent Activity -->
                   <div class="card portfolio-panel">
@@ -743,6 +708,29 @@
                 </div><!-- /portfolio-right-rail -->
 
               </div><!-- /portfolio-layout -->
+
+              <!-- Monthly Performance Heatmap (full-width) -->
+              <div class="card monthly-perf-card" id="monthlyPerfCard">
+                <div class="monthly-perf-header">
+                  <div class="monthly-perf-title-row">
+                    <span class="chart-card-title">Monthly Performance</span>
+                    <span class="monthly-perf-hint">Monthly % return per holding</span>
+                  </div>
+                  <div class="monthly-perf-view-toggle">
+                    <button class="mpv-btn active" data-view="12m"
+                      onclick="setMonthlyPerfView('12m', this)">12M</button>
+                    <button class="mpv-btn" data-view="1y" onclick="setMonthlyPerfView('1y', this)" disabled
+                      title="Coming soon">1Y</button>
+                    <button class="mpv-btn" data-view="3y" onclick="setMonthlyPerfView('3y', this)" disabled
+                      title="Coming soon">3Y</button>
+                  </div>
+                </div>
+                <div class="monthly-perf-scroll">
+                  <div id="monthlyPerfHeatmap" class="monthly-perf-heatmap">
+                    <div class="monthly-perf-loading">Loading monthly performance…</div>
+                  </div>
+                </div>
+              </div>
 
             </div><!-- /dashboard -->
           </div><!-- /view-main -->
@@ -887,7 +875,6 @@
               <section class="widget-panel act-panel">
                 <div class="panel-header">
                   <h3 class="panel-title">Recent Activity</h3>
-                  <span class="panel-subtitle">All portfolios combined</span>
                 </div>
                 <div id="activityTimelineList" class="activity-list-home">
                   <div class="skel-item">
@@ -913,7 +900,6 @@
               <section class="widget-panel act-panel">
                 <div class="panel-header">
                   <h3 class="panel-title">Dividend History</h3>
-                  <span class="panel-subtitle">Combined from all portfolios</span>
                 </div>
                 <div id="divHistoryList" class="activity-list-home">
                   <div class="skel-item">
@@ -943,13 +929,7 @@
         <!-- ═══ VIEW: CALENDAR ═══ -->
         <div id="view-calendar" class="spa-view" style="display:none">
           <div class="view-main">
-
-            <div class="cal-view-header">
-              <div class="cal-view-title-block">
-                <h1 class="cal-view-title">Market Calendar</h1>
-                <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
-              </div>
-            </div>
+            <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
 
             <div class="calendar-layout">
 
@@ -1304,6 +1284,69 @@
           </div><!-- /view-main -->
         </div><!-- /view-watchlist -->
 
+        <!-- ═══ VIEW: AI Intelligence ═══ -->
+        <div id="view-ai-intelligence" class="spa-view" style="display:none">
+          <div class="ai-view-body">
+            <div class="ai-grid">
+
+              <!-- Column 1: Market Digest -->
+              <div class="ai-col">
+                <div class="card ai-card">
+                  <div class="ai-card-header">
+                    <span class="material-symbols-outlined">newspaper</span>
+                    <h3>Market Digest</h3>
+                    <button class="ai-refresh-btn" id="aiRefreshDigest" onclick="loadAiDigest(true)">
+                      <span class="material-symbols-outlined">refresh</span>
+                    </button>
+                  </div>
+                  <div class="ai-card-content" id="aiDigestContent">
+                    <div class="ai-loading">Generating summary...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Column 2: Trade Signals -->
+              <div class="ai-col">
+                <div class="card ai-card">
+                  <div class="ai-card-header">
+                    <span class="material-symbols-outlined">trending_up</span>
+                    <h3>Trade Signals</h3>
+                    <button class="ai-refresh-btn" id="aiRefreshSignals" onclick="loadAiSignals(true)">
+                      <span class="material-symbols-outlined">refresh</span>
+                    </button>
+                  </div>
+                  <div class="ai-card-content" id="aiSignalsContent">
+                    <div class="ai-loading">Analyzing portfolio...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Column 3: AI Chat -->
+              <div class="ai-col">
+                <div class="card ai-card ai-chat-card">
+                  <div class="ai-card-header">
+                    <span class="material-symbols-outlined">forum</span>
+                    <h3>AI Assistant</h3>
+                  </div>
+                  <div class="ai-chat-content" id="aiChatContent">
+                    <div class="ai-msg ai-msg-bot">
+                      Hello! I'm your Gemini-powered portfolio assistant. How can I help you today?
+                    </div>
+                  </div>
+                  <div class="ai-chat-input-row">
+                    <input type="text" id="aiChatInput" placeholder="Ask me anything..."
+                      onkeyup="if(event.key==='Enter') sendAiChatMessage()">
+                    <button onclick="sendAiChatMessage()">
+                      <span class="material-symbols-outlined">send</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
       </div><!-- /view-container -->
 
       <!-- Stock drill-down side panel — global, accessible from any view -->
@@ -1505,14 +1548,16 @@
     </div>
   </div>
 
+  <div id="namesConfig" data-names='{{ names | tojson | safe }}' style="display:none"></div>
   <script>
-    const PORTFOLIO_NAMES = {{ names | tojson }};
+    const PORTFOLIO_NAMES = JSON.parse(document.getElementById('namesConfig').dataset.names || '{}');
     var PORTFOLIO_ID = null;
   </script>
   <script src="/static/currency.js"></script>
   <script src="/static/router.js"></script>
   <script src="/static/home.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/ai_intelligence.js"></script>
   <script>
     (function () {
       var h = new Date().getHours();
@@ -1541,6 +1586,4 @@
   </div>
 </body>
 
-</html><a href="#" class="view-all-link"
-  style="margin-left: 4px; border: 1px solid var(--border); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem;"
-  onclick="openSignalsSidebar(); return false;">View All</a>
+</html>

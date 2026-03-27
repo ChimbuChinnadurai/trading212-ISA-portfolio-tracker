@@ -9,7 +9,6 @@ let sortDir = 'desc';
 let activeCountry = null;
 let _recommendations = {};
 let _lastTotalDividends = null;
-let _lastPAI = 0;
 let _activityData = null;
 let _dividendData = null;
 let _monthlyData = null;
@@ -78,41 +77,79 @@ function esc(s) {
 /* ─── Activity panels ─────────────────────────────────────────────────────── */
 async function loadDetailActivity() {
   try {
-    const res = await fetch(`/api/p${PORTFOLIO_ID}/activity`);
-    const json = await res.json();
-    _activityData = json.data || [];
-    _renderActivity(_activityData, json.warning);
+    const [actRes, divRes] = await Promise.all([
+      fetch(`/api/p${PORTFOLIO_ID}/activity`),
+      fetch(`/api/p${PORTFOLIO_ID}/recent-dividends`)
+    ]);
+    const actJson = await actRes.json();
+    const divJson = await divRes.json();
+    _activityData = actJson.data || [];
+    _dividendData = divJson.data || [];
+    _renderActivity(_activityData, _dividendData, actJson.warning);
   } catch (err) {
     document.getElementById('detailActivityList').innerHTML =
       `<div class="activity-empty">Could not load activity: ${esc(err.message)}</div>`;
   }
 }
 
-function _renderActivity(data, warning) {
+function _renderActivity(orders, dividends, warning) {
   const listEl = document.getElementById('detailActivityList');
-  if (data.length === 0) {
-    const msg = warning ? `API error: ${warning}` : 'No recent orders found.';
+
+  const taggedOrders = orders.map(o => ({ ...o, _type: 'order' }));
+  const taggedDivs = dividends.map(d => ({ ...d, _type: 'dividend' }));
+  const combined = [...taggedOrders, ...taggedDivs].sort((a, b) => {
+    const dateA = a.dateExecuted ?? a.dateCreated ?? a.paidOn ?? a.date ?? '';
+    const dateB = b.dateExecuted ?? b.dateCreated ?? b.paidOn ?? b.date ?? '';
+    return dateB.localeCompare(dateA);
+  });
+
+  if (combined.length === 0) {
+    const msg = warning ? `API error: ${warning}` : 'No recent activity found.';
     listEl.innerHTML = `<div class="activity-empty">${esc(msg)}</div>`;
     return;
   }
 
   const badge = document.getElementById('detailActivityBadge');
-  if (badge) { badge.textContent = data.length; badge.style.display = ''; }
+  if (badge) { badge.textContent = combined.length; badge.style.display = ''; }
 
-  listEl.innerHTML = data.map(order => {
-    const rawTicker = order.ticker || '';
+  listEl.innerHTML = combined.map(item => {
+    if (item._type === 'dividend') {
+      const rawTicker = item.ticker || '';
+      const ticker = rawTicker.split('_')[0] || rawTicker;
+      const company = item._company_name || item.company_name || ticker || 'Unknown';
+      const amount = fmt.currency(item.amount || 0);
+      const rawDate = item.paidOn || item.date || '';
+      const timeStr = rawDate
+        ? new Date(rawDate).toLocaleString('en-GB', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+        })
+        : '—';
+      return `
+        <div class="activity-item">
+          <div class="activity-dot activity-dot-div"></div>
+          <div class="activity-content">
+            <span class="activity-company">${esc(company)}</span>
+            <span class="activity-ticker activity-ticker-sm">${esc(ticker)}</span>
+            <div class="activity-desc">Dividend paid</div>
+            <div class="activity-time">${timeStr}</div>
+          </div>
+          <div class="activity-amount pos">${amount}</div>
+        </div>`;
+    }
+
+    const rawTicker = item.ticker || '';
     const ticker = rawTicker.split('_')[0] || rawTicker;
-    const company = order._company_name || order.company_name || ticker || 'Unknown stock';
+    const company = item._company_name || item.company_name || ticker || 'Unknown stock';
 
-    const qty = Math.abs(order.filledQuantity ?? order.orderedQuantity ?? 0);
-    const price = order.fillPrice ?? order.filledPrice ?? 0;
-    const rawDate = order.dateExecuted ?? order.dateCreated ?? '';
-    const status = (order.status || '').toUpperCase();
-    const type = order.type || '';
+    const qty = Math.abs(item.filledQuantity ?? item.orderedQuantity ?? 0);
+    const price = item.fillPrice ?? item.filledPrice ?? 0;
+    const rawDate = item.dateExecuted ?? item.dateCreated ?? '';
+    const status = (item.status || '').toUpperCase();
+    const type = item.type || '';
 
     const isCancelled = status === 'CANCELLED' || status === 'REJECTED';
     const typeUpper = type.toUpperCase();
-    const isSell = (order.side || order.direction || '').toUpperCase() === 'SELL'
+    const isSell = (item.side || item.direction || '').toUpperCase() === 'SELL'
       || typeUpper.includes('SELL');
     const dotClass = isCancelled ? 'activity-dot-cancel'
       : isSell ? 'activity-dot-sell'
@@ -126,8 +163,8 @@ function _renderActivity(data, warning) {
         day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
       })
       : '—';
-    const value = order.filledValue
-      ? fmt.currency(order.filledValue)
+    const value = item.filledValue
+      ? fmt.currency(item.filledValue)
       : (qty && price) ? fmt.currency(qty * price) : '—';
 
     return `
@@ -144,40 +181,6 @@ function _renderActivity(data, warning) {
   }).join('');
 }
 
-async function loadUpcomingDividends() {
-  try {
-    const res = await fetch(`/api/p${PORTFOLIO_ID}/recent-dividends`);
-    const json = await res.json();
-    _dividendData = json.data || [];
-    _renderDividends(_dividendData);
-  } catch (err) {
-    document.getElementById('upcomingList').innerHTML =
-      '<div class="activity-empty">Could not load dividend history.</div>';
-  }
-}
-
-function _renderDividends(data) {
-  const listEl = document.getElementById('upcomingList');
-  if (data.length === 0) {
-    listEl.innerHTML = '<div class="activity-empty">No dividend history found.</div>';
-    return;
-  }
-  listEl.innerHTML = data.map(div => {
-    const ticker = (div.ticker || '').split('_')[0];
-    const amount = fmt.currency(div.amount || 0);
-    const date = div.paidOn || div.date || '—';
-    return `
-      <div class="activity-item">
-        <div class="activity-dot activity-dot-div"></div>
-        <div class="activity-content">
-          <span class="activity-ticker">${esc(ticker)}</span>
-          <div class="activity-desc">Dividend paid</div>
-          <div class="activity-time">${esc(date)}</div>
-        </div>
-        <div class="activity-amount pos">${amount}</div>
-      </div>`;
-  }).join('');
-}
 
 /* ─── Load portfolio ──────────────────────────────────────────────────────── */
 async function loadPortfolio(force = false) {
@@ -212,9 +215,8 @@ async function loadPortfolio(force = false) {
     });
 
     _lastTotalDividends = json.total_dividends ?? null;
-    _lastPAI = json.pai ?? 0;
 
-    renderSummary(allRows, _lastTotalDividends, _lastPAI);
+    renderSummary(allRows, _lastTotalDividends);
     if (_returnsMode === 'today') _loadTodayReturns();
     document.getElementById('dashboard').style.display = '';
     document.getElementById('stateError').style.display = 'none';
@@ -263,8 +265,8 @@ async function loadPortfolio(force = false) {
     if (staleEl) {
       if (cached && cacheAge != null && cacheAge > 300) {
         const mins = Math.floor(cacheAge / 60);
-        document.getElementById('staleBannerText').textContent =
-          `Data is ${mins} minute${mins !== 1 ? 's' : ''} old.`;
+        const staleText = document.getElementById('staleBannerText');
+        if (staleText) staleText.textContent = `Data is ${mins} minute${mins !== 1 ? 's' : ''} old.`;
         staleEl.style.display = '';
       } else {
         staleEl.style.display = 'none';
@@ -285,6 +287,7 @@ async function loadPortfolio(force = false) {
     // Load portfolio bottom panels
     loadDetailActivity();
     loadMonthlyDividends();
+    loadMonthlyPerformance();
 
   } catch (err) {
     showState('error', 'Network error: ' + err.message);
@@ -323,7 +326,7 @@ function hideSkeletons() {
 }
 
 /* ─── Summary cards ───────────────────────────────────────────────────────── */
-function renderSummary(rows, allTimeDividends = null, pai = 0) {
+function renderSummary(rows, allTimeDividends = null) {
   const totalValue = rows.reduce((s, r) => s + r.current_value, 0);
   const totalReturns = rows.reduce((s, r) => s + r.total_returns, 0);
   const totalDividends = allTimeDividends != null
@@ -346,9 +349,6 @@ function renderSummary(rows, allTimeDividends = null, pai = 0) {
 
   // Card 2: Dividends
   set('totalDividends', fmt.currency(totalDividends));
-
-  // Card 4: PAI
-  set('totalPAI', fmt.currency(pai));
 
   const topDivEl = document.getElementById('topDivStock');
   if (topDiv && topDiv.dividends > 0) {
@@ -556,23 +556,20 @@ async function loadMonthlyDividends() {
 }
 
 function _renderMonthly(data) {
-  const panel = document.getElementById('monthlyDivPanel');
   const chartEl = document.getElementById('monthlyChart');
-  if (!panel || !chartEl) return;
+  if (!chartEl) return;
 
-  if (data.length === 0) { panel.style.display = 'none'; return; }
+  if (data.length === 0) { chartEl.style.display = 'none'; return; }
 
-  panel.style.display = '';
-  const recent = data.slice(-12);
+  chartEl.style.display = '';
+  // Show last 8 months in the mini chart for better fit
+  const recent = data.slice(-8);
   const maxAmount = Math.max(...recent.map(d => d.amount));
 
-  const badge = document.getElementById('monthlyDivBadge');
-  if (badge) { badge.textContent = `${data.length} mo`; badge.style.display = ''; }
-
-  chartEl.innerHTML = `<div class="monthly-bars">
+  chartEl.innerHTML = `<div class="monthly-bars-mini">
     ${recent.map(d => {
     const pct = maxAmount > 0 ? (d.amount / maxAmount * 100) : 0;
-    const label = new Date(d.month + '-01').toLocaleString('en-GB', { month: 'short', year: '2-digit' });
+    const label = new Date(d.month + '-01').toLocaleString('en-GB', { month: 'short' });
     const tipText = `<strong>${label}</strong><br/>${fmt.currency(d.amount)}`;
     return `<div class="month-bar-item" 
               onmouseenter="showTooltip(event, '${tipText}')" 
@@ -789,10 +786,12 @@ function renderTable(rows) {
   });
 
   const total = rows.length, shown = filtered.length;
-  document.getElementById('rowCount').textContent =
-    shown === total
+  const rcEl = document.getElementById('rowCount');
+  if (rcEl) {
+    rcEl.textContent = shown === total
       ? `${total} holding${total !== 1 ? 's' : ''}`
       : `${shown} of ${total} holdings`;
+  }
 
   _loadStockSparklines(filtered);
 }
@@ -990,7 +989,12 @@ function showState(state, msg) {
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 function set(id, val) {
-  document.getElementById(id).textContent = val;
+  const el = document.getElementById(id);
+  if (el) {
+    el.textContent = val;
+  } else {
+    console.warn(`[UI] Element with id "${id}" not found.`);
+  }
 }
 
 function fmtAge(seconds) {
@@ -1854,75 +1858,7 @@ function _renderStockNews(data, ticker) {
 }
 
 
-/* ─── Summary Drill-downs (PAI & Diversification) ────────────────────────── */
-async function openPaiDetails() {
-  const panel = document.getElementById('summaryPanel');
-  const backdrop = document.getElementById('summaryPanelBackdrop');
-  const content = document.getElementById('smContent');
-  const title = document.getElementById('smTitle');
-  const subtitle = document.getElementById('smSubtitle');
-  const iconWrap = document.getElementById('smIcon');
-
-  title.textContent = 'Projected Annual Income';
-  subtitle.textContent = 'Trailing 12m Estimates';
-  iconWrap.textContent = '£';
-  content.innerHTML = `
-    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-60"></div><div class="skeleton skel-line skel-w-40"></div></div><div class="skeleton skel-amount"></div></div>
-    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-50"></div><div class="skeleton skel-line skel-w-35"></div></div><div class="skeleton skel-amount"></div></div>
-    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-55"></div><div class="skeleton skel-line skel-w-30"></div></div><div class="skeleton skel-amount"></div></div>
-  `;
-
-  panel.classList.add('open');
-  backdrop.classList.add('active');
-
-  try {
-    const res = await fetch(`/api/p${PORTFOLIO_ID}/pai-details`);
-    const json = await res.json();
-    if (json.status !== 'ok') throw new Error(json.message);
-
-    const { total_pai, contributors } = json.data;
-    let html = `
-      <div class="sm-section">
-        <div class="sm-rationale" style="border-left-color: #8b5cf6;">
-          Based on your current holdings, your portfolio is estimated to generate <strong>${fmt.currency(total_pai)}</strong> over the next 12 months (excluding special dividends).
-        </div>
-      </div>
-      <div class="sm-section">
-        <h3 class="sm-section-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
-          Top Income Contributors
-        </h3>
-        <table class="sm-table">
-          <thead>
-            <tr>
-              <th>Stock</th>
-              <th style="text-align:right">Income</th>
-              <th style="text-align:right">Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${contributors.map(c => `
-              <tr>
-                <td>
-                  <div style="font-weight:600">${esc(c.ticker)}</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted)">${esc(c.company_name)}</div>
-                </td>
-                <td style="text-align:right">${fmt.currency(c.income)}</td>
-                <td style="text-align:right">
-                  <div>${c.percentage}%</div>
-                  <div class="sm-item-weight"><div class="sm-weight-fill" style="width:${c.percentage}%; background:#8b5cf6"></div></div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-    content.innerHTML = html;
-  } catch (err) {
-    content.innerHTML = `<div class="activity-empty">Error: ${err.message}</div>`;
-  }
-}
+/* ─── Summary Drill-downs (Diversification) ───────────────────────────── */
 
 async function openDiversificationDetails() {
   const panel = document.getElementById('summaryPanel');
@@ -2280,7 +2216,7 @@ async function loadStocksView(force = false) {
 
   try {
     const url = force
-      ? `/api/p${PORTFOLIO_ID}/portfolio?force=1`
+      ? `/api/p${PORTFOLIO_fID}/portfolio?force=1`
       : `/api/p${PORTFOLIO_ID}/portfolio`;
     const res = await fetch(url);
     const json = await res.json();
@@ -2335,4 +2271,104 @@ function showStocksState(state, msg) {
     const el = document.getElementById('stocksErrorText');
     if (el) el.textContent = msg;
   }
+}
+
+/* ── Monthly Performance Heatmap ────────────────────────────────────────── */
+
+let _monthlyPerfData = null;
+
+async function loadMonthlyPerformance() {
+  const container = document.getElementById('monthlyPerfHeatmap');
+  if (!container) return;
+  container.innerHTML = '<div class="monthly-perf-loading">Loading monthly performance…</div>';
+
+  try {
+    const res = await fetch(`/api/p${PORTFOLIO_ID}/monthly-performance`);
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+    _monthlyPerfData = json.data;
+    _renderMonthlyPerfHeatmap(_monthlyPerfData);
+  } catch (err) {
+    container.innerHTML = `<div class="monthly-perf-loading">Failed to load: ${err.message}</div>`;
+  }
+}
+
+function setMonthlyPerfView(view, btn) {
+  document.querySelectorAll('.mpv-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Only 12m is implemented; other views are placeholders
+  if (view === '12m' && _monthlyPerfData) {
+    _renderMonthlyPerfHeatmap(_monthlyPerfData);
+  }
+}
+
+function _renderMonthlyPerfHeatmap(data) {
+  const container = document.getElementById('monthlyPerfHeatmap');
+  if (!container) return;
+
+  // Collect all month keys present across tickers, last 12 months sorted
+  const allMonths = new Set();
+  Object.values(data).forEach(monthly => Object.keys(monthly).forEach(m => allMonths.add(m)));
+  const sortedMonths = Array.from(allMonths).sort().slice(-12);
+
+  if (sortedMonths.length === 0) {
+    container.innerHTML = '<div class="monthly-perf-loading">No data available.</div>';
+    return;
+  }
+
+  const monthLabels = sortedMonths.map(m => {
+    const [year, mon] = m.split('-');
+    const d = new Date(+year, +mon - 1, 1);
+    return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }).toUpperCase();
+  });
+
+  // Sort tickers: use allRows order if available, otherwise alphabetical
+  const tickers = Object.keys(data);
+  if (typeof allRows !== 'undefined' && allRows.length) {
+    const order = allRows.map(r => r.ticker);
+    tickers.sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+  } else {
+    tickers.sort();
+  }
+
+  // Build table
+  let html = '<table class="mph-table"><thead><tr>';
+  html += '<th class="mph-ticker-col">Ticker</th>';
+  monthLabels.forEach(lbl => { html += `<th>${lbl}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  tickers.forEach(ticker => {
+    const monthly = data[ticker] || {};
+    html += `<tr><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
+    sortedMonths.forEach(mk => {
+      const val = monthly[mk];
+      if (val == null) {
+        html += '<td class="mph-cell mph-empty">—</td>';
+      } else {
+        const sign = val >= 0 ? '+' : '';
+        const cls = val >= 0 ? 'mph-pos' : 'mph-neg';
+        const bg = _mphColor(val);
+        html += `<td class="mph-cell ${cls}" style="background:${bg}">${sign}${val.toFixed(1)}%</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function _mphColor(pct) {
+  // Monthly return bands — same gradient style as allocation heatmap (_pnlColor)
+  // but with tighter thresholds suited to monthly % moves
+  if (pct >= 10) return 'linear-gradient(135deg,#052e16,#15803d)';
+  if (pct >=  5) return 'linear-gradient(135deg,#14532d,#16a34a)';
+  if (pct >=  2) return 'linear-gradient(135deg,#166534,#22c55e)';
+  if (pct >=  0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+  if (pct >= -2) return 'linear-gradient(135deg,#78350f,#b45309)';
+  if (pct >= -5) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
+  return 'linear-gradient(135deg,#450a0a,#b91c1c)';
 }

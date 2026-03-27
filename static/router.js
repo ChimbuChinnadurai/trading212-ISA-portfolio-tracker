@@ -23,6 +23,8 @@ let _calendarInitialized    = false;
 let _activityInitialized    = false;
 let _marketInitialized      = false;
 let _watchlistInitialized   = false;
+let _aiInitialized          = false;
+
 
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
@@ -104,8 +106,10 @@ function _updatePidSwitcher(route) {
     const btnCombined = document.getElementById('pidBtnCombined');
     if (!switcher) return;
 
-    // Always visible — clear active state on non-portfolio/stocks routes
-    if (btnCombined) btnCombined.style.display = '';
+    // Only show on portfolio/stocks routes
+    const isRelevant = route.startsWith('portfolio/') || route.startsWith('stocks/');
+    switcher.style.display = isRelevant ? 'flex' : 'none';
+
     document.querySelectorAll('.pid-btn').forEach(b => b.classList.remove('active'));
 
     if (route.startsWith('portfolio/') || route.startsWith('stocks/')) {
@@ -145,7 +149,11 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadMarketView(true);
     } else if (view === 'watchlist') {
         btn.onclick = () => loadWatchlistView();
+    } else if (view === 'ai-intelligence') {
+        // AI view has its own refresh buttons per section
+        btn.style.display = 'none'; 
     }
+
 }
 
 /* ── Sidebar active state ────────────────────────────────────────────────── */
@@ -242,7 +250,7 @@ function _router() {
 
     /* ── Portfolio ── */
     } else if (hash.startsWith('portfolio/')) {
-        const pid = hash.split('/')[1];
+        const pid = hash.split('/')[1] || 'combined';
         _showView('portfolio');
         _updateRefreshBtn('portfolio');
         document.title = _portfolioTitle(pid) + ' — Portfolio Tracker';
@@ -258,7 +266,7 @@ function _router() {
 
     /* ── Stocks ── */
     } else if (hash.startsWith('stocks/')) {
-        const pid = hash.split('/')[1];
+        const pid = hash.split('/')[1] || 'combined';
         _showView('stocks');
         _updateRefreshBtn('stocks');
         document.title = _portfolioTitle(pid) + ' · Stocks — Portfolio Tracker';
@@ -322,6 +330,16 @@ function _router() {
         if (!_watchlistInitialized) {
             if (typeof loadWatchlistView === 'function') loadWatchlistView();
             _watchlistInitialized = true;
+        }
+
+    /* ── AI Intelligence ── */
+    } else if (hash === 'ai-intelligence') {
+        _showView('ai-intelligence');
+        _updateRefreshBtn('ai-intelligence');
+        document.title = 'AI Intelligence — Portfolio Tracker';
+        if (!_aiInitialized) {
+            if (typeof initAiView === 'function') initAiView();
+            _aiInitialized = true;
         }
     }
 }
@@ -487,6 +505,16 @@ function _updateThemeIcon(theme) {
 }
 
 window.addEventListener('hashchange', _router);
+
+function toggleNavGroup(groupId, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const group = document.getElementById(groupId);
+    if (!group) return;
+    group.classList.toggle('open');
+}
 
 // Public exports
 window.navigate      = navigate;
