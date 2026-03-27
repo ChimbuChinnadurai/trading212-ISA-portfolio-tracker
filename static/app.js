@@ -9,14 +9,20 @@ let sortDir = 'desc';
 let activeCountry = null;
 let _recommendations = {};
 let _lastTotalDividends = null;
-let _lastPAI = 0;
-let _lastDivScore = 0;
 let _activityData = null;
 let _dividendData = null;
 let _monthlyData = null;
 let _stockCalData = null;
 let _calYear = new Date().getFullYear();
 let _calMonth = new Date().getMonth();
+
+/* ─── Returns toggle state ────────────────────────────────────────────────── */
+let _returnsMode = 'alltime'; // 'alltime' | 'today'
+let _allTimeReturns = 0;
+let _allTimeReturnsPct = 0;
+let _todayReturns = null;     // null = not yet fetched
+let _todayReturnsPct = null;
+let _tickerChangeMap = {};    // ticker -> change_pct (today)
 
 /* ─── Currency colors ───────────────────────────────────────────────────── */
 const CURRENCY_COLORS = {
@@ -71,41 +77,79 @@ function esc(s) {
 /* ─── Activity panels ─────────────────────────────────────────────────────── */
 async function loadDetailActivity() {
   try {
-    const res = await fetch(`/api/p${PORTFOLIO_ID}/activity`);
-    const json = await res.json();
-    _activityData = json.data || [];
-    _renderActivity(_activityData, json.warning);
+    const [actRes, divRes] = await Promise.all([
+      fetch(`/api/p${PORTFOLIO_ID}/activity`),
+      fetch(`/api/p${PORTFOLIO_ID}/recent-dividends`)
+    ]);
+    const actJson = await actRes.json();
+    const divJson = await divRes.json();
+    _activityData = actJson.data || [];
+    _dividendData = divJson.data || [];
+    _renderActivity(_activityData, _dividendData, actJson.warning);
   } catch (err) {
     document.getElementById('detailActivityList').innerHTML =
       `<div class="activity-empty">Could not load activity: ${esc(err.message)}</div>`;
   }
 }
 
-function _renderActivity(data, warning) {
+function _renderActivity(orders, dividends, warning) {
   const listEl = document.getElementById('detailActivityList');
-  if (data.length === 0) {
-    const msg = warning ? `API error: ${warning}` : 'No recent orders found.';
+
+  const taggedOrders = orders.map(o => ({ ...o, _type: 'order' }));
+  const taggedDivs = dividends.map(d => ({ ...d, _type: 'dividend' }));
+  const combined = [...taggedOrders, ...taggedDivs].sort((a, b) => {
+    const dateA = a.dateExecuted ?? a.dateCreated ?? a.paidOn ?? a.date ?? '';
+    const dateB = b.dateExecuted ?? b.dateCreated ?? b.paidOn ?? b.date ?? '';
+    return dateB.localeCompare(dateA);
+  });
+
+  if (combined.length === 0) {
+    const msg = warning ? `API error: ${warning}` : 'No recent activity found.';
     listEl.innerHTML = `<div class="activity-empty">${esc(msg)}</div>`;
     return;
   }
 
   const badge = document.getElementById('detailActivityBadge');
-  if (badge) { badge.textContent = data.length; badge.style.display = ''; }
+  if (badge) { badge.textContent = combined.length; badge.style.display = ''; }
 
-  listEl.innerHTML = data.map(order => {
-    const rawTicker = order.ticker || '';
+  listEl.innerHTML = combined.map(item => {
+    if (item._type === 'dividend') {
+      const rawTicker = item.ticker || '';
+      const ticker = rawTicker.split('_')[0] || rawTicker;
+      const company = item._company_name || item.company_name || ticker || 'Unknown';
+      const amount = fmt.currency(item.amount || 0);
+      const rawDate = item.paidOn || item.date || '';
+      const timeStr = rawDate
+        ? new Date(rawDate).toLocaleString('en-GB', {
+          day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+        })
+        : '—';
+      return `
+        <div class="activity-item">
+          <div class="activity-dot activity-dot-div"></div>
+          <div class="activity-content">
+            <span class="activity-company">${esc(company)}</span>
+            <span class="activity-ticker activity-ticker-sm">${esc(ticker)}</span>
+            <div class="activity-desc">Dividend paid</div>
+            <div class="activity-time">${timeStr}</div>
+          </div>
+          <div class="activity-amount pos">${amount}</div>
+        </div>`;
+    }
+
+    const rawTicker = item.ticker || '';
     const ticker = rawTicker.split('_')[0] || rawTicker;
-    const company = order._company_name || order.company_name || ticker || 'Unknown stock';
+    const company = item._company_name || item.company_name || ticker || 'Unknown stock';
 
-    const qty = Math.abs(order.filledQuantity ?? order.orderedQuantity ?? 0);
-    const price = order.fillPrice ?? order.filledPrice ?? 0;
-    const rawDate = order.dateExecuted ?? order.dateCreated ?? '';
-    const status = (order.status || '').toUpperCase();
-    const type = order.type || '';
+    const qty = Math.abs(item.filledQuantity ?? item.orderedQuantity ?? 0);
+    const price = item.fillPrice ?? item.filledPrice ?? 0;
+    const rawDate = item.dateExecuted ?? item.dateCreated ?? '';
+    const status = (item.status || '').toUpperCase();
+    const type = item.type || '';
 
     const isCancelled = status === 'CANCELLED' || status === 'REJECTED';
     const typeUpper = type.toUpperCase();
-    const isSell = (order.side || order.direction || '').toUpperCase() === 'SELL'
+    const isSell = (item.side || item.direction || '').toUpperCase() === 'SELL'
       || typeUpper.includes('SELL');
     const dotClass = isCancelled ? 'activity-dot-cancel'
       : isSell ? 'activity-dot-sell'
@@ -119,8 +163,8 @@ function _renderActivity(data, warning) {
         day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
       })
       : '—';
-    const value = order.filledValue
-      ? fmt.currency(order.filledValue)
+    const value = item.filledValue
+      ? fmt.currency(item.filledValue)
       : (qty && price) ? fmt.currency(qty * price) : '—';
 
     return `
@@ -137,46 +181,14 @@ function _renderActivity(data, warning) {
   }).join('');
 }
 
-async function loadUpcomingDividends() {
-  try {
-    const res = await fetch(`/api/p${PORTFOLIO_ID}/recent-dividends`);
-    const json = await res.json();
-    _dividendData = json.data || [];
-    _renderDividends(_dividendData);
-  } catch (err) {
-    document.getElementById('upcomingList').innerHTML =
-      '<div class="activity-empty">Could not load dividend history.</div>';
-  }
-}
-
-function _renderDividends(data) {
-  const listEl = document.getElementById('upcomingList');
-  if (data.length === 0) {
-    listEl.innerHTML = '<div class="activity-empty">No dividend history found.</div>';
-    return;
-  }
-  listEl.innerHTML = data.map(div => {
-    const ticker = (div.ticker || '').split('_')[0];
-    const amount = fmt.currency(div.amount || 0);
-    const date = div.paidOn || div.date || '—';
-    return `
-      <div class="activity-item">
-        <div class="activity-dot activity-dot-div"></div>
-        <div class="activity-content">
-          <span class="activity-ticker">${esc(ticker)}</span>
-          <div class="activity-desc">Dividend paid</div>
-          <div class="activity-time">${esc(date)}</div>
-        </div>
-        <div class="activity-amount pos">${amount}</div>
-      </div>`;
-  }).join('');
-}
 
 /* ─── Load portfolio ──────────────────────────────────────────────────────── */
 async function loadPortfolio(force = false) {
   document.getElementById('refreshBtn').disabled = true;
   showSkeletons();
   activeCountry = null;
+  _todayReturns = null;
+  _todayReturnsPct = null;
 
   try {
     const url = force ? `/api/p${PORTFOLIO_ID}/portfolio?force=1` : `/api/p${PORTFOLIO_ID}/portfolio`;
@@ -203,10 +215,9 @@ async function loadPortfolio(force = false) {
     });
 
     _lastTotalDividends = json.total_dividends ?? null;
-    _lastPAI = json.pai ?? 0;
-    _lastDivScore = json.div_score ?? 0;
 
-    renderSummary(allRows, _lastTotalDividends, _lastPAI, _lastDivScore);
+    renderSummary(allRows, _lastTotalDividends);
+    if (_returnsMode === 'today') _loadTodayReturns();
     document.getElementById('dashboard').style.display = '';
     document.getElementById('stateError').style.display = 'none';
     document.getElementById('stateEmpty').style.display = 'none';
@@ -254,8 +265,8 @@ async function loadPortfolio(force = false) {
     if (staleEl) {
       if (cached && cacheAge != null && cacheAge > 300) {
         const mins = Math.floor(cacheAge / 60);
-        document.getElementById('staleBannerText').textContent =
-          `Data is ${mins} minute${mins !== 1 ? 's' : ''} old.`;
+        const staleText = document.getElementById('staleBannerText');
+        if (staleText) staleText.textContent = `Data is ${mins} minute${mins !== 1 ? 's' : ''} old.`;
         staleEl.style.display = '';
       } else {
         staleEl.style.display = 'none';
@@ -276,6 +287,7 @@ async function loadPortfolio(force = false) {
     // Load portfolio bottom panels
     loadDetailActivity();
     loadMonthlyDividends();
+    loadMonthlyPerformance();
 
   } catch (err) {
     showState('error', 'Network error: ' + err.message);
@@ -314,7 +326,7 @@ function hideSkeletons() {
 }
 
 /* ─── Summary cards ───────────────────────────────────────────────────────── */
-function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
+function renderSummary(rows, allTimeDividends = null) {
   const totalValue = rows.reduce((s, r) => s + r.current_value, 0);
   const totalReturns = rows.reduce((s, r) => s + r.total_returns, 0);
   const totalDividends = allTimeDividends != null
@@ -338,19 +350,6 @@ function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
   // Card 2: Dividends
   set('totalDividends', fmt.currency(totalDividends));
 
-  // Card 4: PAI
-  set('totalPAI', fmt.currency(pai));
-
-  // Card 5: Div Score
-  set('divScore', divScore);
-  const meaningEl = document.getElementById('divScoreMeaning');
-  if (meaningEl) {
-    if (divScore >= 80) meaningEl.textContent = 'Excellent diversification';
-    else if (divScore >= 60) meaningEl.textContent = 'Good diversification';
-    else if (divScore >= 40) meaningEl.textContent = 'Moderate concentration';
-    else meaningEl.textContent = 'High concentration';
-  }
-
   const topDivEl = document.getElementById('topDivStock');
   if (topDiv && topDiv.dividends > 0) {
     topDivEl.innerHTML = `🏅 ${esc(topDiv.company_name)} <strong>${fmt.currency(topDiv.dividends)}</strong>`;
@@ -368,17 +367,17 @@ function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
     fEl.className = 's-card-sub';
   }
 
-  // Card 3: Returns
-  const rEl = document.getElementById('totalReturns');
-  rEl.textContent = (totalReturns >= 0 ? '+' : '') + fmt.currency(totalReturns);
-  rEl.className = 's-card-value ' + colorClass(totalReturns);
-
-  const pEl = document.getElementById('totalReturnsPct');
-  pEl.textContent = fmt.pct(returnsPct);
-  pEl.className = 's-card-pct ' + colorClass(returnsPct);
+  // Card 3: Returns — store all-time values, re-render with current mode
+  _allTimeReturns = totalReturns;
+  _allTimeReturnsPct = returnsPct;
+  _renderReturnsValues();
 
   const rc = document.getElementById('returnsCard');
   if (rc) rc.dataset.pnl = totalReturns >= 0 ? 'pos' : 'neg';
+
+  // Update breadcrumb value
+  const bcv = document.getElementById('breadcrumbValue');
+  if (bcv) { bcv.textContent = ' · ' + fmt.currency(totalValue); bcv.style.display = ''; }
 
   const wlEl = document.getElementById('winnersLosers');
   wlEl.innerHTML =
@@ -397,6 +396,77 @@ function renderSummary(rows, allTimeDividends = null, pai = 0, divScore = 0) {
   }
 
   drawPortfolioHeatmap(rows, totalValue);
+  drawSectorHeatmap(rows, totalValue);
+}
+
+/* ─── Returns toggle ──────────────────────────────────────────────────────── */
+function _renderReturnsValues() {
+  const isToday = _returnsMode === 'today';
+  const val = isToday ? _todayReturns : _allTimeReturns;
+  const pct = isToday ? _todayReturnsPct : _allTimeReturnsPct;
+
+  const rEl = document.getElementById('totalReturns');
+  const pEl = document.getElementById('totalReturnsPct');
+  if (!rEl || !pEl) return;
+
+  if (isToday && val === null) {
+    rEl.textContent = '—';
+    rEl.className = 's-card-value';
+    pEl.textContent = 'Loading…';
+    pEl.className = 's-card-pct';
+  } else if (val != null) {
+    rEl.textContent = (val >= 0 ? '+' : '') + fmt.currency(val);
+    rEl.className = 's-card-value ' + colorClass(val);
+    pEl.textContent = fmt.pct(pct);
+    pEl.className = 's-card-pct ' + colorClass(pct);
+  }
+}
+
+function setReturnsMode(mode) {
+  _returnsMode = mode;
+  const btnAll = document.getElementById('returnsBtnAllTime');
+  const btnToday = document.getElementById('returnsBtnToday');
+  if (btnAll) btnAll.classList.toggle('active', mode === 'alltime');
+  if (btnToday) btnToday.classList.toggle('active', mode === 'today');
+
+  if (mode === 'today' && _todayReturns === null) {
+    _loadTodayReturns();
+  } else {
+    _renderReturnsValues();
+  }
+}
+
+async function _loadTodayReturns() {
+  _renderReturnsValues(); // show "Loading…"
+  try {
+    const res = await fetch('/api/stock-tickers');
+    const json = await res.json();
+    if (!json.data) return;
+
+    _tickerChangeMap = {};
+    for (const d of json.data) _tickerChangeMap[d.ticker] = d.change_pct ?? 0;
+
+    let todayTotal = 0;
+    let todayInvested = 0;
+    for (const r of allRows) {
+      const chg = _tickerChangeMap[r.ticker] ?? 0;
+      todayTotal += r.current_value * chg / 100;
+      todayInvested += r.current_value;
+    }
+    _todayReturns = todayTotal;
+    _todayReturnsPct = todayInvested ? (todayTotal / todayInvested) * 100 : 0;
+  } catch (_) {
+    _todayReturns = 0;
+    _todayReturnsPct = 0;
+  }
+  _renderReturnsValues();
+}
+
+function _updateMktStatusDot(isOpen) {
+  const dot = document.getElementById('mktStatusDot');
+  if (!dot) return;
+  dot.className = 'mkt-status-dot ' + (isOpen ? 'mkt-dot-open' : 'mkt-dot-closed');
+  dot.title = isOpen ? 'Market open' : 'Market closed';
 }
 
 /* ─── Country allocation bar ─────────────────────────────────────────────── */
@@ -486,29 +556,27 @@ async function loadMonthlyDividends() {
 }
 
 function _renderMonthly(data) {
-  const panel = document.getElementById('monthlyDivPanel');
   const chartEl = document.getElementById('monthlyChart');
-  if (!panel || !chartEl) return;
+  if (!chartEl) return;
 
-  if (data.length === 0) { panel.style.display = 'none'; return; }
+  if (data.length === 0) { chartEl.style.display = 'none'; return; }
 
-  panel.style.display = '';
-  const recent = data.slice(-12);
+  chartEl.style.display = '';
+  // Show last 8 months in the mini chart for better fit
+  const recent = data.slice(-8);
   const maxAmount = Math.max(...recent.map(d => d.amount));
 
-  const badge = document.getElementById('monthlyDivBadge');
-  if (badge) { badge.textContent = `${data.length} mo`; badge.style.display = ''; }
-
-  chartEl.innerHTML = `<div class="monthly-bars">
+  chartEl.innerHTML = `<div class="monthly-bars-mini">
     ${recent.map(d => {
     const pct = maxAmount > 0 ? (d.amount / maxAmount * 100) : 0;
-    const label = new Date(d.month + '-01').toLocaleString('en-GB', { month: 'short', year: '2-digit' });
+    const label = new Date(d.month + '-01').toLocaleString('en-GB', { month: 'short' });
     const tipText = `<strong>${label}</strong><br/>${fmt.currency(d.amount)}`;
     return `<div class="month-bar-item" 
               onmouseenter="showTooltip(event, '${tipText}')" 
               onmouseleave="hideTooltip()">
         <div class="month-bar-track">
-          <div class="month-bar-fill" style="height:${pct.toFixed(1)}%"></div>
+          <div class="month-bar-spacer" style="flex:${(100 - pct).toFixed(1)}"></div>
+          <div class="month-bar-fill" style="flex:${pct.toFixed(1)}"></div>
         </div>
         <div class="month-bar-label">${label}</div>
       </div>`;
@@ -626,7 +694,7 @@ async function loadAnalystRatings() {
 }
 
 function _ratingCell(r) {
-  if (r.country !== 'US' && r.country !== 'CA') return '<span class="cell-na">N/A</span>';
+  if ((r.sector || '').toLowerCase().includes('index')) return '<span class="cell-na">N/A</span>';
   const rec = _recommendations[r.ticker];
   if (!rec) return '<span class="cell-na">—</span>';
   const cls = {
@@ -636,7 +704,9 @@ function _ratingCell(r) {
     'Sell': 'rating-sell',
     'Strong Sell': 'rating-strong-sell',
   }[rec.consensus] || '';
-  const tooltip = `Strong Buy: ${rec.strongBuy}, Buy: ${rec.buy}, Hold: ${rec.hold}, Sell: ${rec.sell}, Strong Sell: ${rec.strongSell} (${rec.total} analysts · ${rec.period})`;
+  const tooltip = rec.total > 0
+    ? `${rec.total} analysts · ${rec.period}`
+    : rec.consensus;
   return `<span class="rating-badge ${cls}" title="${esc(tooltip)}">${esc(rec.consensus)}</span>`;
 }
 
@@ -686,13 +756,13 @@ function renderTable(rows) {
 
     const sparkId = 'sspark-' + r.ticker.replace(/[^a-zA-Z0-9]/g, '_');
     tr.innerHTML = `
+      <td><span class="cell-ticker">${esc(r.ticker)}</span></td>
       <td>
         <div class="cell-name-wrap">
           <span class="cell-company" title="${esc(r.company_name)}">${esc(r.company_name)}</span>
           ${sectorLabel}
         </div>
       </td>
-      <td><span class="cell-ticker">${esc(r.ticker)}</span></td>
       <td><span class="${cbClass}">${esc(r.country)}</span></td>
       <td class="td-center"><canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas></td>
       <td class="td-right cell-num">${fmt.number(r.quantity, 6)}</td>
@@ -709,7 +779,6 @@ function renderTable(rows) {
           ${r.returns_pct >= 0 ? '▲' : '▼'} ${Math.abs(r.returns_pct).toFixed(2)}%
         </span>
       </td>
-      <td class="td-right cell-num">${fmt.currency(r.dividends)}</td>
       <td class="td-right">${divYieldCell}</td>
       <td class="td-right">${_ratingCell(r)}</td>
     `;
@@ -717,10 +786,12 @@ function renderTable(rows) {
   });
 
   const total = rows.length, shown = filtered.length;
-  document.getElementById('rowCount').textContent =
-    shown === total
+  const rcEl = document.getElementById('rowCount');
+  if (rcEl) {
+    rcEl.textContent = shown === total
       ? `${total} holding${total !== 1 ? 's' : ''}`
       : `${shown} of ${total} holdings`;
+  }
 
   _loadStockSparklines(filtered);
 }
@@ -729,10 +800,10 @@ function renderTable(rows) {
 
 async function _loadStockSparklines(rows) {
   if (!rows.length) return;
-  const tickers   = rows.map(r => r.ticker).join(',');
+  const tickers = rows.map(r => r.ticker).join(',');
   const countries = rows.map(r => r.country).join(',');
   try {
-    const res  = await fetch(`/api/stock-sparklines?tickers=${encodeURIComponent(tickers)}&countries=${encodeURIComponent(countries)}`);
+    const res = await fetch(`/api/stock-sparklines?tickers=${encodeURIComponent(tickers)}&countries=${encodeURIComponent(countries)}`);
     const json = await res.json();
     if (json.status !== 'ok') return;
     for (const [ticker, points] of Object.entries(json.data)) {
@@ -751,24 +822,24 @@ function _drawStockSparkline(canvasId, points) {
 
   const W = 80, H = 32;
   const dpr = window.devicePixelRatio || 1;
-  canvas.width  = Math.round(W * dpr);
+  canvas.width = Math.round(W * dpr);
   canvas.height = Math.round(H * dpr);
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const prices  = points.map(p => p.price);
-  const minP    = Math.min(...prices);
-  const maxP    = Math.max(...prices);
-  const range   = (maxP - minP) || 1;
-  const isUp    = prices[prices.length - 1] >= prices[0];
+  const prices = points.map(p => p.price);
+  const minP = Math.min(...prices);
+  const maxP = Math.max(...prices);
+  const range = (maxP - minP) || 1;
+  const isUp = prices[prices.length - 1] >= prices[0];
   const lineCol = isUp ? '#10b981' : '#ef4444';
   const fillCol = isUp ? 'rgba(16,185,129,0.13)' : 'rgba(239,68,68,0.13)';
 
   const pad = { top: 3, bottom: 3, left: 1, right: 1 };
-  const cW  = W - pad.left - pad.right;
-  const cH  = H - pad.top  - pad.bottom;
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
   const xOf = i => pad.left + (i / (points.length - 1)) * cW;
-  const yOf = v => pad.top  + (1 - (v - minP) / range) * cH;
+  const yOf = v => pad.top + (1 - (v - minP) / range) * cH;
 
   // Fill
   ctx.beginPath();
@@ -785,15 +856,15 @@ function _drawStockSparkline(canvasId, points) {
   ctx.moveTo(xOf(0), yOf(prices[0]));
   for (let i = 1; i < prices.length; i++) ctx.lineTo(xOf(i), yOf(prices[i]));
   ctx.strokeStyle = lineCol;
-  ctx.lineWidth   = 1.5;
-  ctx.lineJoin    = 'round';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
   ctx.stroke();
 
-  canvas._sparkPoints  = points;
+  canvas._sparkPoints = points;
   canvas._sparkLineCol = lineCol;
-  canvas._sparkMinP    = minP;
-  canvas._sparkRange   = range;
-  canvas._sparkPad     = pad;
+  canvas._sparkMinP = minP;
+  canvas._sparkRange = range;
+  canvas._sparkPad = pad;
 
   _attachStockSparkHover(canvas);
 }
@@ -805,7 +876,7 @@ function _attachStockSparkHover(canvas) {
   let tip = document.getElementById('stock-spark-tip');
   if (!tip) {
     tip = document.createElement('div');
-    tip.id        = 'stock-spark-tip';
+    tip.id = 'stock-spark-tip';
     tip.className = 'spark-tip';
     document.body.appendChild(tip);
   }
@@ -813,22 +884,22 @@ function _attachStockSparkHover(canvas) {
   canvas.addEventListener('mousemove', (e) => {
     const points = canvas._sparkPoints;
     if (!points) return;
-    const rect   = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
-    const W      = 80;
-    const pad    = canvas._sparkPad;
-    const cW     = W - pad.left - pad.right;
-    const idx    = Math.max(0, Math.min(points.length - 1, Math.round((mouseX - pad.left) / cW * (points.length - 1))));
-    const pt     = points[idx];
-    const time   = new Date(pt.ts * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-    tip.innerHTML    = `<span class="spark-tip-val">${pt.price.toFixed(2)}</span><span class="spark-tip-time">${time}</span>`;
+    const W = 80;
+    const pad = canvas._sparkPad;
+    const cW = W - pad.left - pad.right;
+    const idx = Math.max(0, Math.min(points.length - 1, Math.round((mouseX - pad.left) / cW * (points.length - 1))));
+    const pt = points[idx];
+    const time = new Date(pt.ts * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    tip.innerHTML = `<span class="spark-tip-val">${pt.price.toFixed(2)}</span><span class="spark-tip-time">${time}</span>`;
     tip.style.display = 'flex';
     const tipW = 140;
-    let left   = e.clientX + window.scrollX - tipW / 2;
+    let left = e.clientX + window.scrollX - tipW / 2;
     if (left + tipW > window.innerWidth - 8) left = e.clientX + window.scrollX - tipW;
     if (left < 4) left = 4;
     tip.style.left = left + 'px';
-    tip.style.top  = (e.clientY + window.scrollY - 54) + 'px';
+    tip.style.top = (e.clientY + window.scrollY - 54) + 'px';
     e.stopPropagation();
   });
 
@@ -918,7 +989,12 @@ function showState(state, msg) {
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
 function set(id, val) {
-  document.getElementById(id).textContent = val;
+  const el = document.getElementById(id);
+  if (el) {
+    el.textContent = val;
+  } else {
+    console.warn(`[UI] Element with id "${id}" not found.`);
+  }
 }
 
 function fmtAge(seconds) {
@@ -952,7 +1028,7 @@ function hideTooltip() {
 /* ─── Currency re-render ─────────────────────────────────────────────────── */
 function onCurrencyChange() {
   if (allRows.length === 0) return;
-  renderSummary(allRows, _lastTotalDividends, _lastPAI, _lastDivScore);
+  renderSummary(allRows, _lastTotalDividends, _lastPAI);
   renderTable(allRows);
   if (_activityData) _renderActivity(_activityData);
   if (_dividendData) _renderDividends(_dividendData);
@@ -979,52 +1055,349 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ─── Analyst Ratings panel renderer ─────────────────────────────────────── */
-function _renderPanelAnalystRatings(ticker) {
+function _renderPanelAnalystRatings(ticker, curPrice, currency) {
   const sec = document.getElementById('spAnalystRatingsSection');
   const container = document.getElementById('spAnalystRatings');
   const periodEl = document.getElementById('spAnalystPeriod');
   if (!sec || !container) return;
 
   const rec = _recommendations[ticker];
-  if (!rec || rec.total === 0) { sec.style.display = 'none'; return; }
+  // Show section if we have a consensus (total may be 0 when only rec_text is available)
+  if (!rec || (!rec.total && !rec.consensus)) { sec.style.display = 'none'; return; }
 
   sec.style.display = '';
-  periodEl.textContent = rec.period || '';
+  periodEl.textContent = '';
 
-  const cats = [
-    { key: 'strongBuy', label: 'Strong Buy', cls: 'ar-strong-buy' },
-    { key: 'buy', label: 'Buy', cls: 'ar-buy' },
-    { key: 'hold', label: 'Hold', cls: 'ar-hold' },
-    { key: 'sell', label: 'Sell', cls: 'ar-sell' },
-    { key: 'strongSell', label: 'Strong Sell', cls: 'ar-strong-sell' },
-  ];
+  // Map consensus to 0-100 gauge score (Strong Buy=100, Strong Sell=0)
+  const gaugeMap = { 'Strong Buy': 100, 'Buy': 75, 'Hold': 50, 'Sell': 25, 'Strong Sell': 0 };
+  let gaugeScore = gaugeMap[rec.consensus] ?? 50;
 
-  // Stacked bar
-  const barSegs = cats.map(c => {
-    const pct = (rec[c.key] / rec.total * 100).toFixed(1);
-    return pct > 0 ? `<div class="ar-bar-seg ${c.cls}" style="width:${pct}%" title="${c.label}: ${rec[c.key]}"></div>` : '';
-  }).join('');
+  // If we have the full breakdown, compute exact weighted score
+  if (rec.hasBreakdown && rec.total > 0) {
+    const score = (rec.strongBuy * 1 + rec.buy * 2 + rec.hold * 3 + rec.sell * 4 + rec.strongSell * 5) / rec.total;
+    gaugeScore = ((5 - score) / 4) * 100;
+  }
 
-  // Row breakdown
-  const rows = cats.map(c => {
-    if (rec[c.key] === 0) return '';
-    const pct = (rec[c.key] / rec.total * 100).toFixed(0);
-    return `
-      <div class="ar-row">
-        <span class="ar-dot ${c.cls}"></span>
-        <span class="ar-label">${c.label}</span>
-        <div class="ar-track"><div class="ar-fill ${c.cls}" style="width:${pct}%"></div></div>
-        <span class="ar-count">${rec[c.key]}</span>
-      </div>`;
-  }).join('');
+  const consensusCls = _ratingCls(rec.consensus);
+  const totalLabel = rec.total > 0
+    ? `Based on ${rec.total} analysts giving stock ratings in the ${rec.period || 'past 3 months'}.`
+    : '';
+
+  // Breakdown rows — only shown when individual counts are available
+  let breakdownHtml = '';
+  if (rec.hasBreakdown && rec.total > 0) {
+    const cats = [
+      { key: 'strongBuy', label: 'Strong buy', cls: 'ar-strong-buy' },
+      { key: 'buy', label: 'Buy', cls: 'ar-buy' },
+      { key: 'hold', label: 'Hold', cls: 'ar-hold' },
+      { key: 'sell', label: 'Sell', cls: 'ar-sell' },
+      { key: 'strongSell', label: 'Strong sell', cls: 'ar-strong-sell' },
+    ];
+    const maxCount = Math.max(...cats.map(c => rec[c.key] || 0), 1);
+    breakdownHtml = `<div class="ar-breakdown">` + cats.map(c => {
+      const count = rec[c.key] || 0;
+      const pct = Math.round(count / maxCount * 100);
+      return `
+        <div class="ar-row">
+          <span class="ar-label">${c.label}</span>
+          <div class="ar-track"><div class="ar-fill ${c.cls}" style="width:${pct}%"></div></div>
+          <span class="ar-count">${count}</span>
+        </div>`;
+    }).join('') + `</div>`;
+  }
+
+  // Price target chart — shown when targets and current price are available
+  const hasTargets = rec.avgTarget != null || rec.highTarget != null || rec.lowTarget != null;
+  console.debug('[PriceTarget]', ticker, 'curPrice:', curPrice, 'avg:', rec.avgTarget, 'high:', rec.highTarget, 'low:', rec.lowTarget);
+  const priceTargetHtml = (hasTargets && curPrice)
+    ? `<div class="pt-chart-wrap"><canvas id="pt-canvas" class="pt-canvas"></canvas></div>`
+    : '';
 
   container.innerHTML = `
-    <div class="ar-consensus-row">
-      <span class="rating-badge ${_ratingCls(rec.consensus)}">${esc(rec.consensus)}</span>
-      <span class="ar-total">${rec.total} analysts</span>
+    ${priceTargetHtml}
+    ${totalLabel ? `<p class="ar-subtitle">${totalLabel}</p>` : ''}
+    <div class="ar-gauge-outer">
+      <canvas id="ar-gauge" class="ar-gauge-canvas"></canvas>
     </div>
-    <div class="ar-bar">${barSegs}</div>
-    <div class="ar-breakdown">${rows}</div>`;
+    <div class="ar-consensus-label ${consensusCls}">${esc(rec.consensus)}</div>
+    ${breakdownHtml}`;
+
+  requestAnimationFrame(() => {
+    if (hasTargets && curPrice) {
+      drawPriceTargetChart('pt-canvas', curPrice, rec.avgTarget, rec.highTarget, rec.lowTarget, currency);
+    }
+    drawAnalystGauge('ar-gauge', gaugeScore, rec.consensus);
+  });
+}
+
+/* ─── Price Target Fan Chart ──────────────────────────────────────────────── */
+function drawPriceTargetChart(canvasId, curPrice, avg, high, low, currency) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const W = canvas.offsetWidth || 280;
+  const H = 140;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const mutedColor = isDark ? '#64748b' : '#9ca3af';
+  const textColor = isDark ? '#cbd5e1' : '#374151';
+  const dividerColor = isDark ? '#334155' : '#e2e8f0';
+
+  // Layout constants
+  const padT = 12, padB = 18;
+  const anchorX = 28;          // left anchor dot x
+  const fanEndX = W * 0.52;    // where dashed lines end (left edge of label area)
+  const labelX = fanEndX + 8; // where label pills start
+
+  // Y scale: span all values with 15% padding above and below
+  const vals = [curPrice, high, avg, low].filter(v => v != null);
+  const minV = Math.min(...vals);
+  const maxV = Math.max(...vals);
+  const span = (maxV - minV) || curPrice * 0.25;
+  const yLo = minV - span * 0.25;
+  const yHi = maxV + span * 0.25;
+  const yScale = v => padT + (1 - (v - yLo) / (yHi - yLo)) * (H - padT - padB);
+
+  const anchorY = yScale(curPrice);
+  const maxY = high != null ? yScale(high) : anchorY - 35;
+  const avgY = avg != null ? yScale(avg) : anchorY - 15;
+  const minY = low != null ? yScale(low) : anchorY + 10;
+
+  // Currency symbol helper
+  const symMap = { USD: '$', GBP: '£', GBp: 'p', GBX: 'p', EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥', CHF: 'Fr' };
+  const sym = symMap[currency] || '';
+
+  const fmtPrice = v => {
+    if (v == null) return '';
+    if (v >= 1000) return sym + v.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return sym + v.toFixed(2);
+  };
+
+  // ── Shaded fan region (max → min cone) ──────────────────────────────────
+  if (high != null && low != null) {
+    ctx.beginPath();
+    ctx.moveTo(anchorX, anchorY);
+    ctx.lineTo(fanEndX, maxY);
+    ctx.lineTo(fanEndX, minY);
+    ctx.closePath();
+    ctx.fillStyle = isDark ? 'rgba(13,148,136,0.13)' : 'rgba(13,148,136,0.09)';
+    ctx.fill();
+  }
+
+  // ── Dashed lines: anchor → each target level ─────────────────────────────
+  const lineConf = [
+    { y: maxY, val: high, color: '#0d9488' },
+    { y: avgY, val: avg, color: '#3b82f6' },
+    { y: minY, val: low, color: '#94a3b8' },
+  ];
+  ctx.setLineDash([3, 4]);
+  ctx.lineWidth = 1.5;
+  for (const { y, val, color } of lineConf) {
+    if (val == null) continue;
+    ctx.beginPath();
+    ctx.moveTo(anchorX, anchorY);
+    ctx.lineTo(fanEndX, y);
+    ctx.strokeStyle = color;
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // ── Short baseline for "Current" ─────────────────────────────────────────
+  ctx.beginPath();
+  ctx.moveTo(4, anchorY);
+  ctx.lineTo(anchorX + 8, anchorY);
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Anchor dot
+  ctx.beginPath();
+  ctx.arc(anchorX, anchorY, 4, 0, 2 * Math.PI);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fill();
+
+  // ── Right-side labels ─────────────────────────────────────────────────────
+  const labelConf = [
+    { y: maxY, val: high, label: 'Max', color: '#0d9488' },
+    { y: avgY, val: avg, label: 'Avg', color: '#3b82f6' },
+    { y: minY, val: low, label: 'Min', color: '#94a3b8' },
+  ];
+
+  for (const { y, val, label, color } of labelConf) {
+    if (val == null) continue;
+    const pct = ((val - curPrice) / curPrice * 100);
+    const sign = pct >= 0 ? '+' : '';
+    const pill = `${label} ${sign}${pct.toFixed(1)}%`;
+
+    ctx.font = `600 9px system-ui,sans-serif`;
+    const pillW = ctx.measureText(pill).width + 10;
+    const pillH = 15;
+    const pillY = y - pillH / 2;
+
+    // Pill background
+    ctx.beginPath();
+    _roundRect(ctx, labelX, pillY, pillW, pillH, 3);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Pill text
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(pill, labelX + 5, y);
+
+    // Price value to the right of pill
+    const priceStr = fmtPrice(val);
+    ctx.font = `600 10px system-ui,sans-serif`;
+    ctx.fillStyle = textColor;
+    ctx.fillText(priceStr, labelX + pillW + 5, y);
+  }
+
+  // Current label (bottom-aligned near anchor)
+  const curStr = fmtPrice(curPrice);
+  ctx.font = `600 9px system-ui,sans-serif`;
+  const curPillW = ctx.measureText('Current').width + 10;
+  _roundRect(ctx, labelX, anchorY - 7.5, curPillW, 15, 3);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Current', labelX + 5, anchorY);
+
+  ctx.font = `600 10px system-ui,sans-serif`;
+  ctx.fillStyle = textColor;
+  ctx.fillText(curStr, labelX + curPillW + 5, anchorY);
+
+  // ── X-axis divider line at bottom ─────────────────────────────────────────
+  ctx.beginPath();
+  ctx.moveTo(4, H - padB + 2);
+  ctx.lineTo(W - 4, H - padB + 2);
+  ctx.strokeStyle = dividerColor;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // ── Footer labels ─────────────────────────────────────────────────────────
+  ctx.font = `500 9px system-ui,sans-serif`;
+  ctx.fillStyle = mutedColor;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('Current', 4, H - 4);
+  ctx.textAlign = 'center';
+  ctx.fillText('1Y Forecast', fanEndX * 0.75, H - 4);
+}
+
+function _roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function drawAnalystGauge(canvasId, score, consensus) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const W = canvas.offsetWidth || 200;
+  const H = Math.round(W * 0.62);
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Arc centre: near the bottom, with room below for bottom labels
+  const cx = W / 2;
+  const cy = H - 22;
+  // Leave room on sides for "Strong sell" / "Strong buy" labels
+  const outerR = Math.min(W / 2 - 44, H - 30);
+  const innerR = outerR * 0.62;
+
+  // Sectors: [start%, end%, color]
+  const sectors = [
+    [0, 20, '#f97316'],   // strong sell – orange
+    [20, 40, '#ca8a04'],   // sell        – amber
+    [40, 60, '#cbd5e1'],   // neutral     – slate
+    [60, 80, '#86efac'],   // buy         – light green
+    [80, 100, '#0d9488'],   // strong buy  – teal
+  ];
+  const gapRad = (1.5 / 100) * Math.PI;
+  for (const [s, e, color] of sectors) {
+    const sa = Math.PI + (s / 100) * Math.PI + gapRad / 2;
+    const ea = Math.PI + (e / 100) * Math.PI - gapRad / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, sa, ea, false);
+    ctx.arc(cx, cy, innerR, ea, sa, true);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  // Labels
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const mutedColor = isDark ? '#94a3b8' : '#6b7280';
+  const activeColor = '#0d9488';
+  const fontSize = Math.max(8, Math.round(outerR * 0.13));
+  ctx.font = `500 ${fontSize}px sans-serif`;
+
+  const cons = (consensus || '').toLowerCase();
+  const labelDefs = [
+    { pos: 0, lines: ['Strong', 'sell'], align: 'right', active: cons === 'strong sell' },
+    { pos: 25, lines: ['Sell'], align: 'right', active: cons === 'sell' },
+    { pos: 50, lines: ['Neutral'], align: 'center', active: cons === 'hold' },
+    { pos: 75, lines: ['Buy'], align: 'left', active: cons === 'buy' },
+    { pos: 100, lines: ['Strong', 'buy'], align: 'left', active: cons === 'strong buy' },
+  ];
+  const labelR = outerR + 14;
+  const lineH = fontSize + 2;
+  for (const ldef of labelDefs) {
+    const angle = Math.PI + (ldef.pos / 100) * Math.PI;
+    const lx = cx + Math.cos(angle) * labelR;
+    const ly = cy + Math.sin(angle) * labelR;
+    ctx.fillStyle = ldef.active ? activeColor : mutedColor;
+    ctx.textAlign = ldef.align;
+    ctx.textBaseline = 'middle';
+    if (ldef.lines.length === 2) {
+      ctx.fillText(ldef.lines[0], lx, ly - lineH / 2);
+      ctx.fillText(ldef.lines[1], lx, ly + lineH / 2);
+    } else {
+      ctx.fillText(ldef.lines[0], lx, ly);
+    }
+  }
+
+  // Needle
+  if (score != null) {
+    const needleAngle = Math.PI + (score / 100) * Math.PI;
+    const needleLen = outerR * 0.84;
+    const tipX = cx + Math.cos(needleAngle) * needleLen;
+    const tipY = cy + Math.sin(needleAngle) * needleLen;
+    const needleColor = isDark ? '#e2e8f0' : '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(tipX, tipY);
+    ctx.strokeStyle = needleColor;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, 4, 0, 2 * Math.PI);
+    ctx.fillStyle = needleColor;
+    ctx.fill();
+  }
 }
 
 function _ratingCls(consensus) {
@@ -1055,6 +1428,17 @@ window.openStockPanel = function (r) {
   document.getElementById('spCurrentPrice').textContent = fmt.currency((r.current_value / (r.quantity || 1)), 4);
   document.getElementById('spSector').textContent = r.sector || 'Unknown';
 
+  // Breakeven: dividend-adjusted cost per share
+  const qty = r.quantity || 1;
+  const divs = r.dividends || 0;
+  const breakeven = (r.invested - divs) / qty;
+  const beEl = document.getElementById('spBreakeven');
+  if (beEl) beEl.textContent = fmt.currency(breakeven, 4);
+
+  // Held Since: placeholder until activity loads
+  const hsEl = document.getElementById('spHeldSince');
+  if (hsEl) hsEl.textContent = '—';
+
   // Show panel
   document.getElementById('sidePanelBackdrop').classList.add('active');
   document.getElementById('sidePanel').classList.add('open');
@@ -1064,9 +1448,16 @@ window.openStockPanel = function (r) {
   window.loadStockNews(r.ticker);
   if (r.country === 'US' || r.country === 'CA') {
     window.loadStockMetrics(r.ticker);
-    _renderPanelAnalystRatings(r.ticker);
   } else {
     const sec = document.getElementById('spFundamentalsSection');
+    if (sec) sec.style.display = 'none';
+  }
+  // Show analyst ratings for all individual stocks (skip index funds/ETFs)
+  if (!(r.sector || '').toLowerCase().includes('index')) {
+    // native_price = raw price in original currency (USD/GBX/EUR), matches TradingView target prices
+    _renderPanelAnalystRatings(r.ticker, r.native_price, r.native_currency);
+  } else {
+    const sec = document.getElementById('spAnalystRatingsSection');
     if (sec) sec.style.display = 'none';
   }
 }
@@ -1078,7 +1469,11 @@ window.closeStockPanel = function () {
 
 window.loadStockActivity = async function (ticker) {
   const container = document.getElementById('spActivityList');
-  container.innerHTML = '<div class="activity-loading">Loading Activity…</div>';
+  container.innerHTML = `
+    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-60"></div><div class="skeleton skel-line skel-w-40"></div></div><div class="skeleton skel-amount"></div></div>
+    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-50"></div><div class="skeleton skel-line skel-w-35"></div></div><div class="skeleton skel-amount"></div></div>
+    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-55"></div><div class="skeleton skel-line skel-w-30"></div></div><div class="skeleton skel-amount"></div></div>
+  `;
 
   try {
     const res = await fetch(`/api/p${PORTFOLIO_ID}/stock-activity/${ticker}`);
@@ -1090,6 +1485,20 @@ window.loadStockActivity = async function (ticker) {
     }
 
     _stockCalData = json.data;
+
+    // Compute "Held Since" from earliest BUY date
+    const buyDates = _stockCalData
+      .filter(a => (a.type || '').toUpperCase().includes('BUY') || (a.type || '').toUpperCase().includes('MARKET_BUY') || a.quantity > 0)
+      .map(a => (a.date || '').substring(0, 10))
+      .filter(Boolean).sort();
+    const hsEl = document.getElementById('spHeldSince');
+    if (hsEl && buyDates.length > 0) {
+      const firstBuy = new Date(buyDates[0]);
+      const diffMs = Date.now() - firstBuy.getTime();
+      const diffDays = Math.floor(diffMs / 86400000);
+      const label = firstBuy.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      hsEl.textContent = `${label} · ${diffDays}d`;
+    }
 
     // Default to the most recent month with data
     const dates = _stockCalData
@@ -1256,7 +1665,14 @@ window.loadStockMetrics = async function (ticker) {
   if (!sec || !container) return;
 
   sec.style.display = '';
-  container.innerHTML = '<div class="activity-loading" style="padding:12px 0">Loading fundamentals…</div>';
+  container.innerHTML = `
+    <div style="padding:12px 0;display:flex;flex-direction:column;gap:8px">
+      <div class="skeleton skel-line skel-w-60" style="height:14px"></div>
+      <div class="skeleton skel-line skel-w-80" style="height:14px"></div>
+      <div class="skeleton skel-line skel-w-50" style="height:14px"></div>
+      <div class="skeleton skel-line skel-w-70" style="height:14px"></div>
+    </div>
+  `;
 
   try {
     const res = await fetch(`/api/stock-metrics/${encodeURIComponent(ticker)}`);
@@ -1377,7 +1793,11 @@ window.loadStockNews = async function (ticker) {
   const badgeEl = document.getElementById('spNewsBadge');
   if (!listEl) return;
 
-  listEl.innerHTML = '<div class="activity-loading">Loading news…</div>';
+  listEl.innerHTML = `
+    <div class="skel-news-item"><div class="skeleton skel-news-img"></div><div class="skel-news-body"><div class="skeleton skel-line skel-w-30"></div><div class="skeleton skel-line skel-w-90"></div><div class="skeleton skel-line skel-w-70"></div></div></div>
+    <div class="skel-news-item"><div class="skeleton skel-news-img"></div><div class="skel-news-body"><div class="skeleton skel-line skel-w-40"></div><div class="skeleton skel-line skel-w-80"></div><div class="skeleton skel-line skel-w-60"></div></div></div>
+    <div class="skel-news-item"><div class="skeleton skel-news-img"></div><div class="skel-news-body"><div class="skeleton skel-line skel-w-35"></div><div class="skeleton skel-line skel-w-85"></div><div class="skeleton skel-line skel-w-55"></div></div></div>
+  `;
   if (badgeEl) badgeEl.style.display = 'none';
 
   try {
@@ -1438,71 +1858,7 @@ function _renderStockNews(data, ticker) {
 }
 
 
-/* ─── Summary Drill-downs (PAI & Diversification) ────────────────────────── */
-async function openPaiDetails() {
-  const panel = document.getElementById('summaryPanel');
-  const backdrop = document.getElementById('summaryPanelBackdrop');
-  const content = document.getElementById('smContent');
-  const title = document.getElementById('smTitle');
-  const subtitle = document.getElementById('smSubtitle');
-  const iconWrap = document.getElementById('smIcon');
-
-  title.textContent = 'Projected Annual Income';
-  subtitle.textContent = 'Trailing 12m Estimates';
-  iconWrap.textContent = '£';
-  content.innerHTML = '<div class="activity-loading">Calculating income contributors...</div>';
-
-  panel.classList.add('open');
-  backdrop.classList.add('active');
-
-  try {
-    const res = await fetch(`/api/p${PORTFOLIO_ID}/pai-details`);
-    const json = await res.json();
-    if (json.status !== 'ok') throw new Error(json.message);
-
-    const { total_pai, contributors } = json.data;
-    let html = `
-      <div class="sm-section">
-        <div class="sm-rationale" style="border-left-color: #8b5cf6;">
-          Based on your current holdings, your portfolio is estimated to generate <strong>${fmt.currency(total_pai)}</strong> over the next 12 months (excluding special dividends).
-        </div>
-      </div>
-      <div class="sm-section">
-        <h3 class="sm-section-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
-          Top Income Contributors
-        </h3>
-        <table class="sm-table">
-          <thead>
-            <tr>
-              <th>Stock</th>
-              <th style="text-align:right">Income</th>
-              <th style="text-align:right">Share</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${contributors.map(c => `
-              <tr>
-                <td>
-                  <div style="font-weight:600">${esc(c.ticker)}</div>
-                  <div style="font-size:0.75rem;color:var(--text-muted)">${esc(c.company_name)}</div>
-                </td>
-                <td style="text-align:right">${fmt.currency(c.income)}</td>
-                <td style="text-align:right">
-                  <div>${c.percentage}%</div>
-                  <div class="sm-item-weight"><div class="sm-weight-fill" style="width:${c.percentage}%; background:#8b5cf6"></div></div>
-                </td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-    content.innerHTML = html;
-  } catch (err) {
-    content.innerHTML = `<div class="activity-empty">Error: ${err.message}</div>`;
-  }
-}
+/* ─── Summary Drill-downs (Diversification) ───────────────────────────── */
 
 async function openDiversificationDetails() {
   const panel = document.getElementById('summaryPanel');
@@ -1515,7 +1871,11 @@ async function openDiversificationDetails() {
   title.textContent = 'Diversification Insights';
   subtitle.textContent = 'Risk & Concentration Analysis';
   iconWrap.textContent = '◓';
-  content.innerHTML = '<div class="activity-loading">Analyzing risk metrics...</div>';
+  content.innerHTML = `
+    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-60"></div><div class="skeleton skel-line skel-w-40"></div></div><div class="skeleton skel-amount"></div></div>
+    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-55"></div><div class="skeleton skel-line skel-w-35"></div></div><div class="skeleton skel-amount"></div></div>
+    <div class="skel-item"><div class="skeleton skel-dot"></div><div class="skel-body"><div class="skeleton skel-line skel-w-50"></div><div class="skeleton skel-line skel-w-30"></div></div><div class="skeleton skel-amount"></div></div>
+  `;
 
   panel.classList.add('open');
   backdrop.classList.add('active');
@@ -1525,11 +1885,10 @@ async function openDiversificationDetails() {
     const json = await res.json();
     if (json.status !== 'ok') throw new Error(json.message);
 
-    const { rationale, recommendations, sector_breakdown, top_holdings } = json.data;
+    const { recommendations, sector_breakdown, top_holdings } = json.data;
 
     let html = `
       <div class="sm-section">
-        <div class="sm-rationale">${esc(rationale)}</div>
         <div class="recommendations-box">
           ${recommendations.map(msg => `
             <div class="sm-recommendation">
@@ -1589,10 +1948,10 @@ function _pnlColor(pct) {
   // Total return % — green = gain, amber = tiny loss, red = loss
   if (pct >= 30) return 'linear-gradient(135deg,#052e16,#15803d)';
   if (pct >= 15) return 'linear-gradient(135deg,#14532d,#16a34a)';
-  if (pct >= 5)  return 'linear-gradient(135deg,#166534,#22c55e)';
-  if (pct >= 0)  return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+  if (pct >= 5) return 'linear-gradient(135deg,#166534,#22c55e)';
+  if (pct >= 0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
   if (pct >= -5) return 'linear-gradient(135deg,#78350f,#b45309)';
-  if (pct >= -15)return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
+  if (pct >= -15) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
   return 'linear-gradient(135deg,#450a0a,#b91c1c)';
 }
 
@@ -1601,7 +1960,8 @@ function drawPortfolioHeatmap(rows, totalValue) {
   if (!container || !rows.length) return;
 
   const W = container.clientWidth || 600;
-  const H = Math.max(Math.round(W * 0.42), 220);
+  const H = container.clientHeight || Math.max(Math.round(W * 0.52), 240);
+  if (!container.clientHeight) { requestAnimationFrame(() => drawPortfolioHeatmap(rows, totalValue)); return; }
   container.style.height = H + 'px';
 
   const items = [...rows]
@@ -1614,11 +1974,11 @@ function drawPortfolioHeatmap(rows, totalValue) {
 
   const GAP = 3;
   container.innerHTML = _phmRects.map((rect, i) => {
-    const r     = rect.item;
-    const pct   = r.returns_pct || 0;
-    const sign  = pct >= 0 ? '+' : '';
+    const r = rect.item;
+    const pct = r.returns_pct || 0;
+    const sign = pct >= 0 ? '+' : '';
     const weight = totalValue > 0 ? (r.current_value / totalValue * 100) : (r.weight || 0);
-    const bg    = _pnlColor(pct);
+    const bg = _pnlColor(pct);
     const tinyW = rect.w < 52;
     const tinyH = rect.h < 44;
 
@@ -1629,7 +1989,7 @@ function drawPortfolioHeatmap(rows, totalValue) {
          <span class="phm-pct">${sign}${pct.toFixed(2)}%</span>`;
 
     return `<div class="phm-cell" data-i="${i}"
-      style="left:${(rect.x + GAP/2).toFixed(1)}px;top:${(rect.y + GAP/2).toFixed(1)}px;
+      style="left:${(rect.x + GAP / 2).toFixed(1)}px;top:${(rect.y + GAP / 2).toFixed(1)}px;
              width:${(rect.w - GAP).toFixed(1)}px;height:${(rect.h - GAP).toFixed(1)}px;
              background:${bg}"
       title="${esc(r.company_name)} · ${weight.toFixed(1)}% · ${sign}${pct.toFixed(2)}%">
@@ -1640,6 +2000,72 @@ function drawPortfolioHeatmap(rows, totalValue) {
   container.querySelectorAll('.phm-cell').forEach(el => {
     el.onclick = () => openStockPanel(_phmRects[+el.dataset.i].item);
   });
+}
+
+function drawSectorHeatmap(rows, totalValue) {
+  const container = document.getElementById('sectorHeatmap');
+  if (!container || !rows.length) return;
+
+  // Group rows by sector
+  const bySecMap = {};
+  rows.filter(r => r.current_value > 0).forEach(r => {
+    const sec = r.sector || 'Other';
+    if (!bySecMap[sec]) bySecMap[sec] = { value: 0, weightedReturn: 0 };
+    bySecMap[sec].value += r.current_value;
+    bySecMap[sec].weightedReturn += r.current_value * (r.returns_pct || 0);
+  });
+
+  const items = Object.entries(bySecMap)
+    .map(([name, d]) => ({
+      name,
+      value: d.value,
+      avgReturn: d.value > 0 ? d.weightedReturn / d.value : 0,
+    }))
+    .sort((a, b) => b.value - a.value);
+
+  const W = container.clientWidth || 300;
+  const H = container.clientHeight || Math.max(Math.round(W * 0.52), 240);
+  if (!container.clientHeight) { requestAnimationFrame(() => drawSectorHeatmap(rows, totalValue)); return; }
+  container.style.height = H + 'px';
+
+  const rects = _computeTreemap(items, W, H);
+  const GAP = 3;
+
+  container.innerHTML = rects.map((rect) => {
+    const r = rect.item;
+    const pct = r.avgReturn;
+    const sign = pct >= 0 ? '+' : '';
+    const weight = totalValue > 0 ? (r.value / totalValue * 100) : 0;
+    const bg = _pnlColor(pct);
+    const tinyW = rect.w < 70;
+    const tinyH = rect.h < 44;
+
+    // Shorten common sector labels for tight cells
+    const shortName = r.name
+      .replace('Communication Services', 'Comms')
+      .replace('Consumer Discretionary', 'Cons. Disc.')
+      .replace('Consumer Staples', 'Cons. Staples')
+      .replace('Information Technology', 'Tech')
+      .replace('Health Care', 'Healthcare')
+      .replace('Real Estate', 'Real Estate')
+      .replace('Index Funds', 'Index');
+
+    const displayName = tinyW ? shortName.split(/[\s/]/)[0] : shortName;
+
+    const inner = tinyW || tinyH
+      ? `<span class="phm-ticker" style="font-size:0.58rem">${esc(displayName)}</span>`
+      : `<span class="phm-ticker" style="font-size:0.72rem;font-weight:600">${esc(displayName)}</span>
+         <span class="phm-weight">${weight.toFixed(1)}%</span>
+         <span class="phm-pct">${sign}${pct.toFixed(1)}%</span>`;
+
+    return `<div class="phm-cell"
+      style="left:${(rect.x + GAP / 2).toFixed(1)}px;top:${(rect.y + GAP / 2).toFixed(1)}px;
+             width:${(rect.w - GAP).toFixed(1)}px;height:${(rect.h - GAP).toFixed(1)}px;
+             background:${bg}"
+      title="${esc(r.name)} · ${weight.toFixed(1)}% · avg return ${sign}${pct.toFixed(1)}%">
+      ${inner}
+    </div>`;
+  }).join('');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1657,21 +2083,21 @@ function drawDonutChart(canvasId, legendId, segments) {
   const legendEl = document.getElementById(legendId);
   if (!canvas || !legendEl) return;
 
-  const dpr  = window.devicePixelRatio || 1;
+  const dpr = window.devicePixelRatio || 1;
   const size = 220;
-  canvas.width  = size * dpr;
+  canvas.width = size * dpr;
   canvas.height = size * dpr;
-  canvas.style.width  = size + 'px';
+  canvas.style.width = size + 'px';
   canvas.style.height = size + 'px';
 
-  const ctx   = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
 
-  const cx     = size / 2;
-  const cy     = size / 2;
+  const cx = size / 2;
+  const cy = size / 2;
   const radius = size / 2 - 10;
-  const hole   = radius * 0.58;
-  const total  = segments.reduce((s, g) => s + g.value, 0);
+  const hole = radius * 0.58;
+  const total = segments.reduce((s, g) => s + g.value, 0);
 
   if (total === 0) {
     ctx.clearRect(0, 0, size, size);
@@ -1698,15 +2124,15 @@ function drawDonutChart(canvasId, legendId, segments) {
     ctx.fill();
 
     seg._startAngle = startAngle + gap / 2;
-    seg._endAngle   = startAngle + gap / 2 + slice;
-    startAngle     += slice + gap;
+    seg._endAngle = startAngle + gap / 2 + slice;
+    startAngle += slice + gap;
   });
 
   // Hover interaction
   canvas._donutSegments = segments;
-  canvas._donutTotal    = total;
+  canvas._donutTotal = total;
   canvas._donutCx = cx; canvas._donutCy = cy;
-  canvas._donutR  = radius; canvas._donutHole = hole;
+  canvas._donutR = radius; canvas._donutHole = hole;
   canvas.onmousemove = _donutHover;
   canvas.onmouseleave = _donutLeave;
 
@@ -1723,12 +2149,12 @@ function drawDonutChart(canvasId, legendId, segments) {
 
 function _donutHover(e) {
   const canvas = e.currentTarget;
-  const rect   = canvas.getBoundingClientRect();
-  const mx     = e.clientX - rect.left;
-  const my     = e.clientY - rect.top;
-  const dx     = mx - canvas._donutCx;
-  const dy     = my - canvas._donutCy;
-  const dist   = Math.sqrt(dx * dx + dy * dy);
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const dx = mx - canvas._donutCx;
+  const dy = my - canvas._donutCy;
+  const dist = Math.sqrt(dx * dx + dy * dy);
   if (dist < canvas._donutHole || dist > canvas._donutR) { hideTooltip(); return; }
 
   let angle = Math.atan2(dy, dx);
@@ -1750,16 +2176,16 @@ function drawDonutCharts(rows, totalValue) {
 
   // Palette
   const palette = [
-    '#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444',
-    '#06b6d4','#ec4899','#84cc16','#f97316','#6366f1',
-    '#14b8a6','#a855f7','#eab308','#22c55e','#64748b',
+    '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444',
+    '#06b6d4', '#ec4899', '#84cc16', '#f97316', '#6366f1',
+    '#14b8a6', '#a855f7', '#eab308', '#22c55e', '#64748b',
   ];
   let pi = 0;
   const nextColor = () => palette[pi++ % palette.length];
 
   // --- By Holdings (top 8 + Other) ---
   const sortedRows = [...rows].sort((a, b) => b.current_value - a.current_value);
-  const top8  = sortedRows.slice(0, 8);
+  const top8 = sortedRows.slice(0, 8);
   const other = sortedRows.slice(8);
   const stockSegs = top8.map(r => ({ label: r.ticker, value: r.current_value, color: nextColor() }));
   if (other.length) {
@@ -1790,9 +2216,9 @@ async function loadStocksView(force = false) {
 
   try {
     const url = force
-      ? `/api/p${PORTFOLIO_ID}/portfolio?force=1`
+      ? `/api/p${PORTFOLIO_fID}/portfolio?force=1`
       : `/api/p${PORTFOLIO_ID}/portfolio`;
-    const res  = await fetch(url);
+    const res = await fetch(url);
     const json = await res.json();
 
     if (json.status !== 'ok') { showStocksState('error', json.message || 'Failed to load.'); return; }
@@ -1802,20 +2228,19 @@ async function loadStocksView(force = false) {
 
     const totalValue = allRows.reduce((s, r) => s + r.current_value, 0);
     allRows.forEach(r => {
-      r.weight    = totalValue ? r.current_value / totalValue * 100 : 0;
+      r.weight = totalValue ? r.current_value / totalValue * 100 : 0;
       r.div_yield = r.current_value > 0 ? (r.dividends / r.current_value * 100) : 0;
     });
 
     _lastTotalDividends = json.total_dividends ?? null;
-    _lastPAI   = json.pai   ?? 0;
-    _lastDivScore = json.div_score ?? 0;
+    _lastPAI = json.pai ?? 0;
 
     const titleEl = document.getElementById('stocksTableTitle');
-    const names   = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
+    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
     if (titleEl) {
       const label = PORTFOLIO_ID === 'combined' ? 'Combined'
         : (names[PORTFOLIO_ID] || `Portfolio ${PORTFOLIO_ID}`);
-      titleEl.textContent = `Holdings · ${label}`;
+      // titleEl.textContent = `Holdings · ${label}`;
     }
 
     renderCountryFilters(allRows);
@@ -1833,17 +2258,117 @@ async function loadStocksView(force = false) {
 
 function showStocksState(state, msg) {
   const loading = document.getElementById('stocksStateLoading');
-  const error   = document.getElementById('stocksStateError');
-  const empty   = document.getElementById('stocksStateEmpty');
-  const table   = document.getElementById('stocksTableWrapper');
+  const error = document.getElementById('stocksStateError');
+  const empty = document.getElementById('stocksStateEmpty');
+  const table = document.getElementById('stocksTableWrapper');
 
   if (loading) loading.style.display = state === 'loading' ? '' : 'none';
-  if (error)   error.style.display   = state === 'error'   ? '' : 'none';
-  if (empty)   empty.style.display   = state === 'empty'   ? '' : 'none';
-  if (table)   table.style.display   = state === 'table'   ? '' : 'none';
+  if (error) error.style.display = state === 'error' ? '' : 'none';
+  if (empty) empty.style.display = state === 'empty' ? '' : 'none';
+  if (table) table.style.display = state === 'table' ? '' : 'none';
 
   if (state === 'error' && msg) {
     const el = document.getElementById('stocksErrorText');
     if (el) el.textContent = msg;
   }
+}
+
+/* ── Monthly Performance Heatmap ────────────────────────────────────────── */
+
+let _monthlyPerfData = null;
+
+async function loadMonthlyPerformance() {
+  const container = document.getElementById('monthlyPerfHeatmap');
+  if (!container) return;
+  container.innerHTML = '<div class="monthly-perf-loading">Loading monthly performance…</div>';
+
+  try {
+    const res = await fetch(`/api/p${PORTFOLIO_ID}/monthly-performance`);
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+    _monthlyPerfData = json.data;
+    _renderMonthlyPerfHeatmap(_monthlyPerfData);
+  } catch (err) {
+    container.innerHTML = `<div class="monthly-perf-loading">Failed to load: ${err.message}</div>`;
+  }
+}
+
+function setMonthlyPerfView(view, btn) {
+  document.querySelectorAll('.mpv-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Only 12m is implemented; other views are placeholders
+  if (view === '12m' && _monthlyPerfData) {
+    _renderMonthlyPerfHeatmap(_monthlyPerfData);
+  }
+}
+
+function _renderMonthlyPerfHeatmap(data) {
+  const container = document.getElementById('monthlyPerfHeatmap');
+  if (!container) return;
+
+  // Collect all month keys present across tickers, last 12 months sorted
+  const allMonths = new Set();
+  Object.values(data).forEach(monthly => Object.keys(monthly).forEach(m => allMonths.add(m)));
+  const sortedMonths = Array.from(allMonths).sort().slice(-12);
+
+  if (sortedMonths.length === 0) {
+    container.innerHTML = '<div class="monthly-perf-loading">No data available.</div>';
+    return;
+  }
+
+  const monthLabels = sortedMonths.map(m => {
+    const [year, mon] = m.split('-');
+    const d = new Date(+year, +mon - 1, 1);
+    return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }).toUpperCase();
+  });
+
+  // Sort tickers: use allRows order if available, otherwise alphabetical
+  const tickers = Object.keys(data);
+  if (typeof allRows !== 'undefined' && allRows.length) {
+    const order = allRows.map(r => r.ticker);
+    tickers.sort((a, b) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+  } else {
+    tickers.sort();
+  }
+
+  // Build table
+  let html = '<table class="mph-table"><thead><tr>';
+  html += '<th class="mph-ticker-col">Ticker</th>';
+  monthLabels.forEach(lbl => { html += `<th>${lbl}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  tickers.forEach(ticker => {
+    const monthly = data[ticker] || {};
+    html += `<tr><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
+    sortedMonths.forEach(mk => {
+      const val = monthly[mk];
+      if (val == null) {
+        html += '<td class="mph-cell mph-empty">—</td>';
+      } else {
+        const sign = val >= 0 ? '+' : '';
+        const cls = val >= 0 ? 'mph-pos' : 'mph-neg';
+        const bg = _mphColor(val);
+        html += `<td class="mph-cell ${cls}" style="background:${bg}">${sign}${val.toFixed(1)}%</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function _mphColor(pct) {
+  // Monthly return bands — same gradient style as allocation heatmap (_pnlColor)
+  // but with tighter thresholds suited to monthly % moves
+  if (pct >= 10) return 'linear-gradient(135deg,#052e16,#15803d)';
+  if (pct >=  5) return 'linear-gradient(135deg,#14532d,#16a34a)';
+  if (pct >=  2) return 'linear-gradient(135deg,#166534,#22c55e)';
+  if (pct >=  0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+  if (pct >= -2) return 'linear-gradient(135deg,#78350f,#b45309)';
+  if (pct >= -5) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
+  return 'linear-gradient(135deg,#450a0a,#b91c1c)';
 }

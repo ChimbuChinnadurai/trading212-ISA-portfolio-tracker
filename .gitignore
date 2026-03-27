@@ -7,3 +7,5 @@ venv/
 dist/
 *.egg-info/
 *.db
+ stitch
+ stitch/*

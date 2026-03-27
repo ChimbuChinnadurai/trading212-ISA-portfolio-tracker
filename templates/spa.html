@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 
 <head>
   <meta charset="UTF-8" />
@@ -27,7 +27,7 @@
       --text-primary: #191c1e;
       --text-secondary: #424754;
       --radius: 12px;
-      --sidebar-w: 180px;
+      --sidebar-w: 72px;
       --topbar-h: 54px;
     }
 
@@ -57,6 +57,24 @@
       overflow: hidden
     }
 
+    @media (max-width: 768px) {
+
+      html,
+      body {
+        height: auto;
+        overflow: auto;
+      }
+
+      .app-shell {
+        height: auto;
+        overflow: visible;
+      }
+
+      .app-main {
+        overflow: visible;
+      }
+    }
+
     body {
       background: var(--bg);
       color: var(--text-primary);
@@ -80,10 +98,7 @@
       transition: width .22s ease;
       overflow: hidden;
       z-index: 200;
-    }
-
-    .sidebar.collapsed {
-      width: 60px
+      border-right: 1px solid var(--border);
     }
 
     /* Main */
@@ -107,9 +122,31 @@
       gap: 12px;
     }
 
-    /* View container — scrolls */
+    .topbar-breadcrumb {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1px;
+    }
+
+    .topbar-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      line-height: 1.25;
+    }
+
+    .topbar-subtitle {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      line-height: 1.25;
+    }
+
+    /* View container — scrolls, flex column so children can fill height */
     .view-container {
       flex: 1;
+      display: flex;
+      flex-direction: column;
       overflow-y: auto;
       overflow-x: hidden;
       background: var(--bg);
@@ -133,7 +170,7 @@
 
     <!-- ═══ SIDEBAR ═══ -->
     <aside class="sidebar" id="sidebar">
-      <div class="sidebar-brand">
+      <!-- <div class="sidebar-brand">
         <div class="sidebar-logo" onclick="navigate('home')">
           <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="32" height="32" rx="9" fill="url(#sbLg)" />
@@ -147,8 +184,7 @@
               stroke-linejoin="round" />
           </svg>
         </div>
-        <span class="sidebar-brand-text">Portfolio<br>Tracker</span>
-      </div>
+      </div> -->
 
       <nav class="sidebar-nav">
 
@@ -158,50 +194,19 @@
           <span class="nav-label">Home</span>
         </a>
 
-        <!-- Portfolio group -->
         <div class="nav-group" id="navGroupPortfolio">
-          <button class="nav-group-header" onclick="toggleNavGroup('portfolio')">
+          <a class="nav-group-header" data-route="portfolio/combined" onclick="navigate('portfolio/combined')">
             <span class="material-symbols-outlined nav-icon">pie_chart</span>
             <span class="nav-label">Portfolio</span>
-            <span class="material-symbols-outlined nav-chevron">keyboard_arrow_down</span>
-          </button>
-          <div class="nav-group-items" id="navGroupPortfolioItems">
-            <a class="nav-item nav-sub" data-route="portfolio/1" onclick="navigate('portfolio/1')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['1'] }}</span>
-            </a>
-            <a class="nav-item nav-sub" data-route="portfolio/2" onclick="navigate('portfolio/2')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['2'] }}</span>
-            </a>
-            <a class="nav-item nav-sub" data-route="portfolio/combined" onclick="navigate('portfolio/combined')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">Combined</span>
-            </a>
-          </div>
+          </a>
         </div>
 
         <!-- Stocks group -->
         <div class="nav-group" id="navGroupStocks">
-          <button class="nav-group-header" onclick="toggleNavGroup('stocks')">
+          <a class="nav-group-header" data-route="stocks/combined" onclick="navigate('stocks/combined')">
             <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
-            <span class="nav-label">Stocks</span>
-            <span class="material-symbols-outlined nav-chevron">keyboard_arrow_down</span>
-          </button>
-          <div class="nav-group-items" id="navGroupStocksItems">
-            <a class="nav-item nav-sub" data-route="stocks/1" onclick="navigate('stocks/1')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['1'] }}</span>
-            </a>
-            <a class="nav-item nav-sub" data-route="stocks/2" onclick="navigate('stocks/2')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">{{ names['2'] }}</span>
-            </a>
-            <a class="nav-item nav-sub" data-route="stocks/combined" onclick="navigate('stocks/combined')">
-              <span class="nav-sub-dot"></span>
-              <span class="nav-label">Combined</span>
-            </a>
-          </div>
+            <span class="nav-label">Holdings</span>
+          </a>
         </div>
 
         <!-- Activity -->
@@ -216,24 +221,41 @@
           <span class="nav-label">Calendar</span>
         </a>
 
+        <!-- Market -->
+        <a class="nav-item" data-route="market" onclick="navigate('market')">
+          <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
+          <span class="nav-label">Market</span>
+        </a>
+
+        <!-- Watchlist -->
+        <a class="nav-item" data-route="watchlist" onclick="navigate('watchlist')">
+          <span class="material-symbols-outlined nav-icon">bookmark</span>
+          <span class="nav-label">Watchlist</span>
+        </a>
+
         <!-- News -->
         <a class="nav-item" data-route="news" onclick="navigate('news')">
           <span class="material-symbols-outlined nav-icon">newspaper</span>
           <span class="nav-label">News</span>
         </a>
 
+        <!-- AI Intelligence -->
+        {% if show_ai %}
+        <a class="nav-item" data-route="ai-intelligence" onclick="navigate('ai-intelligence')">
+          <span class="material-symbols-outlined nav-icon">psychology</span>
+          <span class="nav-label">AI Intelligence</span>
+        </a>
+        {% endif %}
+
       </nav><!-- /sidebar-nav -->
 
-      <!-- <div class="sidebar-footer">
-        <button class="sidebar-collapse-btn" id="sidebarCollapseBtn" onclick="toggleSidebar()" title="Collapse sidebar">
-          <svg class="collapse-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd"
-              d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-              clip-rule="evenodd" />
-          </svg>
-          <span class="nav-label">Collapse</span>
-        </button>
-      </div> -->
+      <div class="sidebar-footer">
+        <a class="nav-item sidebar-t212-link" href="https://app.trading212.com/" target="_blank"
+          rel="noopener noreferrer" title="Open Trading212">
+          <span class="material-symbols-outlined nav-icon">open_in_new</span>
+          <span class="nav-label">T212</span>
+        </a>
+      </div>
     </aside>
 
     <!-- Mobile scrim -->
@@ -245,18 +267,19 @@
       <!-- Topbar -->
       <header class="topbar">
         <div class="topbar-left">
-          <!-- <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" title="Menu">
+          <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleSidebar()" title="Menu">
             <span class="material-symbols-outlined" style="font-size:20px;line-height:1">menu</span>
-          </button> -->
-          <!-- <div class="topbar-breadcrumb">
-            <span class="topbar-title" id="breadcrumbText">Overview</span>
-          </div> -->
-          <!-- Pid switcher — shown on portfolio/* and stocks/* routes -->
-          <div class="pid-switcher" id="pidSwitcher" style="display:none">
-            <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
-            <button class="pid-btn" id="pidBtn2" onclick="switchPid('2')">{{ names['2'] }}</button>
+          </button>
+          <div class="topbar-breadcrumb">
+            <span class="topbar-title" id="greetingText">Good morning, Chimbu 👋</span>
+            <span class="topbar-subtitle" id="breadcrumbText">Portfolio overview</span>
+          </div>
+          <!-- Pid switcher — always visible -->
+          <div class="pid-switcher" id="pidSwitcher">
             <button class="pid-btn pid-btn-combined" id="pidBtnCombined"
               onclick="switchPid('combined')">Combined</button>
+            <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
+            <button class="pid-btn" id="pidBtn2" onclick="switchPid('2')">{{ names['2'] }}</button>
           </div>
         </div>
         <div class="topbar-right">
@@ -268,12 +291,16 @@
             <button class="currency-btn" data-currency="GBP" onclick="setCurrency('GBP')">GBP</button>
             <button class="currency-btn" data-currency="USD" onclick="setCurrency('USD')">USD</button>
           </div>
+          <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+            <span class="material-symbols-outlined" id="themeIcon" style="font-size:17px;line-height:1">dark_mode</span>
+          </button>
+          <button class="btn btn-digest" id="digestBtn" onclick="openDigestSidebar()" title="AI Market Digest">
+            <span class="material-symbols-outlined btn-icon">newspaper</span>
+            Market Digest
+          </button>
           <button class="btn btn-refresh" id="refreshBtn" onclick="loadHomeData(true)">
             <span class="material-symbols-outlined btn-icon">refresh</span>
             Refresh
-          </button>
-          <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
-            <span class="material-symbols-outlined" id="themeIcon" style="font-size:17px;line-height:1">dark_mode</span>
           </button>
         </div>
       </header>
@@ -286,10 +313,13 @@
 
         <!-- ═══ VIEW: HOME ═══ -->
         <div id="view-home" class="spa-view">
-          <div class="view-main">
+          <div class="home-body">
 
-            <div class="overview-section">
-              <div class="overview-grid">
+            <!-- ── Left main column ───────────────────────────────────────── -->
+            <div class="home-main">
+
+              <!-- Row 1: Portfolio cards -->
+              <div class="home-cards-row">
 
                 <!-- Portfolio 1 -->
                 <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
@@ -378,94 +408,145 @@
                   </div>
                 </div>
 
-                <!-- Heatmap — spans 2 cols -->
-                <div class="ov-card ov-card-heatmap">
-                  <div class="ov-header">
-                    <span class="ov-label">Stocks Heatmap</span>
-                    <span class="rc-label-wrap">
-                      <span style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
-                      <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="60"></span>
-                    </span>
+              </div><!-- /home-cards-row -->
+
+              <!-- Row 2: Stocks Heatmap -->
+              <div class="ov-card home-heatmap-card">
+                <div class="ov-header">
+                  <span class="ov-label">Stocks Heatmap</span>
+                  <span class="rc-label-wrap">
+                    <span style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
+                    <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="30"></span>
+                  </span>
+                </div>
+                <div id="heatmapContainer" class="heatmap-container">
+                  <div class="hm-skel"></div>
+                </div>
+              </div>
+
+              <!-- Row 3: Latest Trade Signals -->
+              <div class="ov-card home-activity-card" style="margin-top:20px;">
+                <div class="ov-header" style="justify-content:space-between;border-bottom:none">
+                  <div style="display:flex; align-items:center; gap:8px">
+                    <span class="material-symbols-outlined" style="color:var(--text-muted)">analytics</span>
+                    <h2 class="activity-title">Latest Trade Signals</h2>
+
                   </div>
-                  <div id="heatmapContainer" class="heatmap-container">
-                    <div class="hm-skel"></div>
+                  <div>
+                    <a href="#" class="view-all-link" style="margin-left: 4px; padding: 2px 8px; font-size: 0.75rem;"
+                      onclick="openSignalsSidebar(); return false;">View All</a>
                   </div>
                 </div>
-
-                <!-- Fear & Greed -->
-                <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()" style="cursor:pointer">
-                  <div class="ov-header">
-                    <span class="ov-label">Fear &amp; Greed Index</span>
-                    <span class="rc-label-wrap">
-                      <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
-                      <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span>
-                    </span>
-                  </div>
-                  <div class="fg-body">
-                    <div class="fg-gauge-wrap">
-                      <canvas id="fg-gauge"></canvas>
-                      <div class="fg-score-wrap">
-                        <span class="fg-score" id="fg-score">—</span>
-                        <span class="fg-rating" id="fg-rating">Loading…</span>
-                      </div>
-                    </div>
-                    <div class="fg-history" id="fg-history">
-                      <div class="skel-item" style="padding:6px 0">
-                        <div class="skel-body">
-                          <div class="skel skel-line" style="width:55%"></div>
-                        </div>
-                        <div class="skel skel-amount"></div>
-                      </div>
-                      <div class="skel-item" style="padding:6px 0">
-                        <div class="skel-body">
-                          <div class="skel skel-line" style="width:50%"></div>
-                        </div>
-                        <div class="skel skel-amount"></div>
-                      </div>
-                      <div class="skel-item" style="padding:6px 0">
-                        <div class="skel-body">
-                          <div class="skel skel-line" style="width:55%"></div>
-                        </div>
-                        <div class="skel skel-amount"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-              </div><!-- /overview-grid -->
-            </div><!-- /overview-section -->
-
-            <!-- Home widgets row -->
-            <div class="home-widgets">
-
-              <!-- Top Performers -->
-              <section class="widget-panel widget-performers">
-                <div class="panel-header">
-                  <h3 class="panel-title">Top Performers</h3>
-                </div>
-                <div id="performerList" class="activity-list-home">
+                <div id="tradeSignalsList" class="trade-signals-list">
                   <div class="skel-item">
-                    <div class="skel skel-dot"></div>
+                    <div class="skeleton skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:60%"></div>
-                      <div class="skel skel-line" style="width:40%"></div>
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
                     </div>
-                    <div class="skel skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
                   </div>
                   <div class="skel-item">
-                    <div class="skel skel-dot"></div>
+                    <div class="skeleton skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:50%"></div>
-                      <div class="skel skel-line" style="width:35%"></div>
+                      <div class="skeleton skel-line skel-w-50"></div>
+                      <div class="skeleton skel-line skel-w-35"></div>
                     </div>
-                    <div class="skel skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                      <div class="skeleton skel-line skel-w-30"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
-              </section>
+              </div>
 
-            </div><!-- /home-widgets -->
+            </div><!-- /home-main -->
 
-          </div><!-- /view-main -->
+            <!-- ── Right sidebar ───────────────────────────────────────────── -->
+            <div class="home-sidebar">
+
+              <!-- Fear & Greed -->
+              <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()" style="cursor:pointer">
+                <div class="ov-header">
+                  <span class="ov-label">Fear &amp; Greed Index</span>
+                  <span class="rc-label-wrap">
+                    <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
+                    <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span>
+                  </span>
+                </div>
+                <div class="fg-gauge-wrap">
+                  <canvas id="fg-gauge"></canvas>
+                  <div class="fg-score-wrap">
+                    <span class="fg-score" id="fg-score">—</span>
+                    <span class="fg-rating" id="fg-rating">Loading…</span>
+                  </div>
+                </div>
+                <div class="fg-history" id="fg-history">
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-50"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item" style="padding:6px 0">
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Upcoming Events -->
+              <div class="ov-card" id="ov-upcoming-events">
+                <div class="ov-header">
+                  <span class="ov-label">Upcoming Events</span>
+                  <span style="font-size:0.72rem;color:var(--text-muted)">Next 7 days</span>
+                </div>
+                <div id="upcomingEventsList" class="upcoming-events-body">
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                      <div class="skeleton skel-line skel-w-35"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Contributors to Returns -->
+              <div class="ov-card contributors-card" id="ov-contributors">
+                <div class="ov-header">
+                  <span class="ov-label">Contributors to Returns</span>
+                </div>
+                <div class="contributors-body">
+                  <div id="homeContributors" class="cdiv-chart"></div>
+                </div>
+              </div>
+
+            </div><!-- /home-sidebar -->
+
+          </div><!-- /home-body -->
         </div><!-- /view-home -->
 
         <!-- ═══ VIEW: PORTFOLIO ═══ -->
@@ -474,8 +555,18 @@
 
             <!-- Loading / Error / Empty states -->
             <div class="state-container" id="stateLoading" style="display:none">
-              <div class="spinner"></div>
-              <p class="state-text">Fetching portfolio data…</p>
+              <div class="skel-state-cards">
+                <div class="skeleton skeleton-card" style="height:80px;border-radius:12px"></div>
+                <div class="skeleton skeleton-card" style="height:80px;border-radius:12px"></div>
+                <div class="skeleton skeleton-card" style="height:80px;border-radius:12px"></div>
+                <div class="skeleton skeleton-card" style="height:80px;border-radius:12px"></div>
+              </div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
             </div>
             <div class="state-container" id="stateError" style="display:none">
               <span class="material-symbols-outlined state-icon error-icon">error_outline</span>
@@ -518,6 +609,12 @@
                         <span class="material-symbols-outlined">trending_up</span>
                       </div>
                       <span class="s-card-label">Returns</span>
+                      <div class="s-returns-toggle">
+                        <span id="mktStatusDot" class="mkt-status-dot" title="Checking market…"></span>
+                        <button class="s-toggle-btn active" id="returnsBtnAllTime"
+                          onclick="setReturnsMode('alltime')">All-time</button>
+                        <!-- <button class="s-toggle-btn" id="returnsBtnToday" onclick="setReturnsMode('today')">Today</button> -->
+                      </div>
                     </div>
                     <div class="s-card-value-row">
                       <span class="s-card-value" id="totalReturns">—</span>
@@ -539,43 +636,22 @@
                       </div>
                       <span class="s-card-label">Dividends Received</span>
                     </div>
-                    <span class="s-card-value" id="totalDividends">—</span>
+
+                    <div class="s-card-main">
+                      <div class="s-card-left">
+                        <span class="s-card-value" id="totalDividends">—</span>
+                      </div>
+                      <div class="s-card-right">
+                        <!-- Mini monthly chart -->
+                        <div id="monthlyChart" class="monthly-bars-mini"></div>
+                      </div>
+                    </div>
+
                     <div class="s-card-footer">
                       <span class="s-card-sub" id="topDivStock">—</span>
                       <span class="s-card-sub" id="totalFxImpact">—</span>
                     </div>
                   </div>
-
-                  <div class="s-card s-card-purple" id="cardPAI" onclick="openPaiDetails()" style="cursor:pointer">
-                    <div class="s-card-top">
-                      <div class="s-card-icon">
-                        <span class="material-symbols-outlined">savings</span>
-                      </div>
-                      <span class="s-card-label">Projected Annual Income</span>
-                    </div>
-                    <span class="s-card-value" id="totalPAI">—</span>
-                    <div class="s-card-footer">
-                      <span class="s-card-sub">Estimated trailing 12m</span>
-                    </div>
-                  </div>
-
-                  <div class="s-card s-card-amber" id="cardDivScore" onclick="openDiversificationDetails()"
-                    style="cursor:pointer">
-                    <div class="s-card-top">
-                      <div class="s-card-icon">
-                        <span class="material-symbols-outlined">hub</span>
-                      </div>
-                      <span class="s-card-label">Diversification Score</span>
-                    </div>
-                    <div class="s-card-value-row">
-                      <span class="s-card-value" id="divScore">—</span>
-                      <span class="s-card-pct" id="divScoreLabel">/ 100</span>
-                    </div>
-                    <div class="s-card-footer">
-                      <span class="s-card-sub" id="divScoreMeaning">Calculating...</span>
-                    </div>
-                  </div>
-
                 </div><!-- /summary-cards -->
               </div><!-- /summary-row -->
 
@@ -585,36 +661,38 @@
                 <!-- Left: portfolio heatmap -->
                 <div class="portfolio-left">
                   <div class="card portfolio-heatmap-card">
-                    <div class="phm-header">
-                      <span class="chart-card-title">Position Heatmap</span>
+                    <div class="phm-card-header">
+                      <span class="chart-card-title">Allocation</span>
                       <span class="phm-hint">Size = weight · Color = total return</span>
                     </div>
-                    <div id="portfolioHeatmap" class="portfolio-heatmap"></div>
+                    <div class="phm-panels">
+                      <!-- Left panel: by company -->
+                      <div class="phm-panel">
+                        <div class="phm-panel-label">By Company</div>
+                        <div id="portfolioHeatmap" class="portfolio-heatmap"></div>
+                      </div>
+                      <!-- Right panel: by industry -->
+                      <div class="phm-panel">
+                        <div class="phm-panel-label">By Industry</div>
+                        <div id="sectorHeatmap" class="portfolio-heatmap"></div>
+                      </div>
+                    </div>
                   </div>
 
                   <!-- Stale banner -->
-                  <div id="staleBanner" class="stale-banner" style="display:none">
-                    <span class="material-symbols-outlined" style="font-size:14px;flex-shrink:0;line-height:1;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
+                  <!-- <div id="staleBanner" class="stale-banner" style="display:none">
+                    <span class="material-symbols-outlined"
+                      style="font-size:14px;flex-shrink:0;line-height:1;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
                     <span id="staleBannerText">Data is over 5 minutes old.</span>
                     <a href="#" onclick="loadPortfolio(true); return false;">Refresh now</a>
                     <button class="stale-close" onclick="document.getElementById('staleBanner').style.display='none'"
                       title="Dismiss">✕</button>
-                  </div>
+                  </div> -->
                 </div><!-- /portfolio-left -->
 
                 <!-- Right rail: stacked panels -->
                 <div class="portfolio-right-rail">
 
-                  <!-- Monthly Dividends -->
-                  <div class="card portfolio-panel" id="monthlyDivPanel" style="display:none">
-                    <div class="panel-header">
-                      <h3 class="panel-title">Monthly Dividends</h3>
-                      <div class="panel-badge" id="monthlyDivBadge" style="display:none"></div>
-                    </div>
-                    <div class="monthly-chart-wrap" id="monthlyChart">
-                      <div class="activity-loading">Loading…</div>
-                    </div>
-                  </div>
 
                   <!-- Recent Activity -->
                   <div class="card portfolio-panel">
@@ -631,6 +709,29 @@
 
               </div><!-- /portfolio-layout -->
 
+              <!-- Monthly Performance Heatmap (full-width) -->
+              <div class="card monthly-perf-card" id="monthlyPerfCard">
+                <div class="monthly-perf-header">
+                  <div class="monthly-perf-title-row">
+                    <span class="chart-card-title">Monthly Performance</span>
+                    <span class="monthly-perf-hint">Monthly % return per holding</span>
+                  </div>
+                  <div class="monthly-perf-view-toggle">
+                    <button class="mpv-btn active" data-view="12m"
+                      onclick="setMonthlyPerfView('12m', this)">12M</button>
+                    <button class="mpv-btn" data-view="1y" onclick="setMonthlyPerfView('1y', this)" disabled
+                      title="Coming soon">1Y</button>
+                    <button class="mpv-btn" data-view="3y" onclick="setMonthlyPerfView('3y', this)" disabled
+                      title="Coming soon">3Y</button>
+                  </div>
+                </div>
+                <div class="monthly-perf-scroll">
+                  <div id="monthlyPerfHeatmap" class="monthly-perf-heatmap">
+                    <div class="monthly-perf-loading">Loading monthly performance…</div>
+                  </div>
+                </div>
+              </div>
+
             </div><!-- /dashboard -->
           </div><!-- /view-main -->
 
@@ -641,8 +742,14 @@
           <div class="view-main">
 
             <div class="state-container" id="stocksStateLoading" style="display:none">
-              <div class="spinner"></div>
-              <p class="state-text">Fetching holdings…</p>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
+              <div class="skeleton skeleton-row"></div>
             </div>
             <div class="state-container" id="stocksStateError" style="display:none">
               <span class="material-symbols-outlined state-icon error-icon">error_outline</span>
@@ -656,7 +763,7 @@
             <!-- Full-width holdings table -->
             <div class="table-wrapper card" id="stocksTableWrapper" style="display:none">
               <div class="panel-header">
-                <h3 class="panel-title" id="stocksTableTitle">Holdings</h3>
+                <!-- <h3 class="panel-title" id="stocksTableTitle">Holdings</h3> -->
                 <div class="filter-bar" id="filterBar"></div>
               </div>
               <div class="table-toolbar">
@@ -679,9 +786,9 @@
                 <table class="portfolio-table">
                   <thead>
                     <tr>
-                      <th class="th-sortable" data-col="company_name" onclick="sortTable(this)">Company <span
-                          class="sort-icon">↕</span></th>
                       <th class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker <span
+                          class="sort-icon">↕</span></th>
+                      <th class="th-sortable" data-col="company_name" onclick="sortTable(this)">Company <span
                           class="sort-icon">↕</span></th>
                       <th class="th-sortable" data-col="country" onclick="sortTable(this)">Country <span
                           class="sort-icon">↕</span></th>
@@ -704,12 +811,10 @@
                           class="sort-icon">↕</span></th>
                       <th class="th-sortable th-right" data-col="returns_pct" onclick="sortTable(this)">Returns % <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="dividends" onclick="sortTable(this)">Dividends <span
-                          class="sort-icon">↕</span></th>
                       <th class="th-sortable th-right" data-col="div_yield" onclick="sortTable(this)"
                         title="Annual dividend yield based on dividends received vs current value">Div Yield <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-right" title="Analyst consensus rating from Finnhub (US stocks only)">Rating</th>
+                      <th class="th-right" title="Analyst consensus rating">Rating</th>
                     </tr>
                   </thead>
                   <tbody id="tableBody"></tbody>
@@ -733,27 +838,27 @@
             <div id="newsGrid" class="news-grid">
               <!-- skeleton -->
               <div class="news-card skel-news-card">
-                <div class="skel skel-news-img-lg"></div>
+                <div class="skeleton skel-news-img-lg"></div>
                 <div class="skel-news-body">
-                  <div class="skel skel-line" style="width:30%"></div>
-                  <div class="skel skel-line" style="width:90%"></div>
-                  <div class="skel skel-line" style="width:70%"></div>
+                  <div class="skeleton skel-line skel-w-30"></div>
+                  <div class="skeleton skel-line skel-w-90"></div>
+                  <div class="skeleton skel-line skel-w-70"></div>
                 </div>
               </div>
               <div class="news-card skel-news-card">
-                <div class="skel skel-news-img-lg"></div>
+                <div class="skeleton skel-news-img-lg"></div>
                 <div class="skel-news-body">
-                  <div class="skel skel-line" style="width:40%"></div>
-                  <div class="skel skel-line" style="width:85%"></div>
-                  <div class="skel skel-line" style="width:65%"></div>
+                  <div class="skeleton skel-line skel-w-40"></div>
+                  <div class="skeleton skel-line skel-w-85"></div>
+                  <div class="skeleton skel-line skel-w-65"></div>
                 </div>
               </div>
               <div class="news-card skel-news-card">
-                <div class="skel skel-news-img-lg"></div>
+                <div class="skeleton skel-news-img-lg"></div>
                 <div class="skel-news-body">
-                  <div class="skel skel-line" style="width:35%"></div>
-                  <div class="skel skel-line" style="width:80%"></div>
-                  <div class="skel skel-line" style="width:60%"></div>
+                  <div class="skeleton skel-line skel-w-35"></div>
+                  <div class="skeleton skel-line skel-w-80"></div>
+                  <div class="skeleton skel-line skel-w-60"></div>
                 </div>
               </div>
             </div>
@@ -763,38 +868,30 @@
         <!-- ═══ VIEW: ACTIVITY ═══ -->
         <div id="view-activity" class="spa-view" style="display:none">
           <div class="view-main">
-
-            <div class="act-view-header">
-              <div class="act-view-title-block">
-                <h1 class="act-view-title">Activity &amp; History</h1>
-                <p class="act-view-subtitle">Recent trades and dividend payments across all portfolios</p>
-              </div>
-            </div>
-
+            <p class="act-view-subtitle">Recent trades and dividend payments across all portfolios</p>
             <div class="act-layout">
 
               <!-- Left: Recent Activity -->
               <section class="widget-panel act-panel">
                 <div class="panel-header">
                   <h3 class="panel-title">Recent Activity</h3>
-                  <span class="panel-subtitle">All portfolios combined</span>
                 </div>
                 <div id="activityTimelineList" class="activity-list-home">
                   <div class="skel-item">
-                    <div class="skel skel-dot"></div>
+                    <div class="skeleton skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:55%"></div>
-                      <div class="skel skel-line" style="width:35%"></div>
+                      <div class="skeleton skel-line skel-w-55"></div>
+                      <div class="skeleton skel-line skel-w-35"></div>
                     </div>
-                    <div class="skel skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
                   </div>
                   <div class="skel-item">
-                    <div class="skel skel-dot"></div>
+                    <div class="skeleton skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:65%"></div>
-                      <div class="skel skel-line" style="width:40%"></div>
+                      <div class="skeleton skel-line skel-w-65"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
                     </div>
-                    <div class="skel skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
               </section>
@@ -803,24 +900,23 @@
               <section class="widget-panel act-panel">
                 <div class="panel-header">
                   <h3 class="panel-title">Dividend History</h3>
-                  <span class="panel-subtitle">Combined from all portfolios</span>
                 </div>
                 <div id="divHistoryList" class="activity-list-home">
                   <div class="skel-item">
-                    <div class="skel skel-dot"></div>
+                    <div class="skeleton skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:50%"></div>
-                      <div class="skel skel-line" style="width:30%"></div>
+                      <div class="skeleton skel-line skel-w-50"></div>
+                      <div class="skeleton skel-line skel-w-30"></div>
                     </div>
-                    <div class="skel skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
                   </div>
                   <div class="skel-item">
-                    <div class="skel skel-dot"></div>
+                    <div class="skeleton skel-dot"></div>
                     <div class="skel-body">
-                      <div class="skel skel-line" style="width:60%"></div>
-                      <div class="skel skel-line" style="width:40%"></div>
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
                     </div>
-                    <div class="skel skel-amount"></div>
+                    <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
               </section>
@@ -833,13 +929,7 @@
         <!-- ═══ VIEW: CALENDAR ═══ -->
         <div id="view-calendar" class="spa-view" style="display:none">
           <div class="view-main">
-
-            <div class="cal-view-header">
-              <div class="cal-view-title-block">
-                <h1 class="cal-view-title">Market Calendar</h1>
-                <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
-              </div>
-            </div>
+            <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
 
             <div class="calendar-layout">
 
@@ -851,13 +941,9 @@
                 </div>
                 <div id="divCalendarList" class="activity-list-home">
                   <div class="skel-card">
-                    <div class="skel-card-header">
-                      <div class="skel skel-line" style="width:30%"></div>
-                      <div class="skel skel-amount"></div>
-                    </div>
                     <div class="skel-card-row">
-                      <div class="skel skel-line" style="width:45%"></div>
-                      <div class="skel skel-line" style="width:45%"></div>
+                      <div class="skeleton skel-line skel-w-45"></div>
+                      <div class="skeleton skel-line skel-w-45"></div>
                     </div>
                   </div>
                 </div>
@@ -872,12 +958,12 @@
                 <div id="earningsList" class="activity-list-home">
                   <div class="skel-card">
                     <div class="skel-card-header">
-                      <div class="skel skel-line" style="width:30%"></div>
-                      <div class="skel skel-amount"></div>
+                      <div class="skeleton skel-line skel-w-30"></div>
+                      <div class="skeleton skel-amount"></div>
                     </div>
                     <div class="skel-card-row">
-                      <div class="skel skel-line" style="width:25%"></div>
-                      <div class="skel skel-line" style="width:20%"></div>
+                      <div class="skeleton skel-line skel-w-25"></div>
+                      <div class="skeleton skel-line skel-w-20"></div>
                     </div>
                   </div>
                 </div>
@@ -887,6 +973,394 @@
 
           </div><!-- /view-main -->
         </div><!-- /view-calendar -->
+
+        <!-- ═══ VIEW: MARKET ═══ -->
+        <div id="view-market" class="spa-view" style="display:none">
+          <div class="view-main">
+            <p class="cal-view-subtitle">Sector performance, signals and insider activity</p>
+
+            <!-- <div class="cal-view-header">
+              <div class="cal-view-title-block">
+                <h1 class="cal-view-title">Market</h1>
+              </div>
+            </div> -->
+
+            <!-- Market body: 3-column × 2-row grid -->
+            <div class="market-body">
+
+              <!-- Row 1, Col 1: Portfolio vs S&P 500 -->
+              <div class="market-chart-card widget-panel">
+                <div class="panel-header">
+                  <div class="mkt-chart-title-group">
+                    <h3 class="panel-title">Portfolio vs S&amp;P 500</h3>
+                    <div class="mkt-pvs-legend">
+                      <span class="pvs-leg-dot" style="background:#60a5fa"></span><span
+                        class="pvs-leg-label">S&amp;P</span>
+                      <span class="pvs-leg-dot" style="background:#f59e0b"></span><span
+                        class="pvs-leg-label">Portfolio</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mkt-chart-wrap">
+                  <canvas id="pvsChart"></canvas>
+                  <div id="pvsChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="mkt-chart-footer mkt-chart-footer-sm">
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Portfolio</span>
+                    <span id="pvsPortPct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">S&amp;P 500</span>
+                    <span id="pvsSpPct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Alpha</span>
+                    <span id="pvsAlpha" class="mkt-footer-val">—</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Row 1, Col 2: Sector Performance -->
+              <section class="widget-panel widget-sectors">
+                <div class="panel-header">
+                  <h3 class="panel-title">Sectors</h3>
+                  <span style="font-size:0.7rem;color:var(--text-muted)">Today</span>
+                </div>
+                <div id="sectorBarsList" class="sector-bars-list">
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                  <div class="sector-bar-row">
+                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
+                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
+                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Row 1, Col 3: Market Signals -->
+              <section class="widget-panel widget-signals">
+                <div class="panel-header">
+                  <h3 class="panel-title">Market Signals</h3>
+                  <div class="signal-tabs" id="signalTabs">
+                    <button class="signal-tab active" data-signal="gainers">Gainers</button>
+                    <button class="signal-tab" data-signal="losers">Losers</button>
+                    <button class="signal-tab" data-signal="volume">Volume</button>
+                    <button class="signal-tab" data-signal="newhighs">New Highs</button>
+                    <button class="signal-tab" data-signal="oversold">Oversold</button>
+                  </div>
+                </div>
+                <div id="signalsList" class="signals-list">
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-50"></div>
+                      <div class="skeleton skel-line skel-w-35"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-45"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                      <div class="skeleton skel-line skel-w-30"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Row 2, Col 1-2: Portfolio Gain (spans 2 columns) -->
+              <section class="widget-panel pvs-gain-widget">
+                <div class="pvs-gain-accent"></div>
+                <div class="panel-header" style="padding: 10px 14px 8px">
+                  <h3 class="panel-title">Portfolio Gain</h3>
+                  <span style="font-size:0.7rem;color:var(--text-muted)">Combined · All time</span>
+                </div>
+                <div class="pvs-gain-list">
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">1-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain1M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">6-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain6M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">12-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain12M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">YTD Return</span>
+                    <span class="pvs-gain-val" id="pvsGainYTD">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">Total Return</span>
+                    <span class="pvs-gain-val" id="pvsGainTotal">—</span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Row 2, Col 3: Drawdown Analysis -->
+              <section class="widget-panel drawdown-widget" style="overflow:hidden; display:flex; flex-direction:column;">
+                <div class="panel-header">
+                  <h3 class="panel-title">Drawdown</h3>
+                  <div class="mkt-range-tabs" id="ddRangeTabs">
+                    <button class="mkt-range-tab" data-range="1M">1M</button>
+                    <button class="mkt-range-tab" data-range="3M">3M</button>
+                    <button class="mkt-range-tab" data-range="6M">6M</button>
+                    <button class="mkt-range-tab active" data-range="1Y">1Y</button>
+                    <button class="mkt-range-tab" data-range="ALL">ALL</button>
+                  </div>
+                </div>
+                <div class="drawdown-chart-wrap">
+                  <canvas id="drawdownChart"></canvas>
+                  <div id="drawdownTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="drawdown-stat-bar">
+                  <div class="drawdown-stat-item">
+                    <span class="drawdown-stat-label">Max DD</span>
+                    <span class="drawdown-stat-val neg" id="ddMaxDD">—</span>
+                  </div>
+                  <div class="drawdown-stat-sep"></div>
+                  <div class="drawdown-stat-item">
+                    <span class="drawdown-stat-label">Current</span>
+                    <span class="drawdown-stat-val" id="ddCurrent">—</span>
+                  </div>
+                  <div class="drawdown-stat-sep"></div>
+                  <div class="drawdown-stat-item">
+                    <span class="drawdown-stat-label">Days in DD</span>
+                    <span class="drawdown-stat-val" id="ddDays">—</span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Row 3, Col 3: Insider Trading -->
+              <section class="widget-panel widget-insider">
+                <div class="panel-header">
+                  <h3 class="panel-title">Insider Trading</h3>
+                  <div class="signal-tabs" id="insiderTabs">
+                    <button class="signal-tab active" data-period="latest">Latest</button>
+                    <button class="signal-tab" data-period="top week">Top Week</button>
+                  </div>
+                </div>
+                <div id="insiderList" class="insider-list">
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-40"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-50"></div>
+                      <div class="skeleton skel-line skel-w-35"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-60"></div>
+                      <div class="skeleton skel-line skel-w-45"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                  <div class="skel-item">
+                    <div class="skeleton skel-dot"></div>
+                    <div class="skel-body">
+                      <div class="skeleton skel-line skel-w-55"></div>
+                      <div class="skeleton skel-line skel-w-30"></div>
+                    </div>
+                    <div class="skeleton skel-amount"></div>
+                  </div>
+                </div>
+              </section>
+
+            </div><!-- /market-body -->
+
+          </div><!-- /view-main -->
+        </div><!-- /view-market -->
+
+        <!-- ═══ VIEW: WATCHLIST ═══ -->
+        <div id="view-watchlist" class="spa-view" style="display:none">
+          <div class="view-main">
+
+            <div class="cal-view-header watchlist-header">
+              <div class="cal-view-title-block">
+                <h1 class="cal-view-title">Watchlist</h1>
+                <p class="cal-view-subtitle">Track any stock — price, analyst targets and 48h movement</p>
+              </div>
+              <div class="watchlist-add-bar">
+                <input id="watchlistTickerInput" class="watchlist-input" type="text"
+                  placeholder="Ticker (e.g. AAPL, NVDA)" maxlength="12"
+                  onkeydown="if(event.key==='Enter') addWatchlistTicker()" />
+                <select id="watchlistCountrySelect" class="watchlist-select">
+                  <option value="US">US</option>
+                  <option value="UK">UK</option>
+                  <option value="DE">DE</option>
+                  <option value="FR">FR</option>
+                  <option value="CA">CA</option>
+                  <option value="AU">AU</option>
+                  <option value="JP">JP</option>
+                </select>
+                <button class="btn btn-accent watchlist-add-btn" onclick="addWatchlistTicker()">
+                  <span class="material-symbols-outlined" style="font-size:16px;line-height:1">add</span>
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div class="watchlist-wrap">
+              <div id="watchlistEmpty" class="watchlist-empty" style="display:none">
+                <span class="material-symbols-outlined"
+                  style="font-size:2rem;color:var(--text-muted)">bookmark_border</span>
+                <p>Your watchlist is empty. Add a ticker above to get started.</p>
+              </div>
+              <div class="watchlist-table-wrap" id="watchlistTableWrap" style="display:none">
+                <table class="watchlist-table">
+                  <thead>
+                    <tr>
+                      <th>Ticker</th>
+                      <th>Company</th>
+                      <th>Price</th>
+                      <th>Change</th>
+                      <th class="wl-target-col">Min Target</th>
+                      <th class="wl-target-col">Avg Target</th>
+                      <th class="wl-target-col">Max Target</th>
+                      <th>Signal</th>
+                      <th class="wl-fund-col">Mkt Cap</th>
+                      <th class="wl-fund-col">Revenue LTM</th>
+                      <th class="wl-fund-col">P/S</th>
+                      <th class="wl-fund-col">P/E</th>
+                      <th>48h Chart</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="watchlistTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+          </div><!-- /view-main -->
+        </div><!-- /view-watchlist -->
+
+        <!-- ═══ VIEW: AI Intelligence ═══ -->
+        <div id="view-ai-intelligence" class="spa-view" style="display:none">
+          <div class="ai-view-body">
+            <div class="ai-grid">
+
+              <!-- Column 1: Market Digest -->
+              <div class="ai-col">
+                <div class="card ai-card">
+                  <div class="ai-card-header">
+                    <span class="material-symbols-outlined">newspaper</span>
+                    <h3>Market Digest</h3>
+                    <button class="ai-refresh-btn" id="aiRefreshDigest" onclick="loadAiDigest(true)">
+                      <span class="material-symbols-outlined">refresh</span>
+                    </button>
+                  </div>
+                  <div class="ai-card-content" id="aiDigestContent">
+                    <div class="ai-loading">Generating summary...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Column 2: Trade Signals -->
+              <div class="ai-col">
+                <div class="card ai-card">
+                  <div class="ai-card-header">
+                    <span class="material-symbols-outlined">trending_up</span>
+                    <h3>Trade Signals</h3>
+                    <button class="ai-refresh-btn" id="aiRefreshSignals" onclick="loadAiSignals(true)">
+                      <span class="material-symbols-outlined">refresh</span>
+                    </button>
+                  </div>
+                  <div class="ai-card-content" id="aiSignalsContent">
+                    <div class="ai-loading">Analyzing portfolio...</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Column 3: AI Chat -->
+              <div class="ai-col">
+                <div class="card ai-card ai-chat-card">
+                  <div class="ai-card-header">
+                    <span class="material-symbols-outlined">forum</span>
+                    <h3>AI Assistant</h3>
+                  </div>
+                  <div class="ai-chat-content" id="aiChatContent">
+                    <div class="ai-msg ai-msg-bot">
+                      Hello! I'm your Gemini-powered portfolio assistant. How can I help you today?
+                    </div>
+                  </div>
+                  <div class="ai-chat-input-row">
+                    <input type="text" id="aiChatInput" placeholder="Ask me anything..."
+                      onkeyup="if(event.key==='Enter') sendAiChatMessage()">
+                    <button onclick="sendAiChatMessage()">
+                      <span class="material-symbols-outlined">send</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
 
       </div><!-- /view-container -->
 
@@ -904,19 +1378,32 @@
           <button class="sp-close-btn" onclick="closeStockPanel()">✕</button>
         </div>
         <div class="side-panel-content">
-          <div class="sp-metrics-grid">
-            <div class="sp-metric"><span class="sp-metric-label">Current Value</span><span class="sp-metric-value"
-                id="spValue">£0.00</span></div>
-            <div class="sp-metric"><span class="sp-metric-label">Total Return</span><span class="sp-metric-value"
-                id="spReturn">£0.00 <span class="sp-metric-pct" id="spReturnPct">(0.00%)</span></span></div>
-            <div class="sp-metric"><span class="sp-metric-label">Shares</span><span class="sp-metric-value"
-                id="spQuantity">0.00</span></div>
-            <div class="sp-metric"><span class="sp-metric-label">Avg Price</span><span class="sp-metric-value"
-                id="spAvgPrice">0.00</span></div>
-            <div class="sp-metric"><span class="sp-metric-label">Current Price</span><span class="sp-metric-value"
-                id="spCurrentPrice">0.00</span></div>
-            <div class="sp-metric"><span class="sp-metric-label">Category</span><span class="sp-metric-value"
-                id="spSector">Sector</span></div>
+          <div id="spPortfolioSection">
+            <div class="sp-metrics-grid">
+              <div class="sp-metric"><span class="sp-metric-label">Current Value</span><span class="sp-metric-value"
+                  id="spValue">£0.00</span></div>
+              <div class="sp-metric"><span class="sp-metric-label">Total Return</span><span class="sp-metric-value"
+                  id="spReturn">£0.00 <span class="sp-metric-pct" id="spReturnPct">(0.00%)</span></span></div>
+              <div class="sp-metric"><span class="sp-metric-label">Shares</span><span class="sp-metric-value"
+                  id="spQuantity">0.00</span></div>
+              <div class="sp-metric"><span class="sp-metric-label">Avg Price</span><span class="sp-metric-value"
+                  id="spAvgPrice">0.00</span></div>
+              <div class="sp-metric"><span class="sp-metric-label">Current Price</span><span class="sp-metric-value"
+                  id="spCurrentPrice">0.00</span></div>
+              <div class="sp-metric"><span class="sp-metric-label">Category</span><span class="sp-metric-value"
+                  id="spSector">Sector</span></div>
+              <div class="sp-metric"><span class="sp-metric-label">Breakeven</span><span class="sp-metric-value"
+                  id="spBreakeven">—</span></div>
+              <!-- <div class="sp-metric sp-metric-wide"><span class="sp-metric-label">Held Since</span><span
+                  class="sp-metric-value" id="spHeldSince">—</span></div> -->
+            </div>
+          </div>
+          <div id="spAnalystRatingsSection" style="display:none">
+            <div class="sp-analyst-header">
+              <span class="sp-analyst-title">Analyst Ratings</span>
+              <span id="spAnalystPeriod" class="sp-analyst-period"></span>
+            </div>
+            <div id="spAnalystRatings"></div>
           </div>
           <div class="sp-divider"></div>
           <div class="sp-fundamentals-section" id="spFundamentalsSection" style="display:none">
@@ -925,16 +1412,9 @@
               <span class="sp-fund-source">Finnhub</span>
             </div>
             <div id="spFundamentals"></div>
-            <div id="spAnalystRatingsSection" style="display:none">
-              <div class="sp-analyst-header">
-                <span class="sp-analyst-title">Analyst Ratings</span>
-                <span id="spAnalystPeriod" class="sp-analyst-period"></span>
-              </div>
-              <div id="spAnalystRatings"></div>
-            </div>
             <div class="sp-divider" style="margin-top:16px"></div>
           </div>
-          <div class="sp-activity-section">
+          <div class="sp-activity-section" id="spActivitySection">
             <div class="sp-chart-header">
               <h3 class="sp-section-title">Activity &amp; Dividends</h3>
             </div>
@@ -969,7 +1449,12 @@
           <button class="sp-close-btn" onclick="closeSummaryPanel()">✕</button>
         </div>
         <div class="side-panel-content" id="smContent">
-          <div class="activity-loading">Loading details...</div>
+          <div style="padding:16px;display:flex;flex-direction:column;gap:8px">
+            <div class="skeleton skel-line skel-w-60" style="height:14px"></div>
+            <div class="skeleton skel-line skel-w-80" style="height:14px"></div>
+            <div class="skeleton skel-line skel-w-50" style="height:14px"></div>
+            <div class="skeleton skel-line skel-w-70" style="height:14px"></div>
+          </div>
         </div>
       </div>
 
@@ -987,8 +1472,29 @@
           <button class="sp-close-btn" onclick="closeFGPanel()">✕</button>
         </div>
         <div class="side-panel-content" id="fgPanelContent">
-          <div class="activity-loading">
-            <div class="table-loading-spinner"></div>
+          <div class="skel-item">
+            <div class="skeleton skel-dot"></div>
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-60"></div>
+              <div class="skeleton skel-line skel-w-40"></div>
+            </div>
+            <div class="skeleton skel-amount"></div>
+          </div>
+          <div class="skel-item">
+            <div class="skeleton skel-dot"></div>
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-50"></div>
+              <div class="skeleton skel-line skel-w-35"></div>
+            </div>
+            <div class="skeleton skel-amount"></div>
+          </div>
+          <div class="skel-item">
+            <div class="skeleton skel-dot"></div>
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-55"></div>
+              <div class="skeleton skel-line skel-w-30"></div>
+            </div>
+            <div class="skeleton skel-amount"></div>
           </div>
         </div>
       </div>
@@ -1004,14 +1510,95 @@
 
   <div id="tooltip" class="chart-tooltip"></div>
 
+  <!-- ═══ SIGNALS SIDEBAR ═══ -->
+  <div class="signals-sidebar-overlay" id="signalsSidebarOverlay" onclick="closeSignalsSidebar()"></div>
+  <div class="signals-sidebar" id="signalsSidebar">
+    <div class="ss-header">
+      <div class="ss-header-left">
+        <h2 class="ss-title">Trade Signals</h2>
+        <span class="ss-subtitle">Full Ranking</span>
+      </div>
+      <button class="ss-close-btn" onclick="closeSignalsSidebar()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <div class="ss-tabs">
+      <button class="ss-tab active" id="ssTabSignals" onclick="switchSignalsTab('signals')">Signals</button>
+      <button class="ss-tab" id="ssTabExcluded" onclick="switchSignalsTab('excluded')">Excluded</button>
+    </div>
+
+    <div class="ss-body">
+      <div id="ssListSignals" class="ss-list"></div>
+      <div id="ssListExcluded" class="ss-list" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ═══ MARKET DIGEST SIDEBAR ═══ -->
+  <div class="digest-sidebar-overlay" id="digestSidebarOverlay" onclick="closeDigestSidebar()"></div>
+  <div class="digest-sidebar" id="digestSidebar">
+    <div class="ss-header">
+      <div class="ss-header-left">
+        <h2 class="ss-title">Market Digest</h2>
+        <span class="ss-subtitle" id="digestSidebarMeta">Finviz· Global Analysis</span>
+      </div>
+      <div class="digest-sidebar-controls" style="display:flex; gap:8px;">
+        <button class="ss-refresh-btn" onclick="loadMarketDigest(null, true)" title="Refresh Digest">
+          <span class="material-symbols-outlined" style="font-size:18px">refresh</span>
+        </button>
+        <button class="ss-close-btn" onclick="closeDigestSidebar()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    <div class="ss-body digest-sidebar-body" id="digestSidebarBody">
+      <div class="digest-loading">
+        <div style="display:flex;flex-direction:column;gap:8px;width:100%">
+          <div class="skeleton skel-line skel-w-70" style="height:12px"></div>
+          <div class="skeleton skel-line skel-w-90" style="height:12px"></div>
+          <div class="skeleton skel-line skel-w-60" style="height:12px"></div>
+          <div class="skeleton skel-line skel-w-80" style="height:12px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="namesConfig" data-names='{{ names | tojson | safe }}' style="display:none"></div>
   <script>
-    const PORTFOLIO_NAMES = {{ names | tojson }};
+    const PORTFOLIO_NAMES = JSON.parse(document.getElementById('namesConfig').dataset.names || '{}');
     var PORTFOLIO_ID = null;
   </script>
   <script src="/static/currency.js"></script>
   <script src="/static/router.js"></script>
   <script src="/static/home.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/ai_intelligence.js"></script>
+  <script>
+    (function () {
+      var h = new Date().getHours();
+      var greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+      var name = (typeof PORTFOLIO_NAMES !== 'undefined' && PORTFOLIO_NAMES['1']) || 'there';
+      var el = document.getElementById('greetingText');
+      if (el) el.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
+    }());
+  </script>
+  <!-- Market Digest Fullscreen Modal -->
+  <div id="digestModal" class="modal-overlay" style="display:none; z-index: 2000;">
+    <div class="modal-container digest-modal-container">
+      <div class="modal-header">
+        <div class="header-left">
+          <span class="material-symbols-outlined header-icon">newspaper</span>
+          <h2 class="modal-title">Market Digest</h2>
+        </div>
+        <button class="modal-close" onclick="closeDigestModal()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="modal-body digest-modal-body" id="digestModalBody">
+        <!-- Content injected here -->
+      </div>
+    </div>
+  </div>
 </body>
 
 </html>

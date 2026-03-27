@@ -14,12 +14,18 @@ function convertFromGBP(v) {
   return currentCurrency === 'USD' ? Number(v) * fxRate : Number(v);
 }
 
+function setRate(r) {
+  const n = Number(r);
+  if (n > 0) fxRate = n;
+}
+
 function setCurrency(c) {
   if (c === currentCurrency) return;
   currentCurrency = c;
   localStorage.setItem('currency', c);
   _updateCurrencyButtons();
   if (typeof onCurrencyChange === 'function') onCurrencyChange();
+  if (typeof onHomeCurrencyChange === 'function') onHomeCurrencyChange();
 }
 
 function _updateCurrencyButtons() {

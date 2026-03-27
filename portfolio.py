@@ -57,18 +57,23 @@ def build_rows(positions: list, instruments: dict, dividends: defaultdict, gbpus
         current_value = quantity * current_price
         invested      = quantity * avg_price
         returns_pct   = (ppl / invested * 100) if invested else 0
+        
+        native_currency = (raw_currency.upper() if raw_currency else
+                           ("GBX" if country in PENCE_COUNTRIES else
+                            "USD" if country in USD_COUNTRIES else "GBP"))
  
         # FX impact is only meaningful for non-UK holdings
         fx_impact = None if country == "UK" else (
             round(float(raw_fx_ppl), 2) if raw_fx_ppl is not None else None
         )
- 
         rows.append({
             "company_name":  company_name,
             "ticker":        short_symbol, # This is now the mapped base
             "country":       country,
-            "quantity":      round(quantity, 6),
+            "quantity":      round(quantity, 6), 
             "avg_price":     round(avg_price, 4),
+            "current_price": round(current_price, 4),
+            "native_price":  round(current_price_raw, 4),
             "invested":      round(invested, 2),
             "current_value": round(current_value, 2),
             "total_returns": round(ppl, 2),
@@ -77,6 +82,7 @@ def build_rows(positions: list, instruments: dict, dividends: defaultdict, gbpus
             "dividends":     round(consolidated_divs.get(short_symbol, 0), 2),
             "sector":        sector,
             "currency_code": currency_code,
+            "native_currency": native_currency,
         })
 
     rows.sort(key=lambda r: r["current_value"], reverse=True)
