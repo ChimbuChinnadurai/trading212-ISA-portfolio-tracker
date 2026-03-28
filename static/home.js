@@ -845,6 +845,176 @@ async function loadMetricsView(force = false) {
         _portfolioVsData = null;
     }
     loadPortfolioVsMarket();
+    loadRiskMetrics();
+}
+
+async function loadRiskMetrics() {
+    const grid = document.getElementById('riskMetricsGrid');
+    if (!grid) return;
+    try {
+        const res  = await fetch('/api/pcombined/risk-metrics');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        _renderRiskMetrics(json.data);
+    } catch (err) {
+        if (grid) grid.innerHTML = _rmEmptyState(
+            'cloud_off',
+            'Unable to load metrics',
+            err.message
+        );
+    }
+}
+
+function _rmEmptyState(icon, title, subtitle) {
+    return `<div class="risk-metrics-empty">
+        <div class="rme-icon-wrap">
+            <span class="material-symbols-outlined rme-icon">${icon}</span>
+        </div>
+        <span class="rme-title">${title}</span>
+        ${subtitle ? `<span class="rme-subtitle">${subtitle}</span>` : ''}
+    </div>`;
+}
+
+function _rmBadge(text, type) {
+    // type: 'good' | 'ok' | 'warn' | 'neutral'
+    return `<span class="rm-badge rm-badge-${type}">${text}</span>`;
+}
+
+function _rmTrack(value, min, max, markers) {
+    // markers: [{label, val, accent}]
+    const clamp = v => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
+    const dots  = (markers || []).map(m =>
+        `<div class="rm-track-dot${m.accent ? ' rm-track-dot-accent' : ''}" style="left:${clamp(m.val).toFixed(1)}%">
+           <div class="rm-track-label">${m.label}</div>
+         </div>`
+    ).join('');
+    return `<div class="rm-track"><div class="rm-track-fill" style="width:${clamp(value).toFixed(1)}%"></div>${dots}</div>`;
+}
+
+function _renderRiskMetrics(data) {
+    const grid = document.getElementById('riskMetricsGrid');
+    if (!grid) return;
+
+    if (data.insufficient_data) {
+        grid.innerHTML = _rmEmptyState(
+            'history_toggle_off',
+            'Not enough history yet',
+            'Portfolio metrics will appear once more trading days have been recorded.'
+        );
+        return;
+    }
+
+    const cards = [];
+
+    // ── TWR ──────────────────────────────────────────────────────────────
+    const twrSign  = data.twr >= 0 ? '▲' : '▼';
+    const twrClass = data.twr >= 0 ? 'pos' : 'neg';
+    const spyChip  = data.spy_twr != null
+        ? `<div class="rm-bench-chip">SPY: ${data.spy_twr > 0 ? '+' : ''}${data.spy_twr.toFixed(2)}%
+             <span class="${data.twr_vs_spy >= 0 ? 'pos' : 'neg'}">
+               (${data.twr_vs_spy >= 0 ? '▲' : '▼'}${Math.abs(data.twr_vs_spy).toFixed(2)}%)
+             </span></div>`
+        : '';
+    cards.push(`
+      <div class="risk-metric-card">
+        <div class="rm-header">
+          <div>
+            <span class="rm-title">Portfolio TWR</span>
+            <span class="rm-badge rm-badge-neutral" style="font-size:0.65rem;padding:1px 5px">β</span>
+          </div>
+          <span class="rm-desc">True performance excluding the impact of cash flows</span>
+        </div>
+        <div class="rm-value ${twrClass}">${twrSign}${Math.abs(data.twr).toFixed(2)}%</div>
+        ${spyChip}
+      </div>`);
+
+    // ── P/E ──────────────────────────────────────────────────────────────
+    if (data.pe != null) {
+        const peStatus = data.pe < 15 ? _rmBadge('undervalued', 'good')
+            : data.pe < 25 ? _rmBadge('fair value', 'ok')
+            : data.pe < 35 ? _rmBadge('elevated', 'warn')
+            : _rmBadge('expensive', 'warn');
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Portfolio P/E</span>
+              <span class="rm-desc">Weighted average P/E of all holdings</span>
+            </div>
+            <div class="rm-value neutral">${data.pe.toFixed(1)}×</div>
+            <div class="rm-info-row">${peStatus}
+              ${_rmTrack(data.pe, 0, 70, [{label: 'Portfolio', val: data.pe, accent: true}])}
+            </div>
+          </div>`);
+    }
+
+    // ── Beta ─────────────────────────────────────────────────────────────
+    if (data.beta != null) {
+        const betaStatus = data.beta < 0.8 ? _rmBadge('lower than market', 'good')
+            : data.beta < 1.1 ? _rmBadge('similar to market', 'ok')
+            : _rmBadge('higher than market', 'warn');
+        const betaTrack = _rmTrack(data.beta, 0, 2, [
+            {label: 'Market', val: 1.0, accent: false},
+            {label: 'Portfolio', val: data.beta, accent: true}
+        ]);
+        const volStr = data.volatility != null ? ` · Vol ${data.volatility.toFixed(1)}% p.a.` : '';
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Volatility / Beta</span>
+              <span class="rm-desc">Portfolio volatility relative to the market</span>
+            </div>
+            <div class="rm-info-box">
+              <span class="rm-info-label">β = ${data.beta.toFixed(3)}${volStr}</span>
+              ${betaStatus}
+            </div>
+            ${betaTrack}
+          </div>`);
+    }
+
+    // ── Sharpe ───────────────────────────────────────────────────────────
+    if (data.sharpe != null) {
+        const shStatus = data.sharpe > 2 ? _rmBadge('excellent', 'good')
+            : data.sharpe > 1 ? _rmBadge('good', 'good')
+            : data.sharpe > 0.5 ? _rmBadge('adequate', 'ok')
+            : _rmBadge('requires attention', 'warn');
+        const shMarkers = [{label: 'Portfolio', val: data.sharpe, accent: true}];
+        if (data.spy_sharpe != null) shMarkers.unshift({label: 'SPY', val: data.spy_sharpe, accent: false});
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Sharpe Ratio</span>
+              <span class="rm-desc">Risk-adjusted return (all volatility considered)</span>
+            </div>
+            <div class="rm-info-box">
+              <span class="rm-info-label">Sharpe = ${data.sharpe.toFixed(3)}</span>
+              ${shStatus}
+            </div>
+            ${_rmTrack(data.sharpe, -1, 3, shMarkers)}
+          </div>`);
+    }
+
+    // ── Sortino ──────────────────────────────────────────────────────────
+    if (data.sortino != null) {
+        const soStatus = data.sortino > 2 ? _rmBadge('excellent', 'good')
+            : data.sortino > 1 ? _rmBadge('good', 'good')
+            : data.sortino > 0.5 ? _rmBadge('adequate', 'ok')
+            : _rmBadge('requires attention', 'warn');
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Sortino Ratio</span>
+              <span class="rm-desc">Risk-adjusted return (downside volatility only)</span>
+            </div>
+            <div class="rm-info-box">
+              <span class="rm-info-label">Sortino = ${data.sortino.toFixed(3)}</span>
+              ${soStatus}
+              <span class="rm-hint">Value above 2 is considered good</span>
+            </div>
+            ${_rmTrack(data.sortino, -1, 4, [{label: 'Portfolio', val: data.sortino, accent: true}])}
+          </div>`);
+    }
+
+    grid.innerHTML = cards.join('');
 }
 
 async function loadInlineTradeSignals() {

@@ -1254,6 +1254,156 @@ def monthly_returns_endpoint(pid):
     return jsonify({"status": "ok", "data": result})
 
 
+@app.route("/api/pcombined/risk-metrics")
+def risk_metrics_endpoint():
+    """Portfolio risk metrics: TWR, Beta, Annualised Volatility, Sharpe, Sortino, Weighted P/E."""
+    cache_key = "risk_metrics:combined"
+    cached = kv_get(cache_key, 3600)
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+    try:
+        # ── 1. Build combined daily portfolio values (1 year of snapshots) ──
+        HOURS_1Y = 8760
+        pid_daily = {}
+        for p in API_KEYS:
+            snaps = snapshot_get(p, hours=HOURS_1Y)
+            by_day = {}
+            for s in snaps:
+                day = date.fromtimestamp(s["ts"]).isoformat()
+                if day not in by_day or s["ts"] > by_day[day][0]:
+                    by_day[day] = (s["ts"], s["value"])
+            pid_daily[p] = {d: v for d, (_, v) in by_day.items()}
+
+        all_days = sorted(set().union(*[set(d.keys()) for d in pid_daily.values()]))
+        pf_vals = {}
+        for day in all_days:
+            total = sum(pd.get(day, 0) for pd in pid_daily.values())
+            if total > 0:
+                pf_vals[day] = total
+
+        if len(pf_vals) < 5:
+            return jsonify({"status": "ok", "data": {"insufficient_data": True}})
+
+        pf_days = sorted(pf_vals.keys())
+        pf_prices = [pf_vals[d] for d in pf_days]
+
+        # ── 2. Daily portfolio returns ──────────────────────────────────────
+        pf_returns = [(pf_prices[i] / pf_prices[i - 1]) - 1 for i in range(1, len(pf_prices))]
+
+        # ── 3. TWR ─────────────────────────────────────────────────────────
+        twr = 1.0
+        for r in pf_returns:
+            twr *= (1 + r)
+        twr = round((twr - 1) * 100, 2)
+
+        # ── 4. Fetch SPY for Beta + SPY benchmarks ──────────────────────────
+        spy_points = _yf_fetch_points("SPY", "1y", "1d")
+        spy_by_day = {date.fromtimestamp(p["ts"]).isoformat(): p["price"] for p in spy_points}
+        common_days = sorted(d for d in pf_days if d in spy_by_day)
+
+        spy_twr = None
+        beta = None
+        spy_sharpe = None
+        if len(common_days) >= 10:
+            spy_prices_c = [spy_by_day[d] for d in common_days]
+            pf_prices_c  = [pf_vals[d]     for d in common_days]
+            spy_rets = [(spy_prices_c[i] / spy_prices_c[i - 1]) - 1 for i in range(1, len(spy_prices_c))]
+            pf_rets_c = [(pf_prices_c[i]  / pf_prices_c[i - 1])  - 1 for i in range(1, len(pf_prices_c))]
+            # SPY TWR
+            v = 1.0
+            for r in spy_rets:
+                v *= (1 + r)
+            spy_twr = round((v - 1) * 100, 2)
+            # Beta
+            n = len(pf_rets_c)
+            if n >= 2:
+                mp = sum(pf_rets_c) / n
+                ms = sum(spy_rets) / n
+                cov    = sum((pf_rets_c[i] - mp) * (spy_rets[i] - ms) for i in range(n)) / (n - 1)
+                var_s  = sum((r - ms) ** 2 for r in spy_rets) / (n - 1)
+                beta = round(cov / var_s, 3) if var_s > 0 else None
+            # SPY Sharpe
+            rf_d = (1.045 ** (1 / 252)) - 1
+            spy_exc = [r - rf_d for r in spy_rets]
+            sm = sum(spy_exc) / len(spy_exc)
+            ss = (sum((r - sm) ** 2 for r in spy_exc) / (len(spy_exc) - 1)) ** 0.5
+            spy_sharpe = round(sm / ss * (252 ** 0.5), 3) if ss > 0 else None
+
+        # ── 5. Sharpe, Sortino, Volatility ──────────────────────────────────
+        rf_d = (1.045 ** (1 / 252)) - 1
+        exc  = [r - rf_d for r in pf_returns]
+        n    = len(exc)
+        mean_e = sum(exc) / n if n > 0 else 0
+        var_e  = sum((r - mean_e) ** 2 for r in exc) / (n - 1) if n > 1 else 0
+        std_e  = var_e ** 0.5
+        sharpe = round(mean_e / std_e * (252 ** 0.5), 3) if std_e > 0 else None
+        vol    = round(std_e * (252 ** 0.5) * 100, 2) if std_e > 0 else None
+        down   = [r for r in exc if r < 0]
+        sortino = None
+        if len(down) > 1:
+            dv  = sum(r ** 2 for r in down) / len(down)
+            sortino = round(mean_e / (dv ** 0.5) * (252 ** 0.5), 3) if dv > 0 else None
+
+        # ── 6. Weighted P/E ─────────────────────────────────────────────────
+        pe_weighted = None
+        try:
+            combined_rows = []
+            total_val = 0.0
+            for p in API_KEYS:
+                rows, _ = rows_get(p)
+                if rows:
+                    combined_rows.extend(rows)
+                    total_val += sum(r["current_value"] for r in rows)
+            if total_val > 0:
+                pe_sum = pe_wt = 0.0
+                for row in combined_rows:
+                    tk      = row["ticker"]
+                    country = row.get("country", "US")
+                    suffix  = _COUNTRY_YF_SUFFIX.get(country, "")
+                    clean   = tk[:-1] if suffix == ".L" and tk.lower().endswith("l") else tk
+                    yf_sym  = f"{clean}{suffix}"
+                    ck      = f"pe:{yf_sym}"
+                    pe_val  = kv_get(ck, 86400)
+                    if pe_val is None:
+                        try:
+                            summ   = _yf_summary(yf_sym, modules="summaryDetail,defaultKeyStatistics")
+                            detail = summ.get("summaryDetail", {})
+                            stats  = summ.get("defaultKeyStatistics", {})
+                            def _r(d, k):
+                                v = d.get(k); return v.get("raw") if isinstance(v, dict) else v
+                            raw_pe = _r(detail, "trailingPE") or _r(stats, "trailingPE")
+                            pe_val = round(raw_pe, 1) if raw_pe and 0 < raw_pe < 500 else None
+                        except Exception:
+                            pe_val = None
+                        kv_set(ck, pe_val)
+                    if pe_val:
+                        w = row["current_value"] / total_val
+                        pe_sum += pe_val * w
+                        pe_wt  += w
+                if pe_wt >= 0.5:
+                    pe_weighted = round(pe_sum / pe_wt, 1)
+        except Exception as pe_err:
+            logger.warning("P/E computation error: %s", pe_err)
+
+        result = {
+            "twr": twr,
+            "spy_twr": spy_twr,
+            "twr_vs_spy": round(twr - spy_twr, 2) if spy_twr is not None else None,
+            "beta": beta,
+            "volatility": vol,
+            "sharpe": sharpe,
+            "sortino": sortino,
+            "spy_sharpe": spy_sharpe,
+            "pe": pe_weighted,
+            "data_days": len(pf_days),
+        }
+        kv_set(cache_key, result)
+        return jsonify({"status": "ok", "data": result})
+    except Exception as e:
+        logger.error("risk_metrics error: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/api/p<pid>/monthly-performance")
 def monthly_performance(pid):
     """Monthly % returns for all tickers in the portfolio for the last 12 months."""

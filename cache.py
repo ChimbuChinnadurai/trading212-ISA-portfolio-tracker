@@ -257,17 +257,11 @@ def set_ticker_excluded(ticker: str, excluded: bool) -> None:
 # ── Portfolio value snapshots (for sparkline charts) ──────────────────────────
 
 def snapshot_add(pid: str, value: float) -> None:
-    """Record a portfolio value data point; prune entries older than 60 days."""
-    now = time.time()
-    cutoff = now - 5184000  # 60 days
+    """Record a portfolio value data point. Data is retained permanently until manually cleared."""
     with _db() as conn:
         conn.execute(
             "INSERT INTO portfolio_snapshots (pid, ts, value) VALUES (?, ?, ?)",
-            (pid, now, value),
-        )
-        conn.execute(
-            "DELETE FROM portfolio_snapshots WHERE pid = ? AND ts < ?",
-            (pid, cutoff),
+            (pid, time.time(), value),
         )
 
 

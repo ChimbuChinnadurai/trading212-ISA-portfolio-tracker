@@ -7260,6 +7260,240 @@ html[data-theme="dark"] .nav-item.active {
   gap: 4px;
 }
 
+/* ── Risk Metrics Section ────────────────────────────────────────────────── */
+.risk-metrics-section {
+  overflow-y: auto;
+  max-height: calc(100vh - 180px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.risk-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding: 2px;
+}
+
+.risk-metric-skeleton {
+  height: 160px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.6; }
+  50%       { opacity: 1; }
+}
+
+.risk-metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rm-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rm-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rm-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.rm-value {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.rm-value.pos    { color: var(--green); }
+.rm-value.neg    { color: var(--red); }
+.rm-value.neutral { color: var(--text-primary); }
+
+.rm-bench-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  background: var(--bg-hover);
+  border-radius: 6px;
+  padding: 4px 10px;
+  width: fit-content;
+}
+
+.rm-bench-chip .pos { color: var(--green); }
+.rm-bench-chip .neg { color: var(--red); }
+
+.rm-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.rm-badge-good    { background: rgba(16,185,129,.15); color: #10b981; }
+.rm-badge-ok      { background: rgba(245,158,11,.15);  color: #f59e0b; }
+.rm-badge-warn    { background: rgba(239,68,68,.15);   color: #ef4444; }
+.rm-badge-neutral { background: var(--bg-hover); color: var(--text-muted); }
+
+.rm-info-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-hover);
+  border-radius: 8px;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+
+.rm-info-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  flex: 1;
+  min-width: 120px;
+}
+
+.rm-hint {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  width: 100%;
+  margin-top: -4px;
+}
+
+.rm-info-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Range track ─────────────────────────────────────────────────────────── */
+.rm-track {
+  position: relative;
+  height: 6px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+  margin: 18px 0 8px;
+}
+
+.rm-track-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  opacity: 0.5;
+}
+
+.rm-track-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  border: 2px solid var(--bg-card);
+}
+
+.rm-track-dot.rm-track-dot-accent {
+  background: var(--accent);
+  width: 12px;
+  height: 12px;
+}
+
+.rm-track-label {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  background: var(--bg-card);
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.risk-metrics-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 56px 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.rme-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: rme-breathe 3s ease-in-out infinite;
+}
+
+.rme-icon {
+  font-size: 1.5rem;
+  color: var(--text-muted);
+}
+
+@keyframes rme-breathe {
+  0%, 100% { transform: scale(1);    opacity: 0.7; }
+  50%       { transform: scale(1.08); opacity: 1;   }
+}
+
+.rme-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.rme-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .risk-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Chart card (Portfolio vs S&P) ──────────────────────────────────────── */
 .market-chart-card {
   display: flex;
