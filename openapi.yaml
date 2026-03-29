@@ -1,0 +1,1901 @@
+openapi: 3.0.3
+info:
+  title: Trading212 Portfolio Tracker API
+  description: |
+    REST API for the Trading212 Portfolio Tracker — a Flask application that aggregates
+    holdings across two named portfolios, enriches them with FX conversion, sector data,
+    dividends, and Yahoo Finance / Finviz market data.
+
+    **Conventions**
+    - All monetary values are stored and returned in **GBP**.
+    - `pid` path parameter accepts `1`, `2`, or `combined`.
+    - Timestamps are UNIX epoch integers; dates are ISO 8601 strings (`YYYY-MM-DD`).
+    - Most endpoints are cached server-side; pass `?refresh=1` / `?force=1` to bypass.
+  version: 1.0.0
+  contact:
+    name: Chimbu
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://t212-xuvvh3rnja-ew.a.run.app
+    description: Production
+
+tags:
+  - name: Pages
+    description: HTML page routes (SPA shell)
+  - name: Portfolio
+    description: Position rows, summary and combined views
+  - name: Activity
+    description: Trade order history
+  - name: Dividends
+    description: Dividend history, monthly totals and upcoming payments
+  - name: History
+    description: Portfolio value snapshots and performance series
+  - name: Market
+    description: Market indicators, status, Fear & Greed, FX rate
+  - name: Stocks
+    description: Real-time prices, sparklines, metrics, news
+  - name: Analyst
+    description: Analyst ratings and earnings calendar
+  - name: Watchlist
+    description: Watchlist ticker management and enrichment
+  - name: Finviz
+    description: Finviz-sourced market signals, insider trades, S&P 500 heatmap
+  - name: TradeSignals
+    description: AI-generated trade signal recommendations
+  - name: RiskMetrics
+    description: Portfolio risk statistics (TWR, Beta, Sharpe, Sortino, Volatility)
+  - name: AI
+    description: Gemini AI market digest and chat
+  - name: Admin
+    description: Cache management and health check
+
+# ─── Reusable Schemas ────────────────────────────────────────────────────────
+components:
+  schemas:
+
+    StatusOk:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [error]
+        error:
+          type: string
+
+    PortfolioRow:
+      type: object
+      description: Enriched position row for a single holding
+      properties:
+        ticker:
+          type: string
+          example: AAPL
+        company_name:
+          type: string
+          example: Apple Inc.
+        country:
+          type: string
+          example: US
+        quantity:
+          type: number
+          format: float
+        avg_price:
+          type: number
+          format: float
+          description: Average purchase price in GBP
+        invested:
+          type: number
+          format: float
+          description: Total cost basis in GBP
+        current_value:
+          type: number
+          format: float
+          description: Current market value in GBP
+        total_returns:
+          type: number
+          format: float
+          description: Absolute P&L in GBP
+        returns_pct:
+          type: number
+          format: float
+          description: Percentage P&L
+        fx_impact:
+          type: number
+          format: float
+          nullable: true
+          description: Gain/loss in GBP caused by currency movements
+        dividends:
+          type: number
+          format: float
+          description: Lifetime dividends received in GBP
+        sector:
+          type: string
+          example: Technology
+        currency_code:
+          type: string
+          example: USD
+        weight:
+          type: number
+          format: float
+          description: Percentage of total portfolio value
+        div_yield:
+          type: number
+          format: float
+          description: Dividends / current value (%)
+        yoc:
+          type: number
+          format: float
+          description: Yield on cost — dividends / invested (%)
+        pid:
+          type: string
+          enum: ["1", "2"]
+          description: Portfolio identifier (present in combined views)
+
+    OverviewPortfolio:
+      type: object
+      properties:
+        value:
+          type: number
+          format: float
+        returns:
+          type: number
+          format: float
+        returns_pct:
+          type: number
+          format: float
+        invested:
+          type: number
+          format: float
+        positions:
+          type: integer
+        top_sector:
+          type: string
+
+    ActivityItem:
+      type: object
+      properties:
+        ticker:
+          type: string
+        type:
+          type: string
+          enum: [order, dividend]
+        action:
+          type: string
+          enum: [BUY, SELL, Dividend Paid]
+        dateExecuted:
+          type: string
+          format: date-time
+        filledQuantity:
+          type: number
+          format: float
+          nullable: true
+        fillPrice:
+          type: number
+          format: float
+          nullable: true
+        amount:
+          type: number
+          format: float
+          nullable: true
+          description: Present for dividend items
+        _company_name:
+          type: string
+        _pid:
+          type: string
+
+    DividendMonthlyItem:
+      type: object
+      properties:
+        month:
+          type: string
+          example: "2024-03"
+        amount:
+          type: number
+          format: float
+
+    Freshness:
+      type: object
+      properties:
+        prices:
+          type: string
+        dividends:
+          type: string
+        fx:
+          type: string
+
+    RiskMetrics:
+      type: object
+      properties:
+        twr:
+          type: number
+          format: float
+          description: Total portfolio TWR (%)
+        spy_twr:
+          type: number
+          format: float
+          description: SPY TWR over same period (%)
+        twr_vs_spy:
+          type: number
+          format: float
+          description: Portfolio TWR minus SPY TWR
+        beta:
+          type: number
+          format: float
+        volatility:
+          type: number
+          format: float
+          description: Annualised volatility (%)
+        sharpe:
+          type: number
+          format: float
+        sortino:
+          type: number
+          format: float
+        spy_sharpe:
+          type: number
+          format: float
+        pe:
+          type: number
+          format: float
+          description: Weighted average P/E ratio
+        data_days:
+          type: integer
+        insufficient_data:
+          type: boolean
+
+# ─── Paths ───────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Pages ──────────────────────────────────────────────────────────────────
+
+  /:
+    get:
+      tags: [Pages]
+      summary: SPA shell
+      description: Returns the single-page application HTML shell. Jinja variables `names` and `show_ai` are injected server-side.
+      responses:
+        "200":
+          description: HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /portfolio/{pid}:
+    get:
+      tags: [Pages]
+      summary: Redirect to SPA portfolio view
+      description: Backward-compatibility redirect to `/#portfolio/{pid}`.
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "302":
+          description: Redirect to SPA hash route
+
+  # ── Portfolio ───────────────────────────────────────────────────────────────
+
+  /api/overview:
+    get:
+      tags: [Portfolio]
+      summary: Combined portfolio overview
+      description: Returns summary values for each portfolio and the combined view. Used by the home page overview cards.
+      parameters:
+        - name: refresh
+          in: query
+          description: Force cache refresh
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+      responses:
+        "200":
+          description: Overview data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: Keyed by pid ("1", "2", "combined")
+                        additionalProperties:
+                          $ref: "#/components/schemas/OverviewPortfolio"
+                      metadata:
+                        type: object
+                        properties:
+                          names:
+                            type: object
+                            additionalProperties:
+                              type: string
+                          freshness:
+                            $ref: "#/components/schemas/Freshness"
+
+  /api/p{pid}/portfolio:
+    get:
+      tags: [Portfolio]
+      summary: Portfolio positions for a single portfolio
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+        - name: force
+          in: query
+          description: Bypass cache
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+      responses:
+        "200":
+          description: Position rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/PortfolioRow"
+                      cached:
+                        type: boolean
+                      cache_age:
+                        type: integer
+                      total_dividends:
+                        type: number
+                        format: float
+                      warning:
+                        type: string
+                        nullable: true
+                      freshness:
+                        $ref: "#/components/schemas/Freshness"
+
+  /api/pcombined/portfolio:
+    get:
+      tags: [Portfolio]
+      summary: Combined portfolio positions across all portfolios
+      description: Merges rows from both portfolios. Each row includes a `portfolio_ids` array.
+      responses:
+        "200":
+          description: Merged position rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          allOf:
+                            - $ref: "#/components/schemas/PortfolioRow"
+                            - type: object
+                              properties:
+                                portfolio_ids:
+                                  type: array
+                                  items:
+                                    type: string
+
+  /api/pcombined/top-performers:
+    get:
+      tags: [Portfolio]
+      summary: Top 5 holdings by total return
+      responses:
+        "200":
+          description: Top 5 consolidated rows sorted by total_returns descending
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/PortfolioRow"
+
+  /api/p{pid}/diversification-details:
+    get:
+      tags: [Portfolio]
+      summary: Sector/country diversification breakdown
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "200":
+          description: Diversification analysis
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          recommendations:
+                            type: array
+                            items:
+                              type: string
+                          sector_breakdown:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                sector:
+                                  type: string
+                                value:
+                                  type: number
+                                  format: float
+                                percentage:
+                                  type: number
+                                  format: float
+                          top_holdings:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                ticker:
+                                  type: string
+                                weight:
+                                  type: number
+                                  format: float
+                      metadata:
+                        type: object
+                        properties:
+                          freshness:
+                            $ref: "#/components/schemas/Freshness"
+
+  # ── Activity ────────────────────────────────────────────────────────────────
+
+  /api/p{pid}/activity:
+    get:
+      tags: [Activity]
+      summary: Trade order history for a single portfolio
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "200":
+          description: Activity items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ActivityItem"
+                      warning:
+                        type: string
+                        nullable: true
+
+  /api/pcombined/activity:
+    get:
+      tags: [Activity]
+      summary: Combined recent activity across all portfolios
+      description: Returns the 20 most recent orders/dividends across both portfolios.
+      responses:
+        "200":
+          description: Combined activity (max 20 items)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        maxItems: 20
+                        items:
+                          $ref: "#/components/schemas/ActivityItem"
+                      warning:
+                        type: string
+                        nullable: true
+
+  /api/p{pid}/stock-activity/{ticker}:
+    get:
+      tags: [Activity]
+      summary: Buy/sell/dividend history for a specific ticker
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+          example: AAPL
+      responses:
+        "200":
+          description: Stock activity items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/ActivityItem"
+
+  # ── Dividends ───────────────────────────────────────────────────────────────
+
+  /api/p{pid}/recent-dividends:
+    get:
+      tags: [Dividends]
+      summary: Recent dividends for a single portfolio
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "200":
+          description: Recent dividend payments
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ticker:
+                              type: string
+                            amount:
+                              type: number
+                              format: float
+                            paidOn:
+                              type: string
+                              format: date-time
+                            _pid:
+                              type: string
+
+  /api/pcombined/recent-dividends:
+    get:
+      tags: [Dividends]
+      summary: Combined recent dividends (max 15)
+      responses:
+        "200":
+          description: Recent dividends across all portfolios
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        maxItems: 15
+                        items:
+                          type: object
+                          properties:
+                            ticker:
+                              type: string
+                            amount:
+                              type: number
+                              format: float
+                            paidOn:
+                              type: string
+                              format: date-time
+                            _pid:
+                              type: string
+
+  /api/p{pid}/dividend-monthly:
+    get:
+      tags: [Dividends]
+      summary: Monthly dividend totals for a single portfolio
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "200":
+          description: Monthly dividend totals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DividendMonthlyItem"
+
+  /api/pcombined/dividend-monthly:
+    get:
+      tags: [Dividends]
+      summary: Combined monthly dividend totals across all portfolios
+      responses:
+        "200":
+          description: Monthly dividend totals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: "#/components/schemas/DividendMonthlyItem"
+
+  /api/upcoming-dividends:
+    get:
+      tags: [Dividends]
+      summary: Upcoming dividend ex-dates and pay dates
+      description: Pre-fetched by background thread. Cached 12h.
+      responses:
+        "200":
+          description: Upcoming dividend schedule
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ticker:
+                              type: string
+                            payment_date:
+                              type: string
+                              format: date
+                            ex_date:
+                              type: string
+                              format: date
+                            amount:
+                              type: number
+                              format: float
+                      last_refresh:
+                        type: integer
+                        description: UNIX timestamp of last background refresh
+                      cached:
+                        type: integer
+                      total:
+                        type: integer
+
+  # ── History ─────────────────────────────────────────────────────────────────
+
+  /api/p{pid}/history:
+    get:
+      tags: [History]
+      summary: Portfolio value snapshot history (48h)
+      description: Returns 5-minute-bucket snapshots for the last 48 hours. Used for overview card sparklines.
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "200":
+          description: Snapshot time series
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ts:
+                              type: integer
+                              description: UNIX timestamp
+                            value:
+                              type: number
+                              format: float
+
+  /api/pcombined/daily-history:
+    get:
+      tags: [History]
+      summary: Combined daily portfolio value history (up to 365 days)
+      description: One data point per day. Used for Portfolio vs S&P 500 and drawdown charts.
+      responses:
+        "200":
+          description: Daily history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                              format: date
+                            ts:
+                              type: integer
+                            value:
+                              type: number
+                              format: float
+
+  /api/p{pid}/monthly-returns:
+    get:
+      tags: [History]
+      summary: Monthly return percentages for a portfolio
+      description: Cached 30 minutes.
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "200":
+          description: Monthly returns
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            month:
+                              type: string
+                              example: "2024-03"
+                            pct:
+                              type: number
+                              format: float
+                            value:
+                              type: number
+                              format: float
+
+  /api/p{pid}/monthly-performance:
+    get:
+      tags: [History]
+      summary: Per-ticker monthly performance matrix
+      description: Returns a map of ticker → month → percentage return. Cached 15 minutes.
+      parameters:
+        - $ref: "#/components/parameters/PidPath"
+      responses:
+        "200":
+          description: Monthly performance matrix
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: "{ '<ticker>': { '<YYYY-MM>': <pct> } }"
+                        additionalProperties:
+                          type: object
+                          additionalProperties:
+                            type: number
+                            format: float
+
+  # ── Risk Metrics ─────────────────────────────────────────────────────────────
+
+  /api/pcombined/risk-metrics:
+    get:
+      tags: [RiskMetrics]
+      summary: Portfolio risk statistics vs SPY benchmark
+      description: |
+        Computes TWR, Beta, Volatility, Sharpe, Sortino, and weighted P/E using
+        up to 1 year of daily snapshot data. Cached 1 hour.
+        Returns `insufficient_data: true` when fewer than 5 trading days of history exist.
+      responses:
+        "200":
+          description: Risk metrics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/RiskMetrics"
+
+  # ── Market ──────────────────────────────────────────────────────────────────
+
+  /api/market-indicators:
+    get:
+      tags: [Market]
+      summary: S&P 500, NASDAQ and VIX indicator data
+      description: Returns price series and moving averages. Cached 30 minutes.
+      responses:
+        "200":
+          description: Market indicators
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: "Keyed by symbol: GSPC, IXIC, VIX"
+                        additionalProperties:
+                          type: object
+                          properties:
+                            label:
+                              type: string
+                              example: S&P 500
+                            ma_period:
+                              type: integer
+                              example: 125
+                            timestamps:
+                              type: array
+                              items:
+                                type: integer
+                            values:
+                              type: array
+                              items:
+                                type: number
+                                format: float
+                            ma:
+                              type: array
+                              items:
+                                type: number
+                                format: float
+                            current:
+                              type: number
+                              format: float
+                            current_ma:
+                              type: number
+                              format: float
+                            pct_vs_ma:
+                              type: number
+                              format: float
+
+  /api/market-status:
+    get:
+      tags: [Market]
+      summary: NASDAQ and LSE open/close session status
+      description: Session data cached 60s; schedule metadata cached 6h.
+      responses:
+        "200":
+          description: Market session status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: "Keyed by exchange: NASDAQ, LSE"
+                        additionalProperties:
+                          type: object
+                          properties:
+                            session:
+                              type: string
+                              enum: [open, pre-market, after-hours, closed]
+                            schedule:
+                              type: object
+                              properties:
+                                today_open:
+                                  type: string
+                                  format: date-time
+                                today_close:
+                                  type: string
+                                  format: date-time
+                                upcoming:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      open:
+                                        type: string
+                                        format: date-time
+                                      close:
+                                        type: string
+                                        format: date-time
+
+  /api/fx-rate:
+    get:
+      tags: [Market]
+      summary: Current GBP/USD exchange rate
+      description: Cached 5 minutes.
+      responses:
+        "200":
+          description: FX rate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rate:
+                    type: number
+                    format: float
+                    example: 1.2745
+
+  /api/news:
+    get:
+      tags: [Market]
+      summary: General market news
+      description: Sourced from CNBC RSS. Cached 30 minutes.
+      responses:
+        "200":
+          description: News items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            headline:
+                              type: string
+                            source:
+                              type: string
+                            url:
+                              type: string
+                            image:
+                              type: string
+                              nullable: true
+                            datetime:
+                              type: integer
+
+  /api/market-digest:
+    get:
+      tags: [Market]
+      summary: Market digest summary text
+      description: Cached 5 minutes per provider.
+      parameters:
+        - name: provider
+          in: query
+          description: Digest source
+          schema:
+            type: string
+            enum: [finviz, claude, gemini]
+            default: finviz
+        - name: refresh
+          in: query
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+      responses:
+        "200":
+          description: Market digest
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      provider:
+                        type: string
+                      digest:
+                        type: string
+                        description: Markdown-formatted summary
+                      cached:
+                        type: boolean
+
+  # ── Home data ────────────────────────────────────────────────────────────────
+
+  /api/home-data:
+    get:
+      tags: [Portfolio]
+      summary: All home-page data in one request
+      description: |
+        Aggregates overview, recent activity, top/under-performers, market indicators,
+        and FX rate into a single response to minimise round-trips on the home page.
+      parameters:
+        - name: refresh
+          in: query
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+      responses:
+        "200":
+          description: Home page bundle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      overview:
+                        type: object
+                        additionalProperties:
+                          $ref: "#/components/schemas/OverviewPortfolio"
+                      overview_metadata:
+                        type: object
+                        properties:
+                          names:
+                            type: object
+                            additionalProperties:
+                              type: string
+                          freshness:
+                            $ref: "#/components/schemas/Freshness"
+                      activity:
+                        type: array
+                        maxItems: 20
+                        items:
+                          $ref: "#/components/schemas/ActivityItem"
+                      top_performers:
+                        type: array
+                        maxItems: 5
+                        items:
+                          $ref: "#/components/schemas/PortfolioRow"
+                      under_performers:
+                        type: array
+                        maxItems: 5
+                        items:
+                          $ref: "#/components/schemas/PortfolioRow"
+                      market_indicators:
+                        type: object
+                        description: Same structure as /api/market-indicators data field
+                      fx_rate:
+                        type: number
+                        format: float
+
+  # ── Stocks ──────────────────────────────────────────────────────────────────
+
+  /api/stock-tickers:
+    get:
+      tags: [Stocks]
+      summary: Real-time prices and change for all held tickers
+      description: Fetched from Yahoo Finance. Cached 60s.
+      responses:
+        "200":
+          description: Ticker price data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ticker:
+                              type: string
+                            company_name:
+                              type: string
+                            price:
+                              type: number
+                              format: float
+                            change:
+                              type: number
+                              format: float
+                            change_pct:
+                              type: number
+                              format: float
+                            currency:
+                              type: string
+                            current_value:
+                              type: number
+                              format: float
+                            sector:
+                              type: string
+                            quantity:
+                              type: number
+                              format: float
+                            avg_price:
+                              type: number
+                              format: float
+                            invested:
+                              type: number
+                              format: float
+                            total_returns:
+                              type: number
+                              format: float
+                            returns_pct:
+                              type: number
+                              format: float
+                            country:
+                              type: string
+
+  /api/stock-sparklines:
+    get:
+      tags: [Stocks]
+      summary: 48-hour OHLC sparkline data per ticker
+      description: Fetched from Yahoo Finance for 5-day/1-hour intervals.
+      parameters:
+        - name: tickers
+          in: query
+          required: true
+          description: Comma-separated list of ticker symbols
+          schema:
+            type: string
+          example: AAPL,MSFT,GOOGL
+        - name: countries
+          in: query
+          description: Comma-separated country codes aligned with tickers
+          schema:
+            type: string
+          example: US,US,US
+      responses:
+        "200":
+          description: Sparkline data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: "{ '<ticker>': [ { ts, price } ] }"
+                        additionalProperties:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              ts:
+                                type: integer
+                              price:
+                                type: number
+                                format: float
+
+  /api/stock-metrics/{ticker}:
+    get:
+      tags: [Stocks]
+      summary: Fundamental metrics for a single ticker
+      description: P/E, market cap, 52-week range, beta from Yahoo Finance. Cached 24h. Only available for US/CA equities.
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+          example: AAPL
+      responses:
+        "200":
+          description: Fundamental metrics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: Raw Yahoo Finance summary metrics dict
+                        additionalProperties: true
+
+  /api/stock-news/{ticker}:
+    get:
+      tags: [Stocks]
+      summary: Company news for a single ticker
+      description: Sourced from Yahoo Finance. Cached 30 minutes.
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+          example: AAPL
+      responses:
+        "200":
+          description: News items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            headline:
+                              type: string
+                            source:
+                              type: string
+                            url:
+                              type: string
+                            image:
+                              type: string
+                              nullable: true
+                            datetime:
+                              type: integer
+
+  # ── Analyst ─────────────────────────────────────────────────────────────────
+
+  /api/analyst-ratings:
+    get:
+      tags: [Analyst]
+      summary: Analyst buy/hold/sell consensus for all held tickers
+      description: Cached 24h per ticker.
+      responses:
+        "200":
+          description: Analyst ratings
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        description: "Keyed by ticker symbol"
+                        additionalProperties:
+                          type: object
+                          properties:
+                            strongBuy:
+                              type: integer
+                            buy:
+                              type: integer
+                            hold:
+                              type: integer
+                            sell:
+                              type: integer
+                            strongSell:
+                              type: integer
+                            total:
+                              type: integer
+                            hasBreakdown:
+                              type: boolean
+                            period:
+                              type: string
+                              example: past 3 months
+                            consensus:
+                              type: string
+                              enum: [Strong Buy, Buy, Hold, Sell, Strong Sell]
+                            avgTarget:
+                              type: number
+                              format: float
+                            highTarget:
+                              type: number
+                              format: float
+                            lowTarget:
+                              type: number
+                              format: float
+
+  /api/earnings:
+    get:
+      tags: [Analyst]
+      summary: Upcoming earnings dates for held tickers
+      description: Cached 24h per symbol.
+      responses:
+        "200":
+          description: Earnings calendar
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            symbol:
+                              type: string
+                            date:
+                              type: string
+                              format: date
+                            epsActual:
+                              type: number
+                              format: float
+                              nullable: true
+                            epsEstimate:
+                              type: number
+                              format: float
+                              nullable: true
+                            _company_name:
+                              type: string
+
+  # ── Watchlist ────────────────────────────────────────────────────────────────
+
+  /api/watchlist/tickers:
+    get:
+      tags: [Watchlist]
+      summary: Get watchlist tickers
+      responses:
+        "200":
+          description: List of ticker symbols
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: string
+                        example: [AAPL, NVDA, TSLA]
+    post:
+      tags: [Watchlist]
+      summary: Replace watchlist tickers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tickers]
+              properties:
+                tickers:
+                  type: array
+                  items:
+                    type: string
+                  example: [AAPL, NVDA, TSLA]
+      responses:
+        "200":
+          description: Updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusOk"
+
+  /api/watchlist/signals:
+    get:
+      tags: [Watchlist]
+      summary: Analyst price target signals for a watchlist ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          schema:
+            type: string
+          example: NVDA
+        - name: country
+          in: query
+          schema:
+            type: string
+            default: US
+      responses:
+        "200":
+          description: Price targets
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          avg:
+                            type: number
+                            format: float
+                          high:
+                            type: number
+                            format: float
+                          low:
+                            type: number
+                            format: float
+                          rec_text:
+                            type: string
+                            example: Buy
+
+  /api/watchlist/fundamentals:
+    get:
+      tags: [Watchlist]
+      summary: Key fundamental metrics for a watchlist ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: query
+          schema:
+            type: string
+            default: US
+      responses:
+        "200":
+          description: Fundamentals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          market_cap:
+                            type: number
+                            format: float
+                          revenue:
+                            type: number
+                            format: float
+                          rev_multiple:
+                            type: number
+                            format: float
+                          pe_ratio:
+                            type: number
+                            format: float
+
+  /api/watchlist/price:
+    get:
+      tags: [Watchlist]
+      summary: Current price and daily change for a watchlist ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: country
+          in: query
+          schema:
+            type: string
+            default: US
+      responses:
+        "200":
+          description: Price data
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ticker:
+                            type: string
+                          company:
+                            type: string
+                          price:
+                            type: number
+                            format: float
+                          change_pct:
+                            type: number
+                            format: float
+                          currency:
+                            type: string
+
+  # ── Finviz ──────────────────────────────────────────────────────────────────
+
+  /api/finviz/news:
+    get:
+      tags: [Finviz]
+      summary: Market news from Finviz
+      description: Cached 5 minutes.
+      responses:
+        "200":
+          description: News items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                      cached:
+                        type: boolean
+
+  /api/finviz/insider:
+    get:
+      tags: [Finviz]
+      summary: Insider trading activity from Finviz
+      description: Cached 5 minutes.
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [latest, top week, top owner trade]
+            default: latest
+      responses:
+        "200":
+          description: Insider trading items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                      period:
+                        type: string
+                      cached:
+                        type: boolean
+
+  /api/finviz/signals:
+    get:
+      tags: [Finviz]
+      summary: Market signals (gainers, losers, volume, etc.) from Finviz
+      description: Returns up to 15 items. Cached 5 minutes.
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [gainers, losers, volume, newhighs, newlows, upgrades, downgrades, oversold, overbought]
+            default: gainers
+      responses:
+        "200":
+          description: Signal items
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        maxItems: 15
+                        items:
+                          type: object
+                          additionalProperties: true
+                      signal:
+                        type: string
+                      cached:
+                        type: boolean
+
+  /api/finviz/sp500-heatmap:
+    get:
+      tags: [Finviz]
+      summary: S&P 500 sector heatmap data from Finviz
+      description: Cached 5 minutes.
+      responses:
+        "200":
+          description: S&P 500 stock data with sector and change
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ticker:
+                              type: string
+                            sector:
+                              type: string
+                            change_pct:
+                              type: number
+                              format: float
+                            price:
+                              type: number
+                              format: float
+                            market_cap:
+                              type: number
+                              format: float
+                      cached:
+                        type: boolean
+
+  /api/finviz/stock/{ticker}:
+    get:
+      tags: [Finviz]
+      summary: Full Finviz profile for a single ticker
+      description: Includes fundamentals, signals, analyst ratings and insider activity. Cached 10 minutes.
+      parameters:
+        - name: ticker
+          in: path
+          required: true
+          schema:
+            type: string
+          example: AAPL
+      responses:
+        "200":
+          description: Finviz stock profile
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        additionalProperties: true
+                      cached:
+                        type: boolean
+
+  # ── Trade Signals ────────────────────────────────────────────────────────────
+
+  /api/trade-signals:
+    get:
+      tags: [TradeSignals]
+      summary: AI-generated trade signal recommendations for held positions
+      description: Cached 12 hours.
+      parameters:
+        - name: refresh
+          in: query
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+      responses:
+        "200":
+          description: Trade signals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ticker:
+                              type: string
+                            company_name:
+                              type: string
+                            currency:
+                              type: string
+                            signal:
+                              type: string
+                              enum: [STRONG BUY, BUY, HOLD, SELL, STRONG SELL]
+                            conviction:
+                              type: string
+                              enum: [HIGH, MEDIUM, LOW]
+                            entry:
+                              type: number
+                              format: float
+                            target:
+                              type: number
+                              format: float
+                            max_target:
+                              type: number
+                              format: float
+                            min_target:
+                              type: number
+                              format: float
+                            stop:
+                              type: number
+                              format: float
+                            exp_return:
+                              type: number
+                              format: float
+                            suggested_weight:
+                              type: number
+                              format: float
+                            timeframe:
+                              type: string
+                              example: 12 months
+                      cached:
+                        type: boolean
+
+  /api/trade-signals/exclude:
+    post:
+      tags: [TradeSignals]
+      summary: Exclude or include a ticker from trade signals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ticker, excluded]
+              properties:
+                ticker:
+                  type: string
+                  example: TSLA
+                excluded:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated exclusion status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      ticker:
+                        type: string
+                      excluded:
+                        type: boolean
+
+  /api/trade-signals/excluded:
+    get:
+      tags: [TradeSignals]
+      summary: List all excluded tickers
+      responses:
+        "200":
+          description: Excluded tickers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: string
+
+  # ── AI ───────────────────────────────────────────────────────────────────────
+
+  /api/ai/market-digest:
+    get:
+      tags: [AI]
+      summary: Gemini AI-generated market digest
+      responses:
+        "200":
+          description: AI market digest
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      digest:
+                        type: string
+                        description: AI-generated market summary
+
+  /api/ai/trade-signals:
+    get:
+      tags: [AI]
+      summary: Gemini AI-generated trade recommendations
+      responses:
+        "200":
+          description: AI trade signals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      signals:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+
+  /api/ai/chat:
+    post:
+      tags: [AI]
+      summary: Gemini AI portfolio chat
+      description: Conversational endpoint for natural-language portfolio questions.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+                  example: What is my best performing sector?
+                history:
+                  type: array
+                  description: Prior conversation turns
+                  items:
+                    type: object
+                    properties:
+                      role:
+                        type: string
+                        enum: [user, model]
+                      parts:
+                        type: array
+                        items:
+                          type: string
+      responses:
+        "200":
+          description: AI response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      response:
+                        type: string
+
+  # ── Admin & Health ──────────────────────────────────────────────────────────
+
+  /api/admin/clear-cache:
+    post:
+      tags: [Admin]
+      summary: Clear all server-side cache entries
+      description: |
+        Wipes all KV cache rows, portfolio rows cache, and portfolio snapshots.
+        **Warning:** This will cause all subsequent requests to re-fetch live data.
+      responses:
+        "200":
+          description: Cache cleared
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/StatusOk"
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                        example: Cache cleared successfully
+
+  /health:
+    get:
+      tags: [Admin]
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+# ─── Reusable Parameters ─────────────────────────────────────────────────────
+  parameters:
+    PidPath:
+      name: pid
+      in: path
+      required: true
+      description: Portfolio identifier
+      schema:
+        type: string
+        enum: ["1", "2", combined]
+      example: "1"

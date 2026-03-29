@@ -1,4 +1,3 @@
-from BACKUP.RM.Operations.oncall.src.oncall.api.v0.team_subscriptions import logger
 import json
 import os
 import time
