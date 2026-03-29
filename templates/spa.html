@@ -782,6 +782,12 @@
                 </div>
                 <div class="toolbar-right">
                   <span class="row-count" id="rowCount"></span>
+                  <div class="col-picker-wrap">
+                    <button class="btn btn-col-picker" id="colPickerBtn" onclick="toggleColPicker()">
+                      <span class="material-symbols-outlined btn-icon">view_column</span>
+                      Columns
+                    </button>
+                  </div>
                   <button class="btn btn-csv" onclick="exportCSV()">
                     <span class="material-symbols-outlined btn-icon">download</span>
                     Export CSV
@@ -792,35 +798,37 @@
                 <table class="portfolio-table">
                   <thead>
                     <tr>
-                      <th class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker <span
+                      <th data-colid="ticker" class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable" data-col="company_name" onclick="sortTable(this)">Company <span
+                      <th data-colid="company" class="th-sortable" data-col="company_name" onclick="sortTable(this)">Company <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable" data-col="country" onclick="sortTable(this)">Country <span
+                      <th data-colid="country" class="th-sortable" data-col="country" onclick="sortTable(this)">Country <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-center" title="48-hour price movement">48h Trend</th>
-                      <th class="th-sortable th-right" data-col="quantity" onclick="sortTable(this)">Shares <span
+                      <th data-colid="trend" class="th-center" title="48-hour price movement">48h Trend</th>
+                      <th data-colid="shares" class="th-sortable th-right" data-col="quantity" onclick="sortTable(this)">Shares <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="avg_price" onclick="sortTable(this)">Avg Price <span
+                      <th data-colid="avg_price" class="th-sortable th-right" data-col="avg_price" onclick="sortTable(this)">Avg Price <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="invested" onclick="sortTable(this)">Invested <span
+                      <th data-colid="current_price" class="th-right">Current Price</th>
+                      <th data-colid="breakeven" class="th-right" title="Dividend-adjusted breakeven price per share. Green = in profit. Red = shows currency shortfall to break even.">Breakeven</th>
+                      <th data-colid="invested" class="th-sortable th-right" data-col="invested" onclick="sortTable(this)">Invested <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="current_value" onclick="sortTable(this)">Value (GBP)
+                      <th data-colid="value" class="th-sortable th-right" data-col="current_value" onclick="sortTable(this)">Value (GBP)
                         <span class="sort-icon">↕</span>
                       </th>
-                      <th class="th-sortable th-right" data-col="weight" onclick="sortTable(this)">Weight <span
+                      <th data-colid="weight" class="th-sortable th-right" data-col="weight" onclick="sortTable(this)">Weight <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="total_returns" onclick="sortTable(this)">P&amp;L <span
+                      <th data-colid="pnl" class="th-sortable th-right" data-col="total_returns" onclick="sortTable(this)">P&amp;L <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="fx_impact" onclick="sortTable(this)"
+                      <th data-colid="fx_impact" class="th-sortable th-right" data-col="fx_impact" onclick="sortTable(this)"
                         title="Gain or loss in GBP caused by currency movements since purchase.">FX Impact <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="returns_pct" onclick="sortTable(this)">Returns % <span
+                      <th data-colid="returns_pct" class="th-sortable th-right" data-col="returns_pct" onclick="sortTable(this)">Returns % <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="div_yield" onclick="sortTable(this)"
+                      <th data-colid="div_yield" class="th-sortable th-right" data-col="div_yield" onclick="sortTable(this)"
                         title="Annual dividend yield based on dividends received vs current value">Div Yield <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-right" title="Analyst consensus rating">Rating</th>
+                      <th data-colid="rating" class="th-right" title="Analyst consensus rating">Rating</th>
                     </tr>
                   </thead>
                   <tbody id="tableBody"></tbody>

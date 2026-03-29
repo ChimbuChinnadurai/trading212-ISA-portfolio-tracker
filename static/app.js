@@ -24,6 +24,100 @@ let _todayReturns = null;     // null = not yet fetched
 let _todayReturnsPct = null;
 let _tickerChangeMap = {};    // ticker -> change_pct (today)
 
+/* ─── Column picker ─────────────────────────────────────────────────────── */
+const _COL_DEFS = [
+  { id: 'ticker',        label: 'Ticker',        locked: true },
+  { id: 'company',       label: 'Company'                     },
+  { id: 'country',       label: 'Country'                     },
+  { id: 'trend',         label: '48h Trend'                   },
+  { id: 'shares',        label: 'Shares'                      },
+  { id: 'avg_price',     label: 'Avg Price'                   },
+  { id: 'current_price', label: 'Current Price'               },
+  { id: 'breakeven',     label: 'Breakeven'                   },
+  { id: 'invested',      label: 'Invested'                    },
+  { id: 'value',         label: 'Value'                       },
+  { id: 'weight',        label: 'Weight'                      },
+  { id: 'pnl',           label: 'P&L'                        },
+  { id: 'fx_impact',     label: 'FX Impact'                   },
+  { id: 'returns_pct',   label: 'Returns %'                   },
+  { id: 'div_yield',     label: 'Div Yield'                   },
+  { id: 'rating',        label: 'Rating'                      },
+];
+
+function _loadColVis() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('colVisibility') || '{}');
+    const map = {};
+    _COL_DEFS.forEach(c => {
+      map[c.id] = c.locked ? true : (stored[c.id] !== undefined ? stored[c.id] : true);
+    });
+    return map;
+  } catch { return Object.fromEntries(_COL_DEFS.map(c => [c.id, true])); }
+}
+
+function _saveColVis(map) {
+  localStorage.setItem('colVisibility', JSON.stringify(map));
+}
+
+function _applyColVis(map) {
+  _COL_DEFS.forEach(c => {
+    document.querySelectorAll(`[data-colid="${c.id}"]`).forEach(el => {
+      el.classList.toggle('col-hidden', map[c.id] === false);
+    });
+  });
+}
+
+function toggleColPicker() {
+  let dropdown = document.getElementById('colPickerDropdown');
+  if (!dropdown) {
+    const map = _loadColVis();
+    const wrap = document.getElementById('colPickerBtn').closest('.col-picker-wrap');
+    dropdown = document.createElement('div');
+    dropdown.id = 'colPickerDropdown';
+    dropdown.className = 'col-picker-dropdown';
+    dropdown.innerHTML = `
+      <div class="col-picker-header">
+        <span>Toggle Columns</span>
+        <button class="col-picker-reset" onclick="_resetColVis()">Reset all</button>
+      </div>
+      <div class="col-picker-list">
+        ${_COL_DEFS.map(c => `
+          <label class="col-picker-item${c.locked ? ' col-picker-locked' : ''}">
+            <input type="checkbox" data-col="${c.id}" ${map[c.id] !== false ? 'checked' : ''} ${c.locked ? 'disabled' : ''} onchange="_onColToggle(this)">
+            <span>${c.label}</span>
+          </label>
+        `).join('')}
+      </div>`;
+    wrap.appendChild(dropdown);
+  }
+  dropdown.classList.toggle('open');
+}
+
+function _onColToggle(cb) {
+  const map = _loadColVis();
+  map[cb.dataset.col] = cb.checked;
+  _saveColVis(map);
+  _applyColVis(map);
+}
+
+function _resetColVis() {
+  localStorage.removeItem('colVisibility');
+  const map = _loadColVis();
+  document.querySelectorAll('#colPickerDropdown input[type=checkbox]').forEach(cb => {
+    cb.checked = map[cb.dataset.col] !== false;
+  });
+  _applyColVis(map);
+}
+
+document.addEventListener('click', e => {
+  const dropdown = document.getElementById('colPickerDropdown');
+  if (dropdown && dropdown.classList.contains('open')) {
+    if (!dropdown.contains(e.target) && !e.target.closest('#colPickerBtn')) {
+      dropdown.classList.remove('open');
+    }
+  }
+});
+
 /* ─── Currency colors ───────────────────────────────────────────────────── */
 const CURRENCY_COLORS = {
   GBP: '#3b82f6', USD: '#f43f5e', EUR: '#8b5cf6',
@@ -311,7 +405,7 @@ function showSkeletons() {
   if (tbody) {
     tbody.innerHTML = Array(8).fill(0).map(() => `
       <tr class="skeleton-row-loading">
-        <td colspan="14"><div class="skeleton skeleton-row"></div></td>
+        <td colspan="16"><div class="skeleton skeleton-row"></div></td>
       </tr>
     `).join('');
   }
@@ -756,36 +850,53 @@ function renderTable(rows) {
       ? `<span class="div-yield-badge">${r.div_yield.toFixed(2)}%</span>`
       : '<span class="div-yield-badge">0.00%</span>';
 
+    // Current price + Breakeven cells
+    const beQty = r.quantity || 1;
+    const beBreakeven = (r.invested - (r.dividends || 0)) / beQty;
+    const beCurrentPx = r.current_value / beQty;
+    const currentPxCell = `<span class="cell-num">${fmt.currency(beCurrentPx, 4)}</span>`;
+    let beCell;
+    if (beCurrentPx >= beBreakeven) {
+      beCell = `<span class="be-profit">${fmt.currency(beBreakeven, 4)}</span>`;
+    } else {
+      const shortfall = (beBreakeven - beCurrentPx).toFixed(4);
+      beCell = `<span class="be-loss">${fmt.currency(beBreakeven, 4)}</span><br><span class="be-needed-tag">${fmt.currency(shortfall, 4)} short</span>`;
+    }
+
     const sparkId = 'sspark-' + r.ticker.replace(/[^a-zA-Z0-9]/g, '_');
     tr.innerHTML = `
-      <td><span class="cell-ticker">${esc(r.ticker)}</span></td>
-      <td>
+      <td data-colid="ticker"><span class="cell-ticker">${esc(r.ticker)}</span></td>
+      <td data-colid="company">
         <div class="cell-name-wrap">
           <span class="cell-company" title="${esc(r.company_name)}">${esc(r.company_name)}</span>
           ${sectorLabel}
         </div>
       </td>
-      <td><span class="${cbClass}">${esc(r.country)}</span></td>
-      <td class="td-center"><canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas></td>
-      <td class="td-right cell-num">${fmt.number(r.quantity, 6)}</td>
-      <td class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
-      <td class="td-right cell-num">${fmt.currency(r.invested)}</td>
-      <td class="td-right cell-num">${fmt.currency(r.current_value)}</td>
-      <td class="td-right">${weightCell}</td>
-      <td class="td-right">
+      <td data-colid="country"><span class="${cbClass}">${esc(r.country)}</span></td>
+      <td data-colid="trend" class="td-center"><canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas></td>
+      <td data-colid="shares" class="td-right cell-num">${fmt.number(r.quantity, 6)}</td>
+      <td data-colid="avg_price" class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
+      <td data-colid="current_price" class="td-right cell-num">${currentPxCell}</td>
+      <td data-colid="breakeven" class="td-right cell-num">${beCell}</td>
+      <td data-colid="invested" class="td-right cell-num">${fmt.currency(r.invested)}</td>
+      <td data-colid="value" class="td-right cell-num">${fmt.currency(r.current_value)}</td>
+      <td data-colid="weight" class="td-right">${weightCell}</td>
+      <td data-colid="pnl" class="td-right">
         ${_pnlCell(r.total_returns, r.returns_pct)}
       </td>
-      <td class="td-right cell-num">${fxCell}</td>
-      <td class="td-right">
+      <td data-colid="fx_impact" class="td-right cell-num">${fxCell}</td>
+      <td data-colid="returns_pct" class="td-right">
         <span class="pct-badge ${colorClass(r.returns_pct)}">
           ${r.returns_pct >= 0 ? '▲' : '▼'} ${Math.abs(r.returns_pct).toFixed(2)}%
         </span>
       </td>
-      <td class="td-right">${divYieldCell}</td>
-      <td class="td-right">${_ratingCell(r)}</td>
+      <td data-colid="div_yield" class="td-right">${divYieldCell}</td>
+      <td data-colid="rating" class="td-right">${_ratingCell(r)}</td>
     `;
     tbody.appendChild(tr);
   });
+
+  _applyColVis(_loadColVis());
 
   const total = rows.length, shown = filtered.length;
   const rcEl = document.getElementById('rowCount');
@@ -1434,8 +1545,16 @@ window.openStockPanel = function (r) {
   const qty = r.quantity || 1;
   const divs = r.dividends || 0;
   const breakeven = (r.invested - divs) / qty;
+  const currentPx = r.current_value / qty;
   const beEl = document.getElementById('spBreakeven');
-  if (beEl) beEl.textContent = fmt.currency(breakeven, 4);
+  if (beEl) {
+    if (currentPx >= breakeven) {
+      beEl.innerHTML = `<span class="be-profit">${fmt.currency(breakeven, 4)}</span>`;
+    } else {
+      const neededPct = breakeven > 0 ? ((breakeven - currentPx) / currentPx * 100).toFixed(1) : 0;
+      beEl.innerHTML = `<span class="be-loss">${fmt.currency(breakeven, 4)}</span><span class="be-needed-tag">+${neededPct}% needed</span>`;
+    }
+  }
 
   // Held Since: placeholder until activity loads
   const hsEl = document.getElementById('spHeldSince');

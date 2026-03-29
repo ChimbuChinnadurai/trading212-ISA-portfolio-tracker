@@ -1,3 +1,4 @@
+from BACKUP.RM.Operations.oncall.src.oncall.api.v0.team_subscriptions import logger
 import json
 import os
 import time
@@ -279,8 +280,11 @@ def snapshot_get(pid: str, hours: int = 24) -> list:
 
 def clear_all_cache() -> None:
     """Wipe all cached tables in the database."""
-    with _db() as conn:
-        conn.execute("DELETE FROM portfolio_cache")
-        conn.execute("DELETE FROM kv_cache")
-        conn.execute("DELETE FROM portfolio_history")
-        conn.execute("DELETE FROM portfolio_snapshots")
+    if _USE_PG:
+        logger.info("Cache clear is not avaiable in production")
+    else:
+        with _db() as conn:
+            conn.execute("DELETE FROM portfolio_cache")
+            conn.execute("DELETE FROM kv_cache")
+            conn.execute("DELETE FROM portfolio_history")
+            conn.execute("DELETE FROM portfolio_snapshots")
