@@ -1304,7 +1304,6 @@ function _drawSectorRadialChart() {
 
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
     const textPrimary   = isDark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.78)';
-    const textMuted     = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)';
     const gridColor     = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
 
     ctx.clearRect(0, 0, W, H);
@@ -1359,6 +1358,17 @@ function _drawSectorRadialChart() {
         ctx.stroke();
     }
 
+    // ── Colour bands — same scheme as Monthly Performance heatmap ───────────
+    const _sectorBandColors = pct => {
+        if (pct >= 10) return ['#052e16', '#15803d'];
+        if (pct >=  5) return ['#14532d', '#16a34a'];
+        if (pct >=  2) return ['#166534', '#22c55e'];
+        if (pct >=  0) return ['#0f766e', '#14b8a6'];
+        if (pct >= -2) return ['#78350f', '#b45309'];
+        if (pct >= -5) return ['#7f1d1d', '#dc2626'];
+        return                 ['#450a0a', '#b91c1c'];
+    };
+
     // ── Wedges ──────────────────────────────────────────────────────────────
     for (let i = 0; i < N; i++) {
         const s = sectors[i];
@@ -1366,26 +1376,18 @@ function _drawSectorRadialChart() {
         const endA   = -Math.PI / 2 + (i + 1) * sa - GAP;
         const r      = Math.max(maxR * Math.abs(s.avg) / maxAbs, 4);
 
-        const isPos = s.avg >  0.01;
-        const isNeg = s.avg < -0.01;
-        const fill  = isPos
-            ? (isDark ? 'rgba(34,197,94,0.70)'  : 'rgba(22,163,74,0.72)')
-            : isNeg
-            ? (isDark ? 'rgba(239,68,68,0.70)'  : 'rgba(220,38,38,0.70)')
-            : 'rgba(148,163,184,0.45)';
-        const stroke = isPos
-            ? (isDark ? 'rgba(34,197,94,0.30)'  : 'rgba(22,163,74,0.30)')
-            : isNeg
-            ? (isDark ? 'rgba(239,68,68,0.30)'  : 'rgba(220,38,38,0.30)')
-            : 'rgba(148,163,184,0.20)';
+        const [c1, c2] = _sectorBandColors(s.avg);
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        grd.addColorStop(0, c1);
+        grd.addColorStop(1, c2);
 
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.arc(cx, cy, r, startA, endA);
         ctx.closePath();
-        ctx.fillStyle = fill;
+        ctx.fillStyle = grd;
         ctx.fill();
-        ctx.strokeStyle = stroke;
+        ctx.strokeStyle = c2 + '55';
         ctx.lineWidth = 1;
         ctx.stroke();
     }
@@ -1399,13 +1401,7 @@ function _drawSectorRadialChart() {
         const ly     = cy + dist * Math.sin(midA);
 
         const sign   = s.avg >= 0 ? '+' : '';
-        const isPos  = s.avg >  0.01;
-        const isNeg  = s.avg < -0.01;
-        const pctCol = isPos
-            ? (isDark ? '#4ade80' : '#16a34a')
-            : isNeg
-            ? (isDark ? '#f87171' : '#dc2626')
-            : textMuted;
+        const pctCol = _sectorBandColors(s.avg)[1];
 
         // Align based on position around circle
         const cosA = Math.cos(midA);

@@ -1568,7 +1568,8 @@ window.openStockPanel = function (r) {
   window.loadStockActivity(r.ticker);
   window.loadStockNews(r.ticker);
   if (r.country === 'US' || r.country === 'CA') {
-    window.loadStockMetrics(r.ticker);
+    const nativePx = r.native_price != null ? r.native_price : (r.current_value / (r.quantity || 1));
+    window.loadStockMetrics(r.ticker, nativePx);
   } else {
     const sec = document.getElementById('spFundamentalsSection');
     if (sec) sec.style.display = 'none';
@@ -1780,7 +1781,7 @@ window.calNextMonth = function () {
 }
 
 /* ─── Stock Fundamentals ─────────────────────────────────────────────────── */
-window.loadStockMetrics = async function (ticker) {
+window.loadStockMetrics = async function (ticker, currentPrice) {
   const sec = document.getElementById('spFundamentalsSection');
   const container = document.getElementById('spFundamentals');
   if (!sec || !container) return;
@@ -1803,14 +1804,14 @@ window.loadStockMetrics = async function (ticker) {
       container.innerHTML = `<div class="activity-empty">${json.message || 'No fundamental data available.'}</div>`;
       return;
     }
-    _renderStockMetrics(json.data);
+    _renderStockMetrics(json.data, currentPrice);
   } catch (err) {
     console.error('Fundamentals error:', err);
     container.innerHTML = '<div class="activity-empty">Error loading fundamentals.</div>';
   }
 }
 
-function _renderStockMetrics(m) {
+function _renderStockMetrics(m, currentPrice) {
   const container = document.getElementById('spFundamentals');
 
   // Helper: format a number with fixed decimals and optional suffix
@@ -1879,6 +1880,15 @@ function _renderStockMetrics(m) {
   if (hi != null && lo != null && hi > lo) {
     const hiDate = m['52WeekHighDate'] ? ` (${m['52WeekHighDate']})` : '';
     const loDate = m['52WeekLowDate'] ? ` (${m['52WeekLowDate']})` : '';
+    const px = (currentPrice != null && isFinite(currentPrice)) ? currentPrice : null;
+    const fillPct = px != null ? Math.min(100, Math.max(0, ((px - lo) / (hi - lo)) * 100)) : null;
+    const markerHtml = fillPct != null
+      ? `<div class="fund-range-marker" style="left:${fillPct.toFixed(1)}%"></div>`
+      : '';
+    const fillStyle = fillPct != null ? `style="width:${fillPct.toFixed(1)}%"` : '';
+    const currentLabel = px != null
+      ? `<div class="fund-range-current">Current: $${Number(px).toFixed(2)} &nbsp;·&nbsp; ${fillPct.toFixed(0)}% of range</div>`
+      : '';
     rangeBar = `
       <div class="fund-range-wrap">
         <div class="fund-range-header">
@@ -1886,7 +1896,11 @@ function _renderStockMetrics(m) {
           <span class="fund-range-label">52-Week Range</span>
           <span class="fund-range-hi">$${Number(hi).toFixed(2)}<span class="fund-range-date">${hiDate}</span></span>
         </div>
-        <div class="fund-range-track"><div class="fund-range-fill"></div></div>
+        <div class="fund-range-track">
+          <div class="fund-range-fill" ${fillStyle}></div>
+          ${markerHtml}
+        </div>
+        ${currentLabel}
       </div>`;
   }
 
@@ -2057,6 +2071,181 @@ async function openDiversificationDetails() {
 function closeSummaryPanel() {
   document.getElementById('summaryPanel').classList.remove('open');
   document.getElementById('summaryPanelBackdrop').classList.remove('active');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PORTFOLIO REBALANCING PANEL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const _REBAL_STORAGE_KEY = () => `rebal_targets_${PORTFOLIO_ID}`;
+
+function _loadRebalTargets() {
+  try { return JSON.parse(localStorage.getItem(_REBAL_STORAGE_KEY()) || 'null') || {}; }
+  catch { return {}; }
+}
+
+function _saveRebalTargets(map) {
+  localStorage.setItem(_REBAL_STORAGE_KEY(), JSON.stringify(map));
+}
+
+function openRebalancePanel() {
+  const panel    = document.getElementById('rebalancePanel');
+  const backdrop = document.getElementById('rebalancePanelBackdrop');
+  if (!panel) return;
+  panel.classList.add('open');
+  backdrop.classList.add('active');
+  _renderRebalancePanel();
+}
+
+function closeRebalancePanel() {
+  document.getElementById('rebalancePanel').classList.remove('open');
+  document.getElementById('rebalancePanelBackdrop').classList.remove('active');
+}
+
+function _renderRebalancePanel() {
+  const content = document.getElementById('rebalancePanelContent');
+  if (!content || !allRows.length) {
+    if (content) content.innerHTML = '<div class="activity-empty" style="padding:24px">Load a portfolio first.</div>';
+    return;
+  }
+
+  // ── Build sector totals from current rows ─────────────────────────────────
+  const totalValue = allRows.reduce((s, r) => s + (r.current_value || 0), 0);
+  const sectorMap  = {};
+  for (const r of allRows) {
+    const sec = r.sector || 'Other';
+    if (!sectorMap[sec]) sectorMap[sec] = { value: 0, tickers: [] };
+    sectorMap[sec].value    += r.current_value || 0;
+    sectorMap[sec].tickers.push(r.ticker);
+  }
+  const sectors = Object.entries(sectorMap)
+    .map(([name, d]) => ({ name, value: d.value, currentPct: totalValue > 0 ? (d.value / totalValue * 100) : 0 }))
+    .sort((a, b) => b.value - a.value);
+
+  // ── Load / default target weights ────────────────────────────────────────
+  const saved     = _loadRebalTargets();
+  const equalPct  = parseFloat((100 / sectors.length).toFixed(1));
+  const targets   = {};
+  let   targetSum = 0;
+  for (const s of sectors) {
+    targets[s.name] = saved[s.name] != null ? saved[s.name] : equalPct;
+    targetSum += targets[s.name];
+  }
+
+  // ── Summary pills ─────────────────────────────────────────────────────────
+  let totalBuy = 0, totalSell = 0;
+  for (const s of sectors) {
+    const delta = targets[s.name] - s.currentPct;
+    const amt   = Math.abs(delta / 100 * totalValue);
+    if (delta > 0.1)  totalBuy  += amt;
+    if (delta < -0.1) totalSell += amt;
+  }
+
+  // ── Build HTML ────────────────────────────────────────────────────────────
+  const rows = sectors.map(s => {
+    const target  = targets[s.name];
+    const delta   = target - s.currentPct;
+    const absDelta = Math.abs(delta);
+    const actionAmt = absDelta / 100 * totalValue;
+    const deltaClass = delta > 0.5 ? 'under' : delta < -0.5 ? 'over' : 'ok';
+    const deltaSign  = delta > 0 ? '+' : '';
+    let actionHtml;
+    if (delta > 0.5)       actionHtml = `<span class="buy">Buy ${fmt.currency(actionAmt)}</span>`;
+    else if (delta < -0.5) actionHtml = `<span class="sell">Sell ${fmt.currency(actionAmt)}</span>`;
+    else                   actionHtml = `<span class="hold">On target</span>`;
+
+    const barPct = Math.min(100, s.currentPct / Math.max(...sectors.map(x => x.currentPct)) * 100);
+
+    return `<tr>
+      <td>
+        <div class="rebal-sector-name">${esc(s.name)}</div>
+        <div style="display:flex;align-items:center;margin-top:4px">
+          <span class="rebal-bar-wrap"><span class="rebal-bar-fill" style="width:${barPct.toFixed(0)}%"></span></span>
+          <span style="font-size:0.68rem;color:var(--text-muted)">${fmt.currency(s.value)}</span>
+        </div>
+      </td>
+      <td class="rebal-val">${s.currentPct.toFixed(1)}%</td>
+      <td>
+        <div class="rebal-target-wrap">
+          <input class="rebal-target-input" type="number" min="0" max="100" step="0.1"
+            value="${target.toFixed(1)}"
+            data-sector="${esc(s.name)}"
+            oninput="_onRebalTargetChange()" />
+          <span style="font-size:0.75rem;color:var(--text-muted)">%</span>
+        </div>
+      </td>
+      <td class="rebal-delta ${deltaClass}">${deltaSign}${delta.toFixed(1)}%</td>
+      <td class="rebal-action">${actionHtml}</td>
+    </tr>`;
+  }).join('');
+
+  const targetSumWarn = Math.abs(targetSum - 100) > 0.5
+    ? `<div style="font-size:0.72rem;color:var(--red);padding:4px 16px 0">⚠ Targets sum to ${targetSum.toFixed(1)}% — should be 100%</div>`
+    : '';
+
+  content.innerHTML = `
+    <p class="rebal-intro">Set target sector weights and see what to buy or sell to rebalance your portfolio.</p>
+    <div class="rebal-summary">
+      <div class="rebal-summary-pill">
+        <div class="pill-val">${fmt.currency(totalValue)}</div>
+        <div class="pill-label">Portfolio value</div>
+      </div>
+      <div class="rebal-summary-pill">
+        <div class="pill-val pos">${fmt.currency(totalBuy)}</div>
+        <div class="pill-label">To buy</div>
+      </div>
+      <div class="rebal-summary-pill">
+        <div class="pill-val neg">${fmt.currency(totalSell)}</div>
+        <div class="pill-label">To sell</div>
+      </div>
+    </div>
+    ${targetSumWarn}
+    <div class="rebal-table-wrap">
+      <table class="rebal-table">
+        <thead>
+          <tr>
+            <th>Sector</th>
+            <th class="th-r">Current</th>
+            <th class="th-r">Target</th>
+            <th class="th-r">Delta</th>
+            <th class="th-r">Action</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="rebal-footer">
+      <button class="rebal-footer-btn" onclick="_rebalReset()">Reset to equal</button>
+      <button class="rebal-footer-btn primary" onclick="_rebalSave()">Save targets</button>
+    </div>`;
+}
+
+function _onRebalTargetChange() {
+  // Live re-render so delta/action columns update as user types
+  const saved = _loadRebalTargets();
+  for (const inp of document.querySelectorAll('.rebal-target-input')) {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) saved[inp.dataset.sector] = v;
+  }
+  _saveRebalTargets(saved);
+  _renderRebalancePanel();
+}
+
+function _rebalReset() {
+  localStorage.removeItem(_REBAL_STORAGE_KEY());
+  _renderRebalancePanel();
+}
+
+function _rebalSave() {
+  const map = {};
+  for (const inp of document.querySelectorAll('.rebal-target-input')) {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) map[inp.dataset.sector] = v;
+  }
+  _saveRebalTargets(map);
+  // Brief visual confirmation
+  const btn = document.querySelector('.rebal-footer-btn.primary');
+  if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => { btn.textContent = 'Save targets'; }, 1500); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

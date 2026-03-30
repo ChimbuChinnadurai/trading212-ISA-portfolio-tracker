@@ -789,6 +789,10 @@
                       Columns
                     </button>
                   </div>
+                  <button class="btn btn-rebalance" onclick="openRebalancePanel()">
+                    <span class="material-symbols-outlined btn-icon">balance</span>
+                    Rebalance
+                  </button>
                   <button class="btn btn-csv" onclick="exportCSV()">
                     <span class="material-symbols-outlined btn-icon">download</span>
                     Export CSV
@@ -1522,6 +1526,22 @@
             <div class="skeleton skel-amount"></div>
           </div>
         </div>
+      </div>
+
+      <!-- ═══ REBALANCE PANEL ═══ -->
+      <div id="rebalancePanelBackdrop" class="side-panel-backdrop" onclick="closeRebalancePanel()"></div>
+      <div id="rebalancePanel" class="side-panel">
+        <div class="side-panel-header">
+          <div class="sp-brand">
+            <div class="sp-logo-wrap" style="font-size:1.3rem">⚖️</div>
+            <div>
+              <h2 class="sp-company-name">Rebalancing</h2>
+              <span class="sp-ticker">Sector target weights</span>
+            </div>
+          </div>
+          <button class="sp-close-btn" onclick="closeRebalancePanel()">✕</button>
+        </div>
+        <div class="side-panel-content" id="rebalancePanelContent"></div>
       </div>
 
       <!-- <footer class="footer">
