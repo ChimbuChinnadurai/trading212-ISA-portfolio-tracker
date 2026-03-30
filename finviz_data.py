@@ -259,34 +259,6 @@ def get_market_signals(signal_type: str, limit: int = 15) -> list[dict]:
         return []
 
 
-def get_sp500_heatmap() -> list[dict]:
-    """Fetch all S&P 500 stocks for the market heatmap.
-
-    Returns list of dicts:
-        ticker, company, sector, price, change_pct, market_cap
-
-    Note: This fetches all pages from Finviz (~500 stocks) and may take
-    10–30 seconds on first call. Results should be cached for >= 5 minutes.
-    """
-    try:
-        url = "https://finviz.com/screener.ashx?v=111&f=idx_sp500&ft=4"
-        raw_rows = _scrape_screener(url)
-        result = []
-        for row in raw_rows:
-            market_cap = _safe_float(row.get("Market Cap"))
-            result.append({
-                "ticker":     row.get("Ticker", ""),
-                "company":    row.get("Company", ""),
-                "sector":     row.get("Sector", "Other"),
-                "price":      _safe_float(row.get("Price")),
-                "change_pct": _parse_change(row.get("Change")),
-                "market_cap": market_cap if market_cap else 0,
-            })
-        return result
-    except Exception as exc:
-        logger.warning("Finviz S&P 500 heatmap fetch failed: %s", exc)
-        return []
-
 
 def get_stock_details(ticker: str) -> dict[str, Any]:
     """Fetch detailed data for a single stock (fundamentals, signals, ratings, insider).

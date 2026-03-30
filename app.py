@@ -1197,6 +1197,213 @@ def portfolio_history(pid):
     return jsonify({"status": "ok", "data": data})
 
 
+@app.route("/api/p<pid>/monthly-returns")
+def monthly_returns_endpoint(pid):
+    """Portfolio-level month-over-month % returns derived from value snapshots."""
+    cache_key = f"monthly_returns:{pid}"
+    cached = kv_get(cache_key, 1800)  # 30-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+
+    HOURS_5Y = 5 * 365 * 24  # fetch up to 5 years of snapshots
+
+    if pid == "combined":
+        pid_daily: dict = {}
+        for p in API_KEYS:
+            snaps = snapshot_get(p, hours=HOURS_5Y)
+            by_day: dict = {}
+            for s in snaps:
+                day = date.fromtimestamp(s["ts"]).isoformat()
+                if day not in by_day or s["ts"] > by_day[day][0]:
+                    by_day[day] = (s["ts"], s["value"])
+            pid_daily[p] = {d: v for d, (_, v) in by_day.items()}
+
+        all_days: set = set()
+        for d in pid_daily.values():
+            all_days.update(d.keys())
+        daily_vals: dict = {}
+        for day in sorted(all_days):
+            total = sum(pd.get(day, 0) for pd in pid_daily.values())
+            if total > 0:
+                daily_vals[day] = round(total, 2)
+    else:
+        snaps = snapshot_get(pid, hours=HOURS_5Y)
+        by_day = {}
+        for s in snaps:
+            d = date.fromtimestamp(s["ts"]).isoformat()
+            if d not in by_day or s["ts"] > by_day[d][0]:
+                by_day[d] = (s["ts"], s["value"])
+        daily_vals = {d: round(v, 2) for d, (_, v) in sorted(by_day.items())}
+
+    # End-of-month value = last snapshot within each calendar month
+    monthly_vals: dict = {}
+    for day in sorted(daily_vals.keys()):
+        monthly_vals[day[:7]] = daily_vals[day]
+
+    # Month-over-month % returns
+    months = sorted(monthly_vals.keys())
+    result = []
+    for i in range(1, len(months)):
+        prev_v = monthly_vals[months[i - 1]]
+        curr_v = monthly_vals[months[i]]
+        if prev_v and prev_v > 0:
+            pct = round((curr_v - prev_v) / prev_v * 100, 2)
+            result.append({"month": months[i], "pct": pct, "value": curr_v})
+
+    kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result})
+
+
+@app.route("/api/pcombined/risk-metrics")
+def risk_metrics_endpoint():
+    """Portfolio risk metrics: TWR, Beta, Annualised Volatility, Sharpe, Sortino, Weighted P/E."""
+    cache_key = "risk_metrics:combined"
+    cached = kv_get(cache_key, 3600)
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+    try:
+        # ── 1. Build combined daily portfolio values (1 year of snapshots) ──
+        HOURS_1Y = 8760
+        pid_daily = {}
+        for p in API_KEYS:
+            snaps = snapshot_get(p, hours=HOURS_1Y)
+            by_day = {}
+            for s in snaps:
+                day = date.fromtimestamp(s["ts"]).isoformat()
+                if day not in by_day or s["ts"] > by_day[day][0]:
+                    by_day[day] = (s["ts"], s["value"])
+            pid_daily[p] = {d: v for d, (_, v) in by_day.items()}
+
+        all_days = sorted(set().union(*[set(d.keys()) for d in pid_daily.values()]))
+        pf_vals = {}
+        for day in all_days:
+            total = sum(pd.get(day, 0) for pd in pid_daily.values())
+            if total > 0:
+                pf_vals[day] = total
+
+        if len(pf_vals) < 5:
+            return jsonify({"status": "ok", "data": {"insufficient_data": True}})
+
+        pf_days = sorted(pf_vals.keys())
+        pf_prices = [pf_vals[d] for d in pf_days]
+
+        # ── 2. Daily portfolio returns ──────────────────────────────────────
+        pf_returns = [(pf_prices[i] / pf_prices[i - 1]) - 1 for i in range(1, len(pf_prices))]
+
+        # ── 3. TWR ─────────────────────────────────────────────────────────
+        twr = 1.0
+        for r in pf_returns:
+            twr *= (1 + r)
+        twr = round((twr - 1) * 100, 2)
+
+        # ── 4. Fetch SPY for Beta + SPY benchmarks ──────────────────────────
+        spy_points = _yf_fetch_points("SPY", "1y", "1d")
+        spy_by_day = {date.fromtimestamp(p["ts"]).isoformat(): p["price"] for p in spy_points}
+        common_days = sorted(d for d in pf_days if d in spy_by_day)
+
+        spy_twr = None
+        beta = None
+        spy_sharpe = None
+        if len(common_days) >= 10:
+            spy_prices_c = [spy_by_day[d] for d in common_days]
+            pf_prices_c  = [pf_vals[d]     for d in common_days]
+            spy_rets = [(spy_prices_c[i] / spy_prices_c[i - 1]) - 1 for i in range(1, len(spy_prices_c))]
+            pf_rets_c = [(pf_prices_c[i]  / pf_prices_c[i - 1])  - 1 for i in range(1, len(pf_prices_c))]
+            # SPY TWR
+            v = 1.0
+            for r in spy_rets:
+                v *= (1 + r)
+            spy_twr = round((v - 1) * 100, 2)
+            # Beta
+            n = len(pf_rets_c)
+            if n >= 2:
+                mp = sum(pf_rets_c) / n
+                ms = sum(spy_rets) / n
+                cov    = sum((pf_rets_c[i] - mp) * (spy_rets[i] - ms) for i in range(n)) / (n - 1)
+                var_s  = sum((r - ms) ** 2 for r in spy_rets) / (n - 1)
+                beta = round(cov / var_s, 3) if var_s > 0 else None
+            # SPY Sharpe
+            rf_d = (1.045 ** (1 / 252)) - 1
+            spy_exc = [r - rf_d for r in spy_rets]
+            sm = sum(spy_exc) / len(spy_exc)
+            ss = (sum((r - sm) ** 2 for r in spy_exc) / (len(spy_exc) - 1)) ** 0.5
+            spy_sharpe = round(sm / ss * (252 ** 0.5), 3) if ss > 0 else None
+
+        # ── 5. Sharpe, Sortino, Volatility ──────────────────────────────────
+        rf_d = (1.045 ** (1 / 252)) - 1
+        exc  = [r - rf_d for r in pf_returns]
+        n    = len(exc)
+        mean_e = sum(exc) / n if n > 0 else 0
+        var_e  = sum((r - mean_e) ** 2 for r in exc) / (n - 1) if n > 1 else 0
+        std_e  = var_e ** 0.5
+        sharpe = round(mean_e / std_e * (252 ** 0.5), 3) if std_e > 0 else None
+        vol    = round(std_e * (252 ** 0.5) * 100, 2) if std_e > 0 else None
+        down   = [r for r in exc if r < 0]
+        sortino = None
+        if len(down) > 1:
+            dv  = sum(r ** 2 for r in down) / len(down)
+            sortino = round(mean_e / (dv ** 0.5) * (252 ** 0.5), 3) if dv > 0 else None
+
+        # ── 6. Weighted P/E ─────────────────────────────────────────────────
+        pe_weighted = None
+        try:
+            combined_rows = []
+            total_val = 0.0
+            for p in API_KEYS:
+                rows, _ = rows_get(p)
+                if rows:
+                    combined_rows.extend(rows)
+                    total_val += sum(r["current_value"] for r in rows)
+            if total_val > 0:
+                pe_sum = pe_wt = 0.0
+                for row in combined_rows:
+                    tk      = row["ticker"]
+                    country = row.get("country", "US")
+                    suffix  = _COUNTRY_YF_SUFFIX.get(country, "")
+                    clean   = tk[:-1] if suffix == ".L" and tk.lower().endswith("l") else tk
+                    yf_sym  = f"{clean}{suffix}"
+                    ck      = f"pe:{yf_sym}"
+                    pe_val  = kv_get(ck, 86400)
+                    if pe_val is None:
+                        try:
+                            summ   = _yf_summary(yf_sym, modules="summaryDetail,defaultKeyStatistics")
+                            detail = summ.get("summaryDetail", {})
+                            stats  = summ.get("defaultKeyStatistics", {})
+                            def _r(d, k):
+                                v = d.get(k); return v.get("raw") if isinstance(v, dict) else v
+                            raw_pe = _r(detail, "trailingPE") or _r(stats, "trailingPE")
+                            pe_val = round(raw_pe, 1) if raw_pe and 0 < raw_pe < 500 else None
+                        except Exception:
+                            pe_val = None
+                        kv_set(ck, pe_val)
+                    if pe_val:
+                        w = row["current_value"] / total_val
+                        pe_sum += pe_val * w
+                        pe_wt  += w
+                if pe_wt >= 0.5:
+                    pe_weighted = round(pe_sum / pe_wt, 1)
+        except Exception as pe_err:
+            logger.warning("P/E computation error: %s", pe_err)
+
+        result = {
+            "twr": twr,
+            "spy_twr": spy_twr,
+            "twr_vs_spy": round(twr - spy_twr, 2) if spy_twr is not None else None,
+            "beta": beta,
+            "volatility": vol,
+            "sharpe": sharpe,
+            "sortino": sortino,
+            "spy_sharpe": spy_sharpe,
+            "pe": pe_weighted,
+            "data_days": len(pf_days),
+        }
+        kv_set(cache_key, result)
+        return jsonify({"status": "ok", "data": result})
+    except Exception as e:
+        logger.error("risk_metrics error: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/api/p<pid>/monthly-performance")
 def monthly_performance(pid):
     """Monthly % returns for all tickers in the portfolio for the last 12 months."""
@@ -1883,19 +2090,71 @@ def finviz_signals():
     return jsonify({"status": "ok", "data": data, "signal": signal_type, "cached": False})
 
 
-@app.route("/api/finviz/sp500-heatmap")
-def finviz_sp500_heatmap():
-    """All S&P 500 stocks with sector, change %, price, market cap for the heatmap.
-    Cached for 5 minutes — first call may be slow (scrapes ~500 stocks across pages).
+
+# ── Sector Performance (SPDR ETFs — fast alternative to Finviz heatmap) ───────
+
+_SECTOR_ETFS = {
+    "XLK":  "Technology",
+    "XLF":  "Financial Services",
+    "XLE":  "Energy",
+    "XLV":  "Healthcare",
+    "XLI":  "Industrials",
+    "XLP":  "Consumer Staples",
+    "XLY":  "Consumer Cyclical",
+    "XLB":  "Basic Materials",
+    "XLRE": "Real Estate",
+    "XLU":  "Utilities",
+    "XLC":  "Communication Services",
+}
+
+
+@app.route("/api/market/sector-performance")
+def market_sector_performance():
+    """Sector performance using SPDR ETFs via Yahoo Finance.
+    Returns [{sector, ticker, change_pct, price}] — one entry per sector.
+    Much faster than /api/finviz/sp500-heatmap (11 tickers vs ~500 stocks).
+    Cached 5 minutes.
     """
-    cache_key = "finviz:sp500heatmap"
-    cached = kv_get(cache_key, 300)  # 5-min TTL
+    cache_key = "market:sector_perf"
+    cached = kv_get(cache_key, 300)
     if cached is not None:
         return jsonify({"status": "ok", "data": cached, "cached": True})
-    data = fvd.get_sp500_heatmap()
-    if data:
-        kv_set(cache_key, data)
-    return jsonify({"status": "ok", "data": data, "cached": False})
+
+    def _fetch_etf(ticker):
+        try:
+            resp = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+                params={"range": "1d", "interval": "1d"},
+                headers={"User-Agent": _YF_UA},
+                timeout=8,
+            )
+            resp.raise_for_status()
+            meta       = resp.json()["chart"]["result"][0]["meta"]
+            price      = meta.get("regularMarketPrice")
+            change_pct = meta.get("regularMarketChangePercent")
+            if price is not None and change_pct is None:
+                prev = meta.get("chartPreviousClose") or meta.get("previousClose")
+                if prev and prev != 0:
+                    change_pct = (price - prev) / prev * 100
+            return {
+                "ticker":     ticker,
+                "sector":     _SECTOR_ETFS[ticker],
+                "change_pct": round(change_pct, 4) if change_pct is not None else 0.0,
+                "price":      round(price,      4) if price      is not None else None,
+            }
+        except Exception as exc:
+            logger.warning("sector ETF fetch failed for %s: %s", ticker, exc)
+            return None
+
+    result = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=11) as ex:
+        for entry in ex.map(_fetch_etf, list(_SECTOR_ETFS.keys())):
+            if entry is not None:
+                result.append(entry)
+
+    if result:
+        kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result, "cached": False})
 
 
 @app.route("/api/finviz/stock/<ticker>")

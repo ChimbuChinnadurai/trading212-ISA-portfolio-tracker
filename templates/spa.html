@@ -227,6 +227,12 @@
           <span class="nav-label">Market</span>
         </a>
 
+        <!-- Metrics -->
+        <a class="nav-item" data-route="metrics" onclick="navigate('metrics')">
+          <span class="material-symbols-outlined nav-icon">analytics</span>
+          <span class="nav-label">Metrics</span>
+        </a>
+
         <!-- Watchlist -->
         <a class="nav-item" data-route="watchlist" onclick="navigate('watchlist')">
           <span class="material-symbols-outlined nav-icon">bookmark</span>
@@ -433,7 +439,8 @@
 
                   </div>
                   <div>
-                    <a href="#" class="view-all-link" style="margin-left: 4px; padding: 2px 8px; font-size: 0.75rem;"
+                    <a href="#" class="view-all-link"
+                      style="margin-left: 4px; padding: 2px 8px; font-size: 0.75rem;color:var(--text-muted);text-decoration:none;"
                       onclick="openSignalsSidebar(); return false;">View All</a>
                   </div>
                 </div>
@@ -709,26 +716,26 @@
 
               </div><!-- /portfolio-layout -->
 
-              <!-- Monthly Performance Heatmap (full-width) -->
-              <div class="card monthly-perf-card" id="monthlyPerfCard">
-                <div class="monthly-perf-header">
-                  <div class="monthly-perf-title-row">
-                    <span class="chart-card-title">Monthly Performance</span>
-                    <span class="monthly-perf-hint">Monthly % return per holding</span>
+              <!-- Dynamics of Portfolio Returns (full-width) -->
+              <div class="card dynamics-returns-card" id="dynamicsCard">
+                <div class="dynamics-header">
+                  <div class="dynamics-title-wrap">
+                    <span class="chart-card-title">Dynamics of Portfolio Returns</span>
+                    <span class="dynamics-hint">Month-over-month portfolio value change</span>
                   </div>
-                  <div class="monthly-perf-view-toggle">
-                    <button class="mpv-btn active" data-view="12m"
-                      onclick="setMonthlyPerfView('12m', this)">12M</button>
-                    <button class="mpv-btn" data-view="1y" onclick="setMonthlyPerfView('1y', this)" disabled
-                      title="Coming soon">1Y</button>
-                    <button class="mpv-btn" data-view="3y" onclick="setMonthlyPerfView('3y', this)" disabled
-                      title="Coming soon">3Y</button>
+                  <div class="dynamics-range-tabs" id="dynamicsRangeTabs">
+                    <button class="dyn-tab" data-range="all">all</button>
+                    <button class="dyn-tab active" data-range="12m">12m</button>
+                    <!-- Year tabs injected by JS -->
                   </div>
                 </div>
-                <div class="monthly-perf-scroll">
-                  <div id="monthlyPerfHeatmap" class="monthly-perf-heatmap">
-                    <div class="monthly-perf-loading">Loading monthly performance…</div>
-                  </div>
+                <div class="dynamics-chart-wrap">
+                  <canvas id="dynamicsChart"></canvas>
+                  <div id="dynamicsTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="dynamics-legend">
+                  <span class="dyn-leg-dot"></span>
+                  <span class="dyn-leg-label">Portfolio</span>
                 </div>
               </div>
 
@@ -776,6 +783,16 @@
                 </div>
                 <div class="toolbar-right">
                   <span class="row-count" id="rowCount"></span>
+                  <div class="col-picker-wrap">
+                    <button class="btn btn-col-picker" id="colPickerBtn" onclick="toggleColPicker()">
+                      <span class="material-symbols-outlined btn-icon">view_column</span>
+                      Columns
+                    </button>
+                  </div>
+                  <button class="btn btn-rebalance" onclick="openRebalancePanel()">
+                    <span class="material-symbols-outlined btn-icon">balance</span>
+                    Rebalance
+                  </button>
                   <button class="btn btn-csv" onclick="exportCSV()">
                     <span class="material-symbols-outlined btn-icon">download</span>
                     Export CSV
@@ -786,35 +803,44 @@
                 <table class="portfolio-table">
                   <thead>
                     <tr>
-                      <th class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable" data-col="company_name" onclick="sortTable(this)">Company <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable" data-col="country" onclick="sortTable(this)">Country <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-center" title="48-hour price movement">48h Trend</th>
-                      <th class="th-sortable th-right" data-col="quantity" onclick="sortTable(this)">Shares <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="avg_price" onclick="sortTable(this)">Avg Price <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="invested" onclick="sortTable(this)">Invested <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="current_value" onclick="sortTable(this)">Value (GBP)
+                      <th data-colid="ticker" class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker
                         <span class="sort-icon">↕</span>
                       </th>
-                      <th class="th-sortable th-right" data-col="weight" onclick="sortTable(this)">Weight <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="total_returns" onclick="sortTable(this)">P&amp;L <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="fx_impact" onclick="sortTable(this)"
+                      <th data-colid="company" class="th-sortable" data-col="company_name" onclick="sortTable(this)">
+                        Company <span class="sort-icon">↕</span></th>
+                      <th data-colid="country" class="th-sortable" data-col="country" onclick="sortTable(this)">Country
+                        <span class="sort-icon">↕</span>
+                      </th>
+                      <th data-colid="trend" class="th-center" title="48-hour price movement">48h Trend</th>
+                      <th data-colid="shares" class="th-sortable th-right" data-col="quantity"
+                        onclick="sortTable(this)">Shares <span class="sort-icon">↕</span></th>
+                      <th data-colid="avg_price" class="th-sortable th-right" data-col="avg_price"
+                        onclick="sortTable(this)">Avg Price <span class="sort-icon">↕</span></th>
+                      <th data-colid="current_price" class="th-right">Current Price</th>
+                      <th data-colid="breakeven" class="th-right"
+                        title="Dividend-adjusted breakeven price per share. Green = in profit. Red = shows currency shortfall to break even.">
+                        Breakeven</th>
+                      <th data-colid="invested" class="th-sortable th-right" data-col="invested"
+                        onclick="sortTable(this)">Invested <span class="sort-icon">↕</span></th>
+                      <th data-colid="value" class="th-sortable th-right" data-col="current_value"
+                        onclick="sortTable(this)">Value (GBP)
+                        <span class="sort-icon">↕</span>
+                      </th>
+                      <th data-colid="weight" class="th-sortable th-right" data-col="weight" onclick="sortTable(this)">
+                        Weight <span class="sort-icon">↕</span></th>
+                      <th data-colid="pnl" class="th-sortable th-right" data-col="total_returns"
+                        onclick="sortTable(this)">P&amp;L <span class="sort-icon">↕</span></th>
+                      <th data-colid="fx_impact" class="th-sortable th-right" data-col="fx_impact"
+                        onclick="sortTable(this)"
                         title="Gain or loss in GBP caused by currency movements since purchase.">FX Impact <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="returns_pct" onclick="sortTable(this)">Returns % <span
-                          class="sort-icon">↕</span></th>
-                      <th class="th-sortable th-right" data-col="div_yield" onclick="sortTable(this)"
+                      <th data-colid="returns_pct" class="th-sortable th-right" data-col="returns_pct"
+                        onclick="sortTable(this)">Returns % <span class="sort-icon">↕</span></th>
+                      <th data-colid="div_yield" class="th-sortable th-right" data-col="div_yield"
+                        onclick="sortTable(this)"
                         title="Annual dividend yield based on dividends received vs current value">Div Yield <span
                           class="sort-icon">↕</span></th>
-                      <th class="th-right" title="Analyst consensus rating">Rating</th>
+                      <th data-colid="rating" class="th-right" title="Analyst consensus rating">Rating</th>
                     </tr>
                   </thead>
                   <tbody id="tableBody"></tbody>
@@ -979,101 +1005,23 @@
           <div class="view-main">
             <p class="cal-view-subtitle">Sector performance, signals and insider activity</p>
 
-            <!-- <div class="cal-view-header">
-              <div class="cal-view-title-block">
-                <h1 class="cal-view-title">Market</h1>
-              </div>
-            </div> -->
-
-            <!-- Market body: 3-column × 2-row grid -->
+            <!-- Market body: 3-column grid (Sectors | Signals | Insider) + Monthly Perf full-width -->
             <div class="market-body">
 
-              <!-- Row 1, Col 1: Portfolio vs S&P 500 -->
-              <div class="market-chart-card widget-panel">
-                <div class="panel-header">
-                  <div class="mkt-chart-title-group">
-                    <h3 class="panel-title">Portfolio vs S&amp;P 500</h3>
-                    <div class="mkt-pvs-legend">
-                      <span class="pvs-leg-dot" style="background:#60a5fa"></span><span
-                        class="pvs-leg-label">S&amp;P</span>
-                      <span class="pvs-leg-dot" style="background:#f59e0b"></span><span
-                        class="pvs-leg-label">Portfolio</span>
-                    </div>
-                  </div>
-                </div>
-                <div class="mkt-chart-wrap">
-                  <canvas id="pvsChart"></canvas>
-                  <div id="pvsChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
-                </div>
-                <div class="mkt-chart-footer mkt-chart-footer-sm">
-                  <span class="mkt-footer-stat">
-                    <span class="mkt-footer-label">Portfolio</span>
-                    <span id="pvsPortPct" class="mkt-footer-val">—</span>
-                  </span>
-                  <span class="mkt-footer-divider"></span>
-                  <span class="mkt-footer-stat">
-                    <span class="mkt-footer-label">S&amp;P 500</span>
-                    <span id="pvsSpPct" class="mkt-footer-val">—</span>
-                  </span>
-                  <span class="mkt-footer-divider"></span>
-                  <span class="mkt-footer-stat">
-                    <span class="mkt-footer-label">Alpha</span>
-                    <span id="pvsAlpha" class="mkt-footer-val">—</span>
-                  </span>
-                </div>
-              </div>
-
-              <!-- Row 1, Col 2: Sector Performance -->
+              <!-- Row 1, Col 1: Sector Performance -->
               <section class="widget-panel widget-sectors">
                 <div class="panel-header">
                   <h3 class="panel-title">Sectors</h3>
-                  <span style="font-size:0.7rem;color:var(--text-muted)">Today</span>
+                  <a href="https://finviz.com/map.ashx" target="_blank" rel="noopener noreferrer"
+                    style="font-size:0.7rem;color:var(--text-muted);text-decoration:none;"
+                    title="View S&P 500 heatmap on Finviz">Today ↗</a>
                 </div>
-                <div id="sectorBarsList" class="sector-bars-list">
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
+                <div class="sector-radial-wrap">
+                  <canvas id="sectorRadialChart"></canvas>
                 </div>
               </section>
 
-              <!-- Row 1, Col 3: Market Signals -->
+              <!-- Row 1, Col 2: Market Signals -->
               <section class="widget-panel widget-signals">
                 <div class="panel-header">
                   <h3 class="panel-title">Market Signals</h3>
@@ -1121,72 +1069,7 @@
                 </div>
               </section>
 
-              <!-- Row 2, Col 1-2: Portfolio Gain (spans 2 columns) -->
-              <section class="widget-panel pvs-gain-widget">
-                <div class="pvs-gain-accent"></div>
-                <div class="panel-header" style="padding: 10px 14px 8px">
-                  <h3 class="panel-title">Portfolio Gain</h3>
-                  <span style="font-size:0.7rem;color:var(--text-muted)">Combined · All time</span>
-                </div>
-                <div class="pvs-gain-list">
-                  <div class="pvs-gain-row">
-                    <span class="pvs-gain-label">1-Month Return</span>
-                    <span class="pvs-gain-val" id="pvsGain1M">—</span>
-                  </div>
-                  <div class="pvs-gain-row">
-                    <span class="pvs-gain-label">6-Month Return</span>
-                    <span class="pvs-gain-val" id="pvsGain6M">—</span>
-                  </div>
-                  <div class="pvs-gain-row">
-                    <span class="pvs-gain-label">12-Month Return</span>
-                    <span class="pvs-gain-val" id="pvsGain12M">—</span>
-                  </div>
-                  <div class="pvs-gain-row">
-                    <span class="pvs-gain-label">YTD Return</span>
-                    <span class="pvs-gain-val" id="pvsGainYTD">—</span>
-                  </div>
-                  <div class="pvs-gain-row">
-                    <span class="pvs-gain-label">Total Return</span>
-                    <span class="pvs-gain-val" id="pvsGainTotal">—</span>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Row 2, Col 3: Drawdown Analysis -->
-              <section class="widget-panel drawdown-widget" style="overflow:hidden; display:flex; flex-direction:column;">
-                <div class="panel-header">
-                  <h3 class="panel-title">Drawdown</h3>
-                  <div class="mkt-range-tabs" id="ddRangeTabs">
-                    <button class="mkt-range-tab" data-range="1M">1M</button>
-                    <button class="mkt-range-tab" data-range="3M">3M</button>
-                    <button class="mkt-range-tab" data-range="6M">6M</button>
-                    <button class="mkt-range-tab active" data-range="1Y">1Y</button>
-                    <button class="mkt-range-tab" data-range="ALL">ALL</button>
-                  </div>
-                </div>
-                <div class="drawdown-chart-wrap">
-                  <canvas id="drawdownChart"></canvas>
-                  <div id="drawdownTooltip" class="mkt-chart-tooltip" style="display:none"></div>
-                </div>
-                <div class="drawdown-stat-bar">
-                  <div class="drawdown-stat-item">
-                    <span class="drawdown-stat-label">Max DD</span>
-                    <span class="drawdown-stat-val neg" id="ddMaxDD">—</span>
-                  </div>
-                  <div class="drawdown-stat-sep"></div>
-                  <div class="drawdown-stat-item">
-                    <span class="drawdown-stat-label">Current</span>
-                    <span class="drawdown-stat-val" id="ddCurrent">—</span>
-                  </div>
-                  <div class="drawdown-stat-sep"></div>
-                  <div class="drawdown-stat-item">
-                    <span class="drawdown-stat-label">Days in DD</span>
-                    <span class="drawdown-stat-val" id="ddDays">—</span>
-                  </div>
-                </div>
-              </section>
-
-              <!-- Row 3, Col 3: Insider Trading -->
+              <!-- Row 1, Col 3: Insider Trading -->
               <section class="widget-panel widget-insider">
                 <div class="panel-header">
                   <h3 class="panel-title">Insider Trading</h3>
@@ -1231,10 +1114,156 @@
                 </div>
               </section>
 
+              <!-- Row 2: Monthly Performance (full width) -->
+              <div class="card monthly-perf-card" id="monthlyPerfCard" style="grid-column: 1 / -1;">
+                <div class="monthly-perf-header">
+                  <div class="monthly-perf-title-row">
+                    <span class="chart-card-title">Monthly Performance</span>
+                  </div>
+                  <div class="monthly-perf-view-toggle">
+                    <button class="mpv-btn active" data-view="12m"
+                      onclick="setMarketMonthlyPerfView('12m', this)">12M</button>
+                    <button class="mpv-btn" data-view="1y" onclick="setMarketMonthlyPerfView('1y', this)" disabled
+                      title="Coming soon">1Y</button>
+                    <button class="mpv-btn" data-view="3y" onclick="setMarketMonthlyPerfView('3y', this)" disabled
+                      title="Coming soon">3Y</button>
+                  </div>
+                </div>
+                <div class="monthly-perf-scroll">
+                  <div id="monthlyPerfHeatmap" class="monthly-perf-heatmap">
+                    <div class="monthly-perf-loading">Loading monthly performance…</div>
+                  </div>
+                </div>
+              </div>
+
             </div><!-- /market-body -->
 
           </div><!-- /view-main -->
         </div><!-- /view-market -->
+
+        <!-- ═══ VIEW: METRICS ═══ -->
+        <div id="view-metrics" class="spa-view" style="display:none">
+          <div class="view-main">
+            <p class="cal-view-subtitle">Portfolio performance metrics and analysis</p>
+
+            <div class="metrics-body">
+
+              <!-- Row 1, Col 1: Portfolio vs S&P 500 -->
+              <div class="market-chart-card widget-panel">
+                <div class="panel-header">
+                  <div class="mkt-chart-title-group">
+                    <h3 class="panel-title">Portfolio vs S&amp;P 500</h3>
+                    <div class="mkt-pvs-legend">
+                      <span class="pvs-leg-dot" style="background:#60a5fa"></span><span
+                        class="pvs-leg-label">S&amp;P</span>
+                      <span class="pvs-leg-dot" style="background:#f59e0b"></span><span
+                        class="pvs-leg-label">Portfolio</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="mkt-chart-wrap">
+                  <canvas id="pvsChart"></canvas>
+                  <div id="pvsChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="mkt-chart-footer mkt-chart-footer-sm">
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Portfolio</span>
+                    <span id="pvsPortPct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">S&amp;P 500</span>
+                    <span id="pvsSpPct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Alpha</span>
+                    <span id="pvsAlpha" class="mkt-footer-val">—</span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- Row 1, Col 2: Portfolio Gain -->
+              <section class="widget-panel pvs-gain-widget">
+                <div class="pvs-gain-accent"></div>
+                <div class="panel-header" style="padding: 10px 14px 8px">
+                  <h3 class="panel-title">Portfolio Gain</h3>
+                  <span style="font-size:0.7rem;color:var(--text-muted)">Combined · All time</span>
+                </div>
+                <div class="pvs-gain-list">
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">1-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain1M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">6-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain6M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">12-Month Return</span>
+                    <span class="pvs-gain-val" id="pvsGain12M">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">YTD Return</span>
+                    <span class="pvs-gain-val" id="pvsGainYTD">—</span>
+                  </div>
+                  <div class="pvs-gain-row">
+                    <span class="pvs-gain-label">Total Return</span>
+                    <span class="pvs-gain-val" id="pvsGainTotal">—</span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Row 1, Col 3: Drawdown Analysis -->
+              <section class="widget-panel drawdown-widget"
+                style="overflow:hidden; display:flex; flex-direction:column;">
+                <div class="panel-header">
+                  <h3 class="panel-title">Drawdown</h3>
+                  <div class="mkt-range-tabs" id="ddRangeTabs">
+                    <button class="mkt-range-tab" data-range="1M">1M</button>
+                    <button class="mkt-range-tab" data-range="3M">3M</button>
+                    <button class="mkt-range-tab" data-range="6M">6M</button>
+                    <button class="mkt-range-tab active" data-range="1Y">1Y</button>
+                    <button class="mkt-range-tab" data-range="ALL">ALL</button>
+                  </div>
+                </div>
+                <div class="drawdown-chart-wrap">
+                  <canvas id="drawdownChart"></canvas>
+                  <div id="drawdownTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="drawdown-stat-bar">
+                  <div class="drawdown-stat-item">
+                    <span class="drawdown-stat-label">Max DD</span>
+                    <span class="drawdown-stat-val neg" id="ddMaxDD">—</span>
+                  </div>
+                  <div class="drawdown-stat-sep"></div>
+                  <div class="drawdown-stat-item">
+                    <span class="drawdown-stat-label">Current</span>
+                    <span class="drawdown-stat-val" id="ddCurrent">—</span>
+                  </div>
+                  <div class="drawdown-stat-sep"></div>
+                  <div class="drawdown-stat-item">
+                    <span class="drawdown-stat-label">Days in DD</span>
+                    <span class="drawdown-stat-val" id="ddDays">—</span>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Row 2: Risk Metrics (full width) -->
+              <div class="risk-metrics-section" style="grid-column: 1 / -1;" id="riskMetricsSection">
+                <div id="riskMetricsGrid" class="risk-metrics-grid">
+                  <div class="risk-metric-skeleton"></div>
+                  <div class="risk-metric-skeleton"></div>
+                  <div class="risk-metric-skeleton"></div>
+                  <div class="risk-metric-skeleton"></div>
+                  <div class="risk-metric-skeleton"></div>
+                </div>
+              </div>
+
+            </div><!-- /metrics-body -->
+
+          </div><!-- /view-main -->
+        </div><!-- /view-metrics -->
 
         <!-- ═══ VIEW: WATCHLIST ═══ -->
         <div id="view-watchlist" class="spa-view" style="display:none">
@@ -1499,6 +1528,22 @@
         </div>
       </div>
 
+      <!-- ═══ REBALANCE PANEL ═══ -->
+      <div id="rebalancePanelBackdrop" class="side-panel-backdrop" onclick="closeRebalancePanel()"></div>
+      <div id="rebalancePanel" class="side-panel">
+        <div class="side-panel-header">
+          <div class="sp-brand">
+            <div class="sp-logo-wrap" style="font-size:1.3rem">⚖️</div>
+            <div>
+              <h2 class="sp-company-name">Rebalancing</h2>
+              <span class="sp-ticker">Sector target weights</span>
+            </div>
+          </div>
+          <button class="sp-close-btn" onclick="closeRebalancePanel()">✕</button>
+        </div>
+        <div class="side-panel-content" id="rebalancePanelContent"></div>
+      </div>
+
       <!-- <footer class="footer">
         <div class="footer-item">
           <span id="cacheBanner" class="cache-badge-footer" style="display:none"></span>
@@ -1531,6 +1576,18 @@
     <div class="ss-body">
       <div id="ssListSignals" class="ss-list"></div>
       <div id="ssListExcluded" class="ss-list" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ═══ CONFIRM MODAL ═══ -->
+  <div class="confirm-modal-overlay" id="confirmModalOverlay"></div>
+  <div class="confirm-modal" id="confirmModal" role="dialog" aria-modal="true">
+    <div class="confirm-modal-icon" id="confirmModalIcon"></div>
+    <h3 class="confirm-modal-title" id="confirmModalTitle"></h3>
+    <p class="confirm-modal-body" id="confirmModalBody"></p>
+    <div class="confirm-modal-actions">
+      <button class="confirm-modal-btn confirm-modal-cancel" id="confirmModalCancel">Cancel</button>
+      <button class="confirm-modal-btn confirm-modal-ok" id="confirmModalOk"></button>
     </div>
   </div>
 

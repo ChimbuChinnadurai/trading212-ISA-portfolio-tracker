@@ -15,6 +15,60 @@ let _portfolioVsData = null; // [{date, ts, value}] from /api/pcombined/daily-hi
 let _pvsActiveRange = '1Y';  // 1M | 3M | 6M | 1Y | ALL
 let _ddActiveRange = '1Y';   // drawdown chart range
 let _pvsChartType = 'line';  // line | bar
+
+/* ── Shared chart empty-state helpers ──────────────────────────────────────
+ * Pass the canvas element; the overlay is injected into canvas.parentElement.
+ * Works for any chart whose wrap already has position:relative.
+ * ─────────────────────────────────────────────────────────────────────── */
+function _showChartEmpty(canvas, msg = 'No data for this period') {
+    if (!canvas) return;
+    const wrap = canvas.parentElement;
+    if (!wrap) return;
+    canvas.style.opacity = '0';
+    let el = wrap.querySelector('.chart-empty-state');
+    if (!el) {
+        el = document.createElement('div');
+        el.className = 'chart-empty-state';
+        el.innerHTML =
+            '<div class="chart-empty-bars">' +
+            '<div class="chart-empty-bar"></div>'.repeat(7) +
+            '</div>' +
+            '<span class="chart-empty-text"></span>';
+        wrap.appendChild(el);
+    }
+    el.querySelector('.chart-empty-text').textContent = msg;
+    requestAnimationFrame(() => el.classList.add('visible'));
+}
+
+function _hideChartEmpty(canvas) {
+    if (!canvas) return;
+    canvas.style.opacity = '';
+    const wrap = canvas.parentElement;
+    if (!wrap) return;
+    const el = wrap.querySelector('.chart-empty-state');
+    if (el) el.classList.remove('visible');
+}
+
+/* ── Shared element loading helper (non-canvas containers) ─────────────────
+ * Replaces the element's content with the standard bar-chart animation.
+ * Call _hideElemLoading(el) to clear it before injecting real content.
+ * ─────────────────────────────────────────────────────────────────────── */
+function _showElemLoading(el, msg = 'Loading…') {
+    if (!el) return;
+    el.innerHTML =
+        '<div class="elem-loading-state">' +
+        '<div class="chart-empty-bars">' +
+        '<div class="chart-empty-bar"></div>'.repeat(7) +
+        '</div>' +
+        '<span class="chart-empty-text">' + msg + '</span>' +
+        '</div>';
+}
+function _hideElemLoading(el) {
+    if (!el) return;
+    const existing = el.querySelector('.elem-loading-state');
+    if (existing) existing.remove();
+}
+
 let _pvsShowSP = true;
 let _pvsShowPvs = true;
 let _signalsData = {};        // cache per signal type
@@ -773,16 +827,215 @@ async function loadHomeWidgets() {
 async function loadMarketView(force = false) {
     if (force) {
         _sp500Data = [];
-        _portfolioVsData = null;
         _signalsData = {};
         _insiderData = {};
     }
     loadSP500Data();
     loadMarketChart();
-    loadPortfolioVsMarket();
     loadMarketSignals(_activeSignal || 'gainers');
     loadInsiderTrading(_activeInsiderPeriod || 'latest');
     loadInlineTradeSignals();
+    loadMarketMonthlyPerf();
+}
+
+async function loadMarketMonthlyPerf() {
+    const container = document.getElementById('monthlyPerfHeatmap');
+    if (!container) return;
+    _showElemLoading(container, 'Loading monthly performance…');
+    try {
+        const res = await fetch('/api/pcombined/monthly-performance');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        window._marketMonthlyPerfData = json.data;
+        if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(json.data);
+    } catch (err) {
+        _showElemLoading(container, 'Failed to load sector performance');
+    }
+}
+
+function setMarketMonthlyPerfView(view, btn) {
+    document.querySelectorAll('#monthlyPerfCard .mpv-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (view === '12m' && window._marketMonthlyPerfData) {
+        if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(window._marketMonthlyPerfData);
+    }
+}
+
+async function loadMetricsView(force = false) {
+    if (force) {
+        _portfolioVsData = null;
+    }
+    loadPortfolioVsMarket();
+    loadRiskMetrics();
+}
+
+async function loadRiskMetrics() {
+    const grid = document.getElementById('riskMetricsGrid');
+    if (!grid) return;
+    try {
+        const res  = await fetch('/api/pcombined/risk-metrics');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        _renderRiskMetrics(json.data);
+    } catch (err) {
+        if (grid) grid.innerHTML = _rmEmptyState(
+            'cloud_off',
+            'Unable to load metrics',
+            err.message
+        );
+    }
+}
+
+function _rmEmptyState(icon, title, subtitle) {
+    return `<div class="risk-metrics-empty">
+        <div class="rme-icon-wrap">
+            <span class="material-symbols-outlined rme-icon">${icon}</span>
+        </div>
+        <span class="rme-title">${title}</span>
+        ${subtitle ? `<span class="rme-subtitle">${subtitle}</span>` : ''}
+    </div>`;
+}
+
+function _rmBadge(text, type) {
+    // type: 'good' | 'ok' | 'warn' | 'neutral'
+    return `<span class="rm-badge rm-badge-${type}">${text}</span>`;
+}
+
+function _rmTrack(value, min, max, markers) {
+    // markers: [{label, val, accent}]
+    const clamp = v => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
+    const dots  = (markers || []).map(m =>
+        `<div class="rm-track-dot${m.accent ? ' rm-track-dot-accent' : ''}" style="left:${clamp(m.val).toFixed(1)}%">
+           <div class="rm-track-label">${m.label}</div>
+         </div>`
+    ).join('');
+    return `<div class="rm-track"><div class="rm-track-fill" style="width:${clamp(value).toFixed(1)}%"></div>${dots}</div>`;
+}
+
+function _renderRiskMetrics(data) {
+    const grid = document.getElementById('riskMetricsGrid');
+    if (!grid) return;
+
+    if (data.insufficient_data) {
+        grid.innerHTML = _rmEmptyState(
+            'history_toggle_off',
+            'Not enough history yet',
+            'Portfolio metrics will appear once more trading days have been recorded.'
+        );
+        return;
+    }
+
+    const cards = [];
+
+    // ── TWR ──────────────────────────────────────────────────────────────
+    const twrSign  = data.twr >= 0 ? '▲' : '▼';
+    const twrClass = data.twr >= 0 ? 'pos' : 'neg';
+    const spyChip  = data.spy_twr != null
+        ? `<div class="rm-bench-chip">SPY: ${data.spy_twr > 0 ? '+' : ''}${data.spy_twr.toFixed(2)}%
+             <span class="${data.twr_vs_spy >= 0 ? 'pos' : 'neg'}">
+               (${data.twr_vs_spy >= 0 ? '▲' : '▼'}${Math.abs(data.twr_vs_spy).toFixed(2)}%)
+             </span></div>`
+        : '';
+    cards.push(`
+      <div class="risk-metric-card">
+        <div class="rm-header">
+          <div>
+            <span class="rm-title">Portfolio TWR</span>
+            <span class="rm-badge rm-badge-neutral" style="font-size:0.65rem;padding:1px 5px">β</span>
+          </div>
+          <span class="rm-desc">True performance excluding the impact of cash flows</span>
+        </div>
+        <div class="rm-value ${twrClass}">${twrSign}${Math.abs(data.twr).toFixed(2)}%</div>
+        ${spyChip}
+      </div>`);
+
+    // ── P/E ──────────────────────────────────────────────────────────────
+    if (data.pe != null) {
+        const peStatus = data.pe < 15 ? _rmBadge('undervalued', 'good')
+            : data.pe < 25 ? _rmBadge('fair value', 'ok')
+            : data.pe < 35 ? _rmBadge('elevated', 'warn')
+            : _rmBadge('expensive', 'warn');
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Portfolio P/E</span>
+              <span class="rm-desc">Weighted average P/E of all holdings</span>
+            </div>
+            <div class="rm-value neutral">${data.pe.toFixed(1)}×</div>
+            <div class="rm-info-row">${peStatus}
+              ${_rmTrack(data.pe, 0, 70, [{label: 'Portfolio', val: data.pe, accent: true}])}
+            </div>
+          </div>`);
+    }
+
+    // ── Beta ─────────────────────────────────────────────────────────────
+    if (data.beta != null) {
+        const betaStatus = data.beta < 0.8 ? _rmBadge('lower than market', 'good')
+            : data.beta < 1.1 ? _rmBadge('similar to market', 'ok')
+            : _rmBadge('higher than market', 'warn');
+        const betaTrack = _rmTrack(data.beta, 0, 2, [
+            {label: 'Market', val: 1.0, accent: false},
+            {label: 'Portfolio', val: data.beta, accent: true}
+        ]);
+        const volStr = data.volatility != null ? ` · Vol ${data.volatility.toFixed(1)}% p.a.` : '';
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Volatility / Beta</span>
+              <span class="rm-desc">Portfolio volatility relative to the market</span>
+            </div>
+            <div class="rm-info-box">
+              <span class="rm-info-label">β = ${data.beta.toFixed(3)}${volStr}</span>
+              ${betaStatus}
+            </div>
+            ${betaTrack}
+          </div>`);
+    }
+
+    // ── Sharpe ───────────────────────────────────────────────────────────
+    if (data.sharpe != null) {
+        const shStatus = data.sharpe > 2 ? _rmBadge('excellent', 'good')
+            : data.sharpe > 1 ? _rmBadge('good', 'good')
+            : data.sharpe > 0.5 ? _rmBadge('adequate', 'ok')
+            : _rmBadge('requires attention', 'warn');
+        const shMarkers = [{label: 'Portfolio', val: data.sharpe, accent: true}];
+        if (data.spy_sharpe != null) shMarkers.unshift({label: 'SPY', val: data.spy_sharpe, accent: false});
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Sharpe Ratio</span>
+              <span class="rm-desc">Risk-adjusted return (all volatility considered)</span>
+            </div>
+            <div class="rm-info-box">
+              <span class="rm-info-label">Sharpe = ${data.sharpe.toFixed(3)}</span>
+              ${shStatus}
+            </div>
+            ${_rmTrack(data.sharpe, -1, 3, shMarkers)}
+          </div>`);
+    }
+
+    // ── Sortino ──────────────────────────────────────────────────────────
+    if (data.sortino != null) {
+        const soStatus = data.sortino > 2 ? _rmBadge('excellent', 'good')
+            : data.sortino > 1 ? _rmBadge('good', 'good')
+            : data.sortino > 0.5 ? _rmBadge('adequate', 'ok')
+            : _rmBadge('requires attention', 'warn');
+        cards.push(`
+          <div class="risk-metric-card">
+            <div class="rm-header">
+              <span class="rm-title">Sortino Ratio</span>
+              <span class="rm-desc">Risk-adjusted return (downside volatility only)</span>
+            </div>
+            <div class="rm-info-box">
+              <span class="rm-info-label">Sortino = ${data.sortino.toFixed(3)}</span>
+              ${soStatus}
+              <span class="rm-hint">Value above 2 is considered good</span>
+            </div>
+            ${_rmTrack(data.sortino, -1, 4, [{label: 'Portfolio', val: data.sortino, accent: true}])}
+          </div>`);
+    }
+
+    grid.innerHTML = cards.join('');
 }
 
 async function loadInlineTradeSignals() {
@@ -1021,27 +1274,41 @@ function _renderDivHistoryTimeline(data) {
 /* ─── S&P 500 Data + Sector Bars ─────────────────────────────────────────── */
 
 async function loadSP500Data() {
-    const el = document.getElementById('sectorBarsList');
-    if (el && !_sp500Data.length) {
-        const skelRow = `<div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>`;
-        el.innerHTML = skelRow.repeat(8);
-    }
+    const canvas = document.getElementById('sectorRadialChart');
+    _showChartEmpty(canvas, 'Loading sector data…');
     try {
-        const res = await fetch('/api/finviz/sp500-heatmap');
+        const res = await fetch('/api/market/sector-performance');
         const json = await res.json();
         if (json.status === 'ok') {
             _sp500Data = json.data || [];
-            _renderSectorBars();
+            _drawSectorRadialChart();
         }
     } catch (err) {
         console.warn('[sp500Data]', err);
+        _showChartEmpty(canvas, 'Failed to load sector data');
     }
 }
 
-function _renderSectorBars() {
-    const el = document.getElementById('sectorBarsList');
-    if (!el || !_sp500Data.length) return;
+function _drawSectorRadialChart() {
+    const canvas = document.getElementById('sectorRadialChart');
+    if (!canvas || !_sp500Data.length) return;
+    _hideChartEmpty(canvas);
 
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 300;
+    const H = canvas.offsetHeight || canvas.parentElement.offsetHeight || 300;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const textPrimary   = isDark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.78)';
+    const gridColor     = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ── Build sector aggregates ─────────────────────────────────────────────
     const sectorMap = {};
     for (const s of _sp500Data) {
         const sec = s.sector || 'Other';
@@ -1050,28 +1317,111 @@ function _renderSectorBars() {
         sectorMap[sec].n++;
     }
     const sectors = Object.entries(sectorMap)
-        .map(([name, d]) => ({ name, avg: d.sum / d.n }))
+        .map(([name, d]) => ({
+            name: name
+                .replace('Consumer ', '').replace(' Services', '')
+                .replace('Basic Materials', 'Materials').replace('Financial Services', 'Financial'),
+            avg: d.sum / d.n
+        }))
         .sort((a, b) => b.avg - a.avg);
 
-    const maxAbs = Math.max(...sectors.map(s => Math.abs(s.avg)), 0.5);
+    const N = sectors.length;
+    if (!N) return;
 
-    el.innerHTML = sectors.map(s => {
-        const pct = s.avg;
-        const sign = pct >= 0 ? '+' : '';
-        const cls = pct >= 0 ? 'pos' : 'neg';
-        const barW = (Math.abs(pct) / maxAbs * 100).toFixed(1);
-        const color = pct >= 0 ? '#16a34a' : '#dc2626';
-        const label = s.name
-            .replace('Consumer ', '').replace(' Services', '')
-            .replace('Basic Materials', 'Materials').replace('Financial Services', 'Financials');
-        return `<div class="sector-bar-row">
-            <span class="sector-bar-name">${esc(label)}</span>
-            <div class="sector-bar-track">
-              <div class="sector-bar-fill" style="width:${barW}%;background:${color}"></div>
-            </div>
-            <span class="sector-bar-pct ${cls}">${sign}${pct.toFixed(2)}%</span>
-        </div>`;
-    }).join('');
+    const maxAbs  = Math.max(...sectors.map(s => Math.abs(s.avg)), 0.5);
+    const labelR  = 46;                              // pixels reserved outside max ring for labels
+    const maxR    = Math.min(W, H) / 2 - labelR - 4;
+    const cx      = W / 2;
+    const cy      = H / 2;
+    const sa      = (2 * Math.PI) / N;              // slice angle
+    const GAP     = 0.018;                           // small gap between slices (radians)
+
+    // ── Grid rings ──────────────────────────────────────────────────────────
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, maxR * i / 4, 0, Math.PI * 2);
+        ctx.strokeStyle = gridColor;
+        ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // ── Spoke lines ─────────────────────────────────────────────────────────
+    for (let i = 0; i < N; i++) {
+        const angle = -Math.PI / 2 + i * sa;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // ── Colour bands — same scheme as Monthly Performance heatmap ───────────
+    const _sectorBandColors = pct => {
+        if (pct >= 10) return ['#052e16', '#15803d'];
+        if (pct >=  5) return ['#14532d', '#16a34a'];
+        if (pct >=  2) return ['#166534', '#22c55e'];
+        if (pct >=  0) return ['#0f766e', '#14b8a6'];
+        if (pct >= -2) return ['#78350f', '#b45309'];
+        if (pct >= -5) return ['#7f1d1d', '#dc2626'];
+        return                 ['#450a0a', '#b91c1c'];
+    };
+
+    // ── Wedges ──────────────────────────────────────────────────────────────
+    for (let i = 0; i < N; i++) {
+        const s = sectors[i];
+        const startA = -Math.PI / 2 + i * sa + GAP;
+        const endA   = -Math.PI / 2 + (i + 1) * sa - GAP;
+        const r      = Math.max(maxR * Math.abs(s.avg) / maxAbs, 4);
+
+        const [c1, c2] = _sectorBandColors(s.avg);
+        const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        grd.addColorStop(0, c1);
+        grd.addColorStop(1, c2);
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, startA, endA);
+        ctx.closePath();
+        ctx.fillStyle = grd;
+        ctx.fill();
+        ctx.strokeStyle = c2 + '55';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // ── Labels ──────────────────────────────────────────────────────────────
+    for (let i = 0; i < N; i++) {
+        const s      = sectors[i];
+        const midA   = -Math.PI / 2 + (i + 0.5) * sa;
+        const dist   = maxR + labelR * 0.52;
+        const lx     = cx + dist * Math.cos(midA);
+        const ly     = cy + dist * Math.sin(midA);
+
+        const sign   = s.avg >= 0 ? '+' : '';
+        const pctCol = _sectorBandColors(s.avg)[1];
+
+        // Align based on position around circle
+        const cosA = Math.cos(midA);
+        ctx.textAlign    = cosA < -0.15 ? 'right' : cosA > 0.15 ? 'left' : 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font      = `600 10px system-ui, sans-serif`;
+        ctx.fillStyle = textPrimary;
+        ctx.fillText(s.name, lx, ly - 7);
+
+        ctx.font      = `500 9.5px system-ui, sans-serif`;
+        ctx.fillStyle = pctCol;
+        ctx.fillText(`${sign}${s.avg.toFixed(2)}%`, lx, ly + 6);
+    }
+
+    // ── Centre dot ──────────────────────────────────────────────────────────
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = gridColor;
+    ctx.fill();
 }
 
 /* ─── S&P 500 Chart ──────────────────────────────────────────────────────── */
@@ -1387,12 +1737,10 @@ function _drawPortfolioVsChart() {
     ctx.scale(dpr, dpr);
 
     if (!_portfolioVsData?.length || !_mktChartData?.GSPC) {
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '12px system-ui,sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Collecting portfolio history…', W / 2, H / 2);
+        _showChartEmpty(canvas, 'Building portfolio history…');
         return;
     }
+    _hideChartEmpty(canvas);
 
     const sp = _mktChartData.GSPC;
     const spByDate = {};
@@ -1411,12 +1759,10 @@ function _drawPortfolioVsChart() {
     const dates = allDates.slice(-maxDays);
 
     if (dates.length < 2) {
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '12px system-ui,sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Not enough data yet', W / 2, H / 2);
+        _showChartEmpty(canvas, 'Not enough data yet');
         return;
     }
+    _hideChartEmpty(canvas);
 
     const spBase = spByDate[dates[0]];
     const pvsBase = pvsByDate[dates[0]];
@@ -1785,8 +2131,8 @@ function _drawDrawdownChart() {
     if (!canvas) return;
     if (!canvas.offsetWidth) { requestAnimationFrame(_drawDrawdownChart); return; }
     if (!_portfolioVsData?.length) {
-        const ctx2 = canvas.getContext('2d');
-        ctx2.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        _showChartEmpty(canvas);
         return;
     }
 
@@ -1797,7 +2143,11 @@ function _drawDrawdownChart() {
     cutoff.setDate(cutoff.getDate() - days);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
     const raw = _portfolioVsData.filter(pt => pt.date >= cutoffStr);
-    if (raw.length < 2) return;
+    if (raw.length < 2) {
+        _showChartEmpty(canvas, 'Not enough data for this range');
+        return;
+    }
+    _hideChartEmpty(canvas);
 
     const series = _calcDrawdown(raw);
 
@@ -2227,8 +2577,46 @@ function _renderFullSignals() {
     listEl.innerHTML = html;
 }
 
+function _showConfirmModal({ icon = '', title, body, okLabel, danger = false }) {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('confirmModalOverlay');
+        const modal   = document.getElementById('confirmModal');
+        document.getElementById('confirmModalIcon').textContent  = icon;
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalBody').textContent  = body;
+        const okBtn = document.getElementById('confirmModalOk');
+        okBtn.textContent = okLabel;
+        okBtn.classList.toggle('danger', danger);
+
+        const close = result => {
+            overlay.classList.remove('open');
+            modal.classList.remove('open');
+            okBtn.removeEventListener('click', onOk);
+            document.getElementById('confirmModalCancel').removeEventListener('click', onCancel);
+            overlay.removeEventListener('click', onCancel);
+            resolve(result);
+        };
+        const onOk     = () => close(true);
+        const onCancel = () => close(false);
+
+        okBtn.addEventListener('click', onOk);
+        document.getElementById('confirmModalCancel').addEventListener('click', onCancel);
+        overlay.addEventListener('click', onCancel);
+
+        overlay.classList.add('open');
+        modal.classList.add('open');
+    });
+}
+
 async function excludeTicker(ticker) {
-    if (!confirm(`Exclude ${ticker} from all trade signals?`)) return;
+    const confirmed = await _showConfirmModal({
+        icon: '🚫',
+        title: `Exclude ${ticker}?`,
+        body: `${ticker} will be hidden from all trade signal lists. You can re-include it from the Excluded tab.`,
+        okLabel: 'Exclude',
+        danger: true,
+    });
+    if (!confirmed) return;
     try {
         const res = await fetch('/api/trade-signals/exclude', {
             method: 'POST',
@@ -2236,7 +2624,6 @@ async function excludeTicker(ticker) {
             body: JSON.stringify({ ticker: ticker, excluded: true })
         });
         if (res.ok) {
-            // Refresh signals
             loadTradeSignals(true);
             if (document.getElementById('signalsSidebar').classList.contains('active')) {
                 switchSignalsTab('signals');
@@ -2246,6 +2633,14 @@ async function excludeTicker(ticker) {
 }
 
 async function includeTicker(ticker) {
+    const confirmed = await _showConfirmModal({
+        icon: '✅',
+        title: `Re-include ${ticker}?`,
+        body: `${ticker} will appear again in trade signal lists.`,
+        okLabel: 'Re-include',
+        danger: false,
+    });
+    if (!confirmed) return;
     try {
         const res = await fetch('/api/trade-signals/exclude', {
             method: 'POST',
@@ -2262,7 +2657,7 @@ async function includeTicker(ticker) {
 async function loadExcludedTickers() {
     const listEl = document.getElementById('ssListExcluded');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="activity-loading">Loading exclusions…</div>';
+    _showElemLoading(listEl, 'Loading exclusions…');
     try {
         const res = await fetch('/api/trade-signals/excluded');
         const json = await res.json();
@@ -3856,7 +4251,7 @@ async function openWatchlistStockPanel(ticker, country) {
     if (analystSec) analystSec.style.display = 'none';
     if (fundSec) fundSec.style.display = 'none';
     const newsList = document.getElementById('spNewsList');
-    if (newsList) newsList.innerHTML = '<div class="activity-loading">Loading news…</div>';
+    if (newsList) _showElemLoading(newsList, 'Loading news…');
 
     document.getElementById('sidePanelBackdrop')?.classList.add('active');
     document.getElementById('sidePanel')?.classList.add('open');
@@ -3915,7 +4310,7 @@ async function openWatchlistStockPanel(ticker, country) {
         if (activitySec) {
             activitySec.style.display = '';
             const actList = document.getElementById('spActivityList');
-            if (actList) actList.innerHTML = '<div class="activity-loading">Loading Activity…</div>';
+            if (actList) _showElemLoading(actList, 'Loading activity…');
             window.PORTFOLIO_ID = portfolioRow.pid || 'combined';
             if (typeof window['loadStockActivity'] === 'function') window['loadStockActivity'](ticker);
         }

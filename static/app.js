@@ -24,6 +24,100 @@ let _todayReturns = null;     // null = not yet fetched
 let _todayReturnsPct = null;
 let _tickerChangeMap = {};    // ticker -> change_pct (today)
 
+/* ─── Column picker ─────────────────────────────────────────────────────── */
+const _COL_DEFS = [
+  { id: 'ticker',        label: 'Ticker',        locked: true },
+  { id: 'company',       label: 'Company'                     },
+  { id: 'country',       label: 'Country'                     },
+  { id: 'trend',         label: '48h Trend'                   },
+  { id: 'shares',        label: 'Shares'                      },
+  { id: 'avg_price',     label: 'Avg Price'                   },
+  { id: 'current_price', label: 'Current Price'               },
+  { id: 'breakeven',     label: 'Breakeven'                   },
+  { id: 'invested',      label: 'Invested'                    },
+  { id: 'value',         label: 'Value'                       },
+  { id: 'weight',        label: 'Weight'                      },
+  { id: 'pnl',           label: 'P&L'                        },
+  { id: 'fx_impact',     label: 'FX Impact'                   },
+  { id: 'returns_pct',   label: 'Returns %'                   },
+  { id: 'div_yield',     label: 'Div Yield'                   },
+  { id: 'rating',        label: 'Rating'                      },
+];
+
+function _loadColVis() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('colVisibility') || '{}');
+    const map = {};
+    _COL_DEFS.forEach(c => {
+      map[c.id] = c.locked ? true : (stored[c.id] !== undefined ? stored[c.id] : true);
+    });
+    return map;
+  } catch { return Object.fromEntries(_COL_DEFS.map(c => [c.id, true])); }
+}
+
+function _saveColVis(map) {
+  localStorage.setItem('colVisibility', JSON.stringify(map));
+}
+
+function _applyColVis(map) {
+  _COL_DEFS.forEach(c => {
+    document.querySelectorAll(`[data-colid="${c.id}"]`).forEach(el => {
+      el.classList.toggle('col-hidden', map[c.id] === false);
+    });
+  });
+}
+
+function toggleColPicker() {
+  let dropdown = document.getElementById('colPickerDropdown');
+  if (!dropdown) {
+    const map = _loadColVis();
+    const wrap = document.getElementById('colPickerBtn').closest('.col-picker-wrap');
+    dropdown = document.createElement('div');
+    dropdown.id = 'colPickerDropdown';
+    dropdown.className = 'col-picker-dropdown';
+    dropdown.innerHTML = `
+      <div class="col-picker-header">
+        <span>Toggle Columns</span>
+        <button class="col-picker-reset" onclick="_resetColVis()">Reset all</button>
+      </div>
+      <div class="col-picker-list">
+        ${_COL_DEFS.map(c => `
+          <label class="col-picker-item${c.locked ? ' col-picker-locked' : ''}">
+            <input type="checkbox" data-col="${c.id}" ${map[c.id] !== false ? 'checked' : ''} ${c.locked ? 'disabled' : ''} onchange="_onColToggle(this)">
+            <span>${c.label}</span>
+          </label>
+        `).join('')}
+      </div>`;
+    wrap.appendChild(dropdown);
+  }
+  dropdown.classList.toggle('open');
+}
+
+function _onColToggle(cb) {
+  const map = _loadColVis();
+  map[cb.dataset.col] = cb.checked;
+  _saveColVis(map);
+  _applyColVis(map);
+}
+
+function _resetColVis() {
+  localStorage.removeItem('colVisibility');
+  const map = _loadColVis();
+  document.querySelectorAll('#colPickerDropdown input[type=checkbox]').forEach(cb => {
+    cb.checked = map[cb.dataset.col] !== false;
+  });
+  _applyColVis(map);
+}
+
+document.addEventListener('click', e => {
+  const dropdown = document.getElementById('colPickerDropdown');
+  if (dropdown && dropdown.classList.contains('open')) {
+    if (!dropdown.contains(e.target) && !e.target.closest('#colPickerBtn')) {
+      dropdown.classList.remove('open');
+    }
+  }
+});
+
 /* ─── Currency colors ───────────────────────────────────────────────────── */
 const CURRENCY_COLORS = {
   GBP: '#3b82f6', USD: '#f43f5e', EUR: '#8b5cf6',
@@ -189,6 +283,8 @@ async function loadPortfolio(force = false) {
   activeCountry = null;
   _todayReturns = null;
   _todayReturnsPct = null;
+  _dynamicsData = null;
+  _dynamicsRange = '12m';
 
   try {
     const url = force ? `/api/p${PORTFOLIO_ID}/portfolio?force=1` : `/api/p${PORTFOLIO_ID}/portfolio`;
@@ -287,7 +383,7 @@ async function loadPortfolio(force = false) {
     // Load portfolio bottom panels
     loadDetailActivity();
     loadMonthlyDividends();
-    loadMonthlyPerformance();
+    loadDynamicsChart();
 
   } catch (err) {
     showState('error', 'Network error: ' + err.message);
@@ -309,7 +405,7 @@ function showSkeletons() {
   if (tbody) {
     tbody.innerHTML = Array(8).fill(0).map(() => `
       <tr class="skeleton-row-loading">
-        <td colspan="14"><div class="skeleton skeleton-row"></div></td>
+        <td colspan="16"><div class="skeleton skeleton-row"></div></td>
       </tr>
     `).join('');
   }
@@ -754,36 +850,53 @@ function renderTable(rows) {
       ? `<span class="div-yield-badge">${r.div_yield.toFixed(2)}%</span>`
       : '<span class="div-yield-badge">0.00%</span>';
 
+    // Current price + Breakeven cells
+    const beQty = r.quantity || 1;
+    const beBreakeven = (r.invested - (r.dividends || 0)) / beQty;
+    const beCurrentPx = r.current_value / beQty;
+    const currentPxCell = `<span class="cell-num">${fmt.currency(beCurrentPx, 4)}</span>`;
+    let beCell;
+    if (beCurrentPx >= beBreakeven) {
+      beCell = `<span class="be-profit">${fmt.currency(beBreakeven, 4)}</span>`;
+    } else {
+      const shortfall = (beBreakeven - beCurrentPx).toFixed(4);
+      beCell = `<span class="be-loss">${fmt.currency(beBreakeven, 4)}</span><br><span class="be-needed-tag">${fmt.currency(shortfall, 4)} short</span>`;
+    }
+
     const sparkId = 'sspark-' + r.ticker.replace(/[^a-zA-Z0-9]/g, '_');
     tr.innerHTML = `
-      <td><span class="cell-ticker">${esc(r.ticker)}</span></td>
-      <td>
+      <td data-colid="ticker"><span class="cell-ticker">${esc(r.ticker)}</span></td>
+      <td data-colid="company">
         <div class="cell-name-wrap">
           <span class="cell-company" title="${esc(r.company_name)}">${esc(r.company_name)}</span>
           ${sectorLabel}
         </div>
       </td>
-      <td><span class="${cbClass}">${esc(r.country)}</span></td>
-      <td class="td-center"><canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas></td>
-      <td class="td-right cell-num">${fmt.number(r.quantity, 6)}</td>
-      <td class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
-      <td class="td-right cell-num">${fmt.currency(r.invested)}</td>
-      <td class="td-right cell-num">${fmt.currency(r.current_value)}</td>
-      <td class="td-right">${weightCell}</td>
-      <td class="td-right">
+      <td data-colid="country"><span class="${cbClass}">${esc(r.country)}</span></td>
+      <td data-colid="trend" class="td-center"><canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas></td>
+      <td data-colid="shares" class="td-right cell-num">${fmt.number(r.quantity, 6)}</td>
+      <td data-colid="avg_price" class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
+      <td data-colid="current_price" class="td-right cell-num">${currentPxCell}</td>
+      <td data-colid="breakeven" class="td-right cell-num">${beCell}</td>
+      <td data-colid="invested" class="td-right cell-num">${fmt.currency(r.invested)}</td>
+      <td data-colid="value" class="td-right cell-num">${fmt.currency(r.current_value)}</td>
+      <td data-colid="weight" class="td-right">${weightCell}</td>
+      <td data-colid="pnl" class="td-right">
         ${_pnlCell(r.total_returns, r.returns_pct)}
       </td>
-      <td class="td-right cell-num">${fxCell}</td>
-      <td class="td-right">
+      <td data-colid="fx_impact" class="td-right cell-num">${fxCell}</td>
+      <td data-colid="returns_pct" class="td-right">
         <span class="pct-badge ${colorClass(r.returns_pct)}">
           ${r.returns_pct >= 0 ? '▲' : '▼'} ${Math.abs(r.returns_pct).toFixed(2)}%
         </span>
       </td>
-      <td class="td-right">${divYieldCell}</td>
-      <td class="td-right">${_ratingCell(r)}</td>
+      <td data-colid="div_yield" class="td-right">${divYieldCell}</td>
+      <td data-colid="rating" class="td-right">${_ratingCell(r)}</td>
     `;
     tbody.appendChild(tr);
   });
+
+  _applyColVis(_loadColVis());
 
   const total = rows.length, shown = filtered.length;
   const rcEl = document.getElementById('rowCount');
@@ -1432,8 +1545,16 @@ window.openStockPanel = function (r) {
   const qty = r.quantity || 1;
   const divs = r.dividends || 0;
   const breakeven = (r.invested - divs) / qty;
+  const currentPx = r.current_value / qty;
   const beEl = document.getElementById('spBreakeven');
-  if (beEl) beEl.textContent = fmt.currency(breakeven, 4);
+  if (beEl) {
+    if (currentPx >= breakeven) {
+      beEl.innerHTML = `<span class="be-profit">${fmt.currency(breakeven, 4)}</span>`;
+    } else {
+      const neededPct = breakeven > 0 ? ((breakeven - currentPx) / currentPx * 100).toFixed(1) : 0;
+      beEl.innerHTML = `<span class="be-loss">${fmt.currency(breakeven, 4)}</span><span class="be-needed-tag">+${neededPct}% needed</span>`;
+    }
+  }
 
   // Held Since: placeholder until activity loads
   const hsEl = document.getElementById('spHeldSince');
@@ -1447,7 +1568,8 @@ window.openStockPanel = function (r) {
   window.loadStockActivity(r.ticker);
   window.loadStockNews(r.ticker);
   if (r.country === 'US' || r.country === 'CA') {
-    window.loadStockMetrics(r.ticker);
+    const nativePx = r.native_price != null ? r.native_price : (r.current_value / (r.quantity || 1));
+    window.loadStockMetrics(r.ticker, nativePx);
   } else {
     const sec = document.getElementById('spFundamentalsSection');
     if (sec) sec.style.display = 'none';
@@ -1659,7 +1781,7 @@ window.calNextMonth = function () {
 }
 
 /* ─── Stock Fundamentals ─────────────────────────────────────────────────── */
-window.loadStockMetrics = async function (ticker) {
+window.loadStockMetrics = async function (ticker, currentPrice) {
   const sec = document.getElementById('spFundamentalsSection');
   const container = document.getElementById('spFundamentals');
   if (!sec || !container) return;
@@ -1682,14 +1804,14 @@ window.loadStockMetrics = async function (ticker) {
       container.innerHTML = `<div class="activity-empty">${json.message || 'No fundamental data available.'}</div>`;
       return;
     }
-    _renderStockMetrics(json.data);
+    _renderStockMetrics(json.data, currentPrice);
   } catch (err) {
     console.error('Fundamentals error:', err);
     container.innerHTML = '<div class="activity-empty">Error loading fundamentals.</div>';
   }
 }
 
-function _renderStockMetrics(m) {
+function _renderStockMetrics(m, currentPrice) {
   const container = document.getElementById('spFundamentals');
 
   // Helper: format a number with fixed decimals and optional suffix
@@ -1758,6 +1880,15 @@ function _renderStockMetrics(m) {
   if (hi != null && lo != null && hi > lo) {
     const hiDate = m['52WeekHighDate'] ? ` (${m['52WeekHighDate']})` : '';
     const loDate = m['52WeekLowDate'] ? ` (${m['52WeekLowDate']})` : '';
+    const px = (currentPrice != null && isFinite(currentPrice)) ? currentPrice : null;
+    const fillPct = px != null ? Math.min(100, Math.max(0, ((px - lo) / (hi - lo)) * 100)) : null;
+    const markerHtml = fillPct != null
+      ? `<div class="fund-range-marker" style="left:${fillPct.toFixed(1)}%"></div>`
+      : '';
+    const fillStyle = fillPct != null ? `style="width:${fillPct.toFixed(1)}%"` : '';
+    const currentLabel = px != null
+      ? `<div class="fund-range-current">Current: $${Number(px).toFixed(2)} &nbsp;·&nbsp; ${fillPct.toFixed(0)}% of range</div>`
+      : '';
     rangeBar = `
       <div class="fund-range-wrap">
         <div class="fund-range-header">
@@ -1765,7 +1896,11 @@ function _renderStockMetrics(m) {
           <span class="fund-range-label">52-Week Range</span>
           <span class="fund-range-hi">$${Number(hi).toFixed(2)}<span class="fund-range-date">${hiDate}</span></span>
         </div>
-        <div class="fund-range-track"><div class="fund-range-fill"></div></div>
+        <div class="fund-range-track">
+          <div class="fund-range-fill" ${fillStyle}></div>
+          ${markerHtml}
+        </div>
+        ${currentLabel}
       </div>`;
   }
 
@@ -1936,6 +2071,181 @@ async function openDiversificationDetails() {
 function closeSummaryPanel() {
   document.getElementById('summaryPanel').classList.remove('open');
   document.getElementById('summaryPanelBackdrop').classList.remove('active');
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PORTFOLIO REBALANCING PANEL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const _REBAL_STORAGE_KEY = () => `rebal_targets_${PORTFOLIO_ID}`;
+
+function _loadRebalTargets() {
+  try { return JSON.parse(localStorage.getItem(_REBAL_STORAGE_KEY()) || 'null') || {}; }
+  catch { return {}; }
+}
+
+function _saveRebalTargets(map) {
+  localStorage.setItem(_REBAL_STORAGE_KEY(), JSON.stringify(map));
+}
+
+function openRebalancePanel() {
+  const panel    = document.getElementById('rebalancePanel');
+  const backdrop = document.getElementById('rebalancePanelBackdrop');
+  if (!panel) return;
+  panel.classList.add('open');
+  backdrop.classList.add('active');
+  _renderRebalancePanel();
+}
+
+function closeRebalancePanel() {
+  document.getElementById('rebalancePanel').classList.remove('open');
+  document.getElementById('rebalancePanelBackdrop').classList.remove('active');
+}
+
+function _renderRebalancePanel() {
+  const content = document.getElementById('rebalancePanelContent');
+  if (!content || !allRows.length) {
+    if (content) content.innerHTML = '<div class="activity-empty" style="padding:24px">Load a portfolio first.</div>';
+    return;
+  }
+
+  // ── Build sector totals from current rows ─────────────────────────────────
+  const totalValue = allRows.reduce((s, r) => s + (r.current_value || 0), 0);
+  const sectorMap  = {};
+  for (const r of allRows) {
+    const sec = r.sector || 'Other';
+    if (!sectorMap[sec]) sectorMap[sec] = { value: 0, tickers: [] };
+    sectorMap[sec].value    += r.current_value || 0;
+    sectorMap[sec].tickers.push(r.ticker);
+  }
+  const sectors = Object.entries(sectorMap)
+    .map(([name, d]) => ({ name, value: d.value, currentPct: totalValue > 0 ? (d.value / totalValue * 100) : 0 }))
+    .sort((a, b) => b.value - a.value);
+
+  // ── Load / default target weights ────────────────────────────────────────
+  const saved     = _loadRebalTargets();
+  const equalPct  = parseFloat((100 / sectors.length).toFixed(1));
+  const targets   = {};
+  let   targetSum = 0;
+  for (const s of sectors) {
+    targets[s.name] = saved[s.name] != null ? saved[s.name] : equalPct;
+    targetSum += targets[s.name];
+  }
+
+  // ── Summary pills ─────────────────────────────────────────────────────────
+  let totalBuy = 0, totalSell = 0;
+  for (const s of sectors) {
+    const delta = targets[s.name] - s.currentPct;
+    const amt   = Math.abs(delta / 100 * totalValue);
+    if (delta > 0.1)  totalBuy  += amt;
+    if (delta < -0.1) totalSell += amt;
+  }
+
+  // ── Build HTML ────────────────────────────────────────────────────────────
+  const rows = sectors.map(s => {
+    const target  = targets[s.name];
+    const delta   = target - s.currentPct;
+    const absDelta = Math.abs(delta);
+    const actionAmt = absDelta / 100 * totalValue;
+    const deltaClass = delta > 0.5 ? 'under' : delta < -0.5 ? 'over' : 'ok';
+    const deltaSign  = delta > 0 ? '+' : '';
+    let actionHtml;
+    if (delta > 0.5)       actionHtml = `<span class="buy">Buy ${fmt.currency(actionAmt)}</span>`;
+    else if (delta < -0.5) actionHtml = `<span class="sell">Sell ${fmt.currency(actionAmt)}</span>`;
+    else                   actionHtml = `<span class="hold">On target</span>`;
+
+    const barPct = Math.min(100, s.currentPct / Math.max(...sectors.map(x => x.currentPct)) * 100);
+
+    return `<tr>
+      <td>
+        <div class="rebal-sector-name">${esc(s.name)}</div>
+        <div style="display:flex;align-items:center;margin-top:4px">
+          <span class="rebal-bar-wrap"><span class="rebal-bar-fill" style="width:${barPct.toFixed(0)}%"></span></span>
+          <span style="font-size:0.68rem;color:var(--text-muted)">${fmt.currency(s.value)}</span>
+        </div>
+      </td>
+      <td class="rebal-val">${s.currentPct.toFixed(1)}%</td>
+      <td>
+        <div class="rebal-target-wrap">
+          <input class="rebal-target-input" type="number" min="0" max="100" step="0.1"
+            value="${target.toFixed(1)}"
+            data-sector="${esc(s.name)}"
+            oninput="_onRebalTargetChange()" />
+          <span style="font-size:0.75rem;color:var(--text-muted)">%</span>
+        </div>
+      </td>
+      <td class="rebal-delta ${deltaClass}">${deltaSign}${delta.toFixed(1)}%</td>
+      <td class="rebal-action">${actionHtml}</td>
+    </tr>`;
+  }).join('');
+
+  const targetSumWarn = Math.abs(targetSum - 100) > 0.5
+    ? `<div style="font-size:0.72rem;color:var(--red);padding:4px 16px 0">⚠ Targets sum to ${targetSum.toFixed(1)}% — should be 100%</div>`
+    : '';
+
+  content.innerHTML = `
+    <p class="rebal-intro">Set target sector weights and see what to buy or sell to rebalance your portfolio.</p>
+    <div class="rebal-summary">
+      <div class="rebal-summary-pill">
+        <div class="pill-val">${fmt.currency(totalValue)}</div>
+        <div class="pill-label">Portfolio value</div>
+      </div>
+      <div class="rebal-summary-pill">
+        <div class="pill-val pos">${fmt.currency(totalBuy)}</div>
+        <div class="pill-label">To buy</div>
+      </div>
+      <div class="rebal-summary-pill">
+        <div class="pill-val neg">${fmt.currency(totalSell)}</div>
+        <div class="pill-label">To sell</div>
+      </div>
+    </div>
+    ${targetSumWarn}
+    <div class="rebal-table-wrap">
+      <table class="rebal-table">
+        <thead>
+          <tr>
+            <th>Sector</th>
+            <th class="th-r">Current</th>
+            <th class="th-r">Target</th>
+            <th class="th-r">Delta</th>
+            <th class="th-r">Action</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="rebal-footer">
+      <button class="rebal-footer-btn" onclick="_rebalReset()">Reset to equal</button>
+      <button class="rebal-footer-btn primary" onclick="_rebalSave()">Save targets</button>
+    </div>`;
+}
+
+function _onRebalTargetChange() {
+  // Live re-render so delta/action columns update as user types
+  const saved = _loadRebalTargets();
+  for (const inp of document.querySelectorAll('.rebal-target-input')) {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) saved[inp.dataset.sector] = v;
+  }
+  _saveRebalTargets(saved);
+  _renderRebalancePanel();
+}
+
+function _rebalReset() {
+  localStorage.removeItem(_REBAL_STORAGE_KEY());
+  _renderRebalancePanel();
+}
+
+function _rebalSave() {
+  const map = {};
+  for (const inp of document.querySelectorAll('.rebal-target-input')) {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) map[inp.dataset.sector] = v;
+  }
+  _saveRebalTargets(map);
+  // Brief visual confirmation
+  const btn = document.querySelector('.rebal-footer-btn.primary');
+  if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => { btn.textContent = 'Save targets'; }, 1500); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2276,11 +2586,13 @@ function showStocksState(state, msg) {
 /* ── Monthly Performance Heatmap ────────────────────────────────────────── */
 
 let _monthlyPerfData = null;
+let _dynamicsData = null;
+let _dynamicsRange = '12m';
 
 async function loadMonthlyPerformance() {
   const container = document.getElementById('monthlyPerfHeatmap');
   if (!container) return;
-  container.innerHTML = '<div class="monthly-perf-loading">Loading monthly performance…</div>';
+  _showElemLoading(container, 'Loading monthly performance…');
 
   try {
     const res = await fetch(`/api/p${PORTFOLIO_ID}/monthly-performance`);
@@ -2289,7 +2601,7 @@ async function loadMonthlyPerformance() {
     _monthlyPerfData = json.data;
     _renderMonthlyPerfHeatmap(_monthlyPerfData);
   } catch (err) {
-    container.innerHTML = `<div class="monthly-perf-loading">Failed to load: ${err.message}</div>`;
+    _showElemLoading(container, 'Failed to load monthly performance');
   }
 }
 
@@ -2312,7 +2624,7 @@ function _renderMonthlyPerfHeatmap(data) {
   const sortedMonths = Array.from(allMonths).sort().slice(-12);
 
   if (sortedMonths.length === 0) {
-    container.innerHTML = '<div class="monthly-perf-loading">No data available.</div>';
+    _showElemLoading(container, 'No monthly data available yet');
     return;
   }
 
@@ -2371,4 +2683,224 @@ function _mphColor(pct) {
   if (pct >= -2) return 'linear-gradient(135deg,#78350f,#b45309)';
   if (pct >= -5) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
   return 'linear-gradient(135deg,#450a0a,#b91c1c)';
+}
+
+/* ── Dynamics of Portfolio Returns ──────────────────────────────────────── */
+
+async function loadDynamicsChart() {
+  const card = document.getElementById('dynamicsCard');
+  if (!card) return;
+  if (_dynamicsData) { _initDynamicsRangeTabs(); _drawDynamicsChart(); return; }
+  try {
+    const res = await fetch(`/api/p${PORTFOLIO_ID}/monthly-returns`);
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+    _dynamicsData = json.data || [];
+    _initDynamicsRangeTabs();
+    _drawDynamicsChart();
+  } catch (err) {
+    const canvas = document.getElementById('dynamicsChart');
+    if (canvas) _showChartEmpty(canvas, 'No data yet — history is building up');
+  }
+}
+
+function _getDynamicsFiltered() {
+  if (!_dynamicsData || !_dynamicsData.length) return [];
+  if (_dynamicsRange === 'all') return _dynamicsData;
+  if (_dynamicsRange === '12m') return _dynamicsData.slice(-12);
+  return _dynamicsData.filter(d => d.month.startsWith(_dynamicsRange));
+}
+
+function _drawDynamicsChart() {
+  const canvas = document.getElementById('dynamicsChart');
+  if (!canvas) return;
+  if (!canvas.offsetWidth) { requestAnimationFrame(_drawDynamicsChart); return; }
+
+  const data = _getDynamicsFiltered();
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  if (!data.length) {
+    _showChartEmpty(canvas);
+    return;
+  }
+  _hideChartEmpty(canvas);
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const textCol = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+  const gridCol = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+  const zeroCol = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)';
+  const posCol  = '#4ade80';
+  const negCol  = '#f87171';
+
+  const PAD = { top: 32, right: 12, bottom: 44, left: 44 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  const vals = data.map(d => d.pct);
+  const maxVal = Math.max(...vals, 1);
+  const minVal = Math.min(...vals, -1);
+  const yMax = Math.ceil(maxVal * 1.25 / 5) * 5;
+  const yMin = Math.floor(minVal * 1.25 / 5) * 5;
+  const yRng = yMax - yMin;
+
+  const yOf     = v => PAD.top + (1 - (v - yMin) / yRng) * cH;
+  const y0      = yOf(0);
+  const barStep = cW / data.length;
+  const barW    = Math.max(6, Math.min(44, barStep * 0.62));
+  const xOf     = i => PAD.left + (i + 0.5) * barStep;
+
+  // Y-axis gridlines + labels
+  const yStep = yRng <= 15 ? 5 : yRng <= 40 ? 10 : 20;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let v = yMin; v <= yMax + 0.01; v += yStep) {
+    const y = yOf(v);
+    ctx.strokeStyle = v === 0 ? zeroCol : gridCol;
+    ctx.lineWidth = v === 0 ? 1.2 : 0.5;
+    ctx.setLineDash(v === 0 ? [] : [4, 4]);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = textCol;
+    ctx.fillText(v + '%', PAD.left - 6, y);
+  }
+
+  const showLabels = barW > 16;
+
+  // Draw bars with rounded outer corners
+  data.forEach((d, i) => {
+    const x   = xOf(i);
+    const pos = d.pct >= 0;
+    const bTop = pos ? yOf(d.pct) : y0;
+    const bH   = Math.max(1, Math.abs(yOf(d.pct) - y0));
+    const r    = Math.min(3, barW / 5);
+
+    ctx.fillStyle = pos ? posCol : negCol;
+    ctx.beginPath();
+    if (pos) {
+      ctx.moveTo(x - barW / 2 + r, bTop);
+      ctx.arcTo(x + barW / 2, bTop, x + barW / 2, bTop + r, r);
+      ctx.lineTo(x + barW / 2, y0);
+      ctx.lineTo(x - barW / 2, y0);
+      ctx.arcTo(x - barW / 2, bTop, x - barW / 2 + r, bTop, r);
+    } else {
+      ctx.moveTo(x - barW / 2, y0);
+      ctx.lineTo(x + barW / 2, y0);
+      ctx.lineTo(x + barW / 2, bTop + bH - r);
+      ctx.arcTo(x + barW / 2, bTop + bH, x + barW / 2 - r, bTop + bH, r);
+      ctx.lineTo(x - barW / 2 + r, bTop + bH);
+      ctx.arcTo(x - barW / 2, bTop + bH, x - barW / 2, bTop + bH - r, r);
+      ctx.lineTo(x - barW / 2, y0);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Value label above/below bar
+    if (showLabels) {
+      const sign = d.pct >= 0 ? '+' : '';
+      const lbl = sign + d.pct.toFixed(1) + '%';
+      ctx.fillStyle = pos ? posCol : negCol;
+      ctx.font = 'bold 10px system-ui,sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = pos ? 'bottom' : 'top';
+      ctx.fillText(lbl, x, pos ? bTop - 3 : bTop + bH + 3);
+    }
+  });
+
+  // X-axis month labels
+  ctx.fillStyle = textCol;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const labelEvery = Math.max(1, Math.ceil(data.length / 18));
+  data.forEach((d, i) => {
+    if (i % labelEvery !== 0 && i !== data.length - 1) return;
+    const [yr, mo] = d.month.split('-');
+    const lbl = new Date(+yr, +mo - 1, 1)
+      .toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    ctx.fillText(lbl, xOf(i), H - PAD.bottom + 6);
+  });
+
+  canvas._dynMeta = { data, xOf, yOf, y0, barW, barStep, PAD, W, H };
+}
+
+function _initDynamicsRangeTabs() {
+  const tabBar = document.getElementById('dynamicsRangeTabs');
+  if (!tabBar || tabBar._dynInit) return;
+  tabBar._dynInit = true;
+
+  // Inject year tabs from data
+  if (_dynamicsData && _dynamicsData.length) {
+    const years = [...new Set(_dynamicsData.map(d => d.month.slice(0, 4)))].sort((a, b) => b - a);
+    years.forEach(yr => {
+      const btn = document.createElement('button');
+      btn.className = 'dyn-tab';
+      btn.dataset.range = yr;
+      btn.dataset.year = yr;
+      btn.textContent = yr;
+      tabBar.appendChild(btn);
+    });
+  }
+
+  tabBar.addEventListener('click', e => {
+    const btn = e.target.closest('.dyn-tab');
+    if (!btn) return;
+    tabBar.querySelectorAll('.dyn-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    _dynamicsRange = btn.dataset.range;
+    _drawDynamicsChart();
+  });
+
+  // Hover: column highlight + tooltip
+  const canvas = document.getElementById('dynamicsChart');
+  if (!canvas) return;
+
+  canvas.addEventListener('mousemove', e => {
+    const m = canvas._dynMeta;
+    if (!m || !m.data.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const idx = Math.max(0, Math.min(m.data.length - 1,
+      Math.floor((mx - m.PAD.left) / m.barStep)));
+    const pt = m.data[idx];
+    if (!pt) return;
+
+    _drawDynamicsChart();
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    ctx.scale(dpr, dpr);
+
+    // Column highlight
+    const pos = pt.pct >= 0;
+    ctx.fillStyle = pos ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)';
+    ctx.fillRect(m.xOf(idx) - m.barStep / 2, m.PAD.top, m.barStep, m.H - m.PAD.top - m.PAD.bottom);
+
+    const tooltip = document.getElementById('dynamicsTooltip');
+    if (!tooltip) return;
+    const [yr, mo] = pt.month.split('-');
+    const monthStr = new Date(+yr, +mo - 1, 1)
+      .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const sign = pt.pct >= 0 ? '+' : '';
+    const fmtVal = v => '£' + v.toLocaleString('en-GB', { maximumFractionDigits: 0 });
+    tooltip.innerHTML = `
+      <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:2px">${monthStr}</div>
+      <div style="font-size:0.85rem;font-weight:700;color:${pos ? '#4ade80' : '#f87171'}">${sign}${pt.pct.toFixed(2)}%</div>
+      <div style="font-size:0.7rem;color:var(--text-muted)">Value: ${fmtVal(pt.value)}</div>`;
+    const tx = Math.min(m.xOf(idx) + 10, m.W - 120);
+    const ty = Math.max(m.PAD.top + 4, m.y0 - 60);
+    tooltip.style.cssText = `display:flex;flex-direction:column;gap:2px;left:${tx}px;top:${ty}px`;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    _drawDynamicsChart();
+    const tooltip = document.getElementById('dynamicsTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+  });
 }
