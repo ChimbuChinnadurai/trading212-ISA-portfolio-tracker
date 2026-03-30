@@ -2403,7 +2403,7 @@ let _dynamicsRange = '12m';
 async function loadMonthlyPerformance() {
   const container = document.getElementById('monthlyPerfHeatmap');
   if (!container) return;
-  container.innerHTML = '<div class="monthly-perf-loading">Loading monthly performance…</div>';
+  _showElemLoading(container, 'Loading monthly performance…');
 
   try {
     const res = await fetch(`/api/p${PORTFOLIO_ID}/monthly-performance`);
@@ -2412,7 +2412,7 @@ async function loadMonthlyPerformance() {
     _monthlyPerfData = json.data;
     _renderMonthlyPerfHeatmap(_monthlyPerfData);
   } catch (err) {
-    container.innerHTML = `<div class="monthly-perf-loading">Failed to load: ${err.message}</div>`;
+    _showElemLoading(container, 'Failed to load monthly performance');
   }
 }
 
@@ -2435,7 +2435,7 @@ function _renderMonthlyPerfHeatmap(data) {
   const sortedMonths = Array.from(allMonths).sort().slice(-12);
 
   if (sortedMonths.length === 0) {
-    container.innerHTML = '<div class="monthly-perf-loading">No data available.</div>';
+    _showElemLoading(container, 'No monthly data available yet');
     return;
   }
 

@@ -2090,19 +2090,71 @@ def finviz_signals():
     return jsonify({"status": "ok", "data": data, "signal": signal_type, "cached": False})
 
 
-@app.route("/api/finviz/sp500-heatmap")
-def finviz_sp500_heatmap():
-    """All S&P 500 stocks with sector, change %, price, market cap for the heatmap.
-    Cached for 5 minutes — first call may be slow (scrapes ~500 stocks across pages).
+
+# ── Sector Performance (SPDR ETFs — fast alternative to Finviz heatmap) ───────
+
+_SECTOR_ETFS = {
+    "XLK":  "Technology",
+    "XLF":  "Financial Services",
+    "XLE":  "Energy",
+    "XLV":  "Healthcare",
+    "XLI":  "Industrials",
+    "XLP":  "Consumer Staples",
+    "XLY":  "Consumer Cyclical",
+    "XLB":  "Basic Materials",
+    "XLRE": "Real Estate",
+    "XLU":  "Utilities",
+    "XLC":  "Communication Services",
+}
+
+
+@app.route("/api/market/sector-performance")
+def market_sector_performance():
+    """Sector performance using SPDR ETFs via Yahoo Finance.
+    Returns [{sector, ticker, change_pct, price}] — one entry per sector.
+    Much faster than /api/finviz/sp500-heatmap (11 tickers vs ~500 stocks).
+    Cached 5 minutes.
     """
-    cache_key = "finviz:sp500heatmap"
-    cached = kv_get(cache_key, 300)  # 5-min TTL
+    cache_key = "market:sector_perf"
+    cached = kv_get(cache_key, 300)
     if cached is not None:
         return jsonify({"status": "ok", "data": cached, "cached": True})
-    data = fvd.get_sp500_heatmap()
-    if data:
-        kv_set(cache_key, data)
-    return jsonify({"status": "ok", "data": data, "cached": False})
+
+    def _fetch_etf(ticker):
+        try:
+            resp = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
+                params={"range": "1d", "interval": "1d"},
+                headers={"User-Agent": _YF_UA},
+                timeout=8,
+            )
+            resp.raise_for_status()
+            meta       = resp.json()["chart"]["result"][0]["meta"]
+            price      = meta.get("regularMarketPrice")
+            change_pct = meta.get("regularMarketChangePercent")
+            if price is not None and change_pct is None:
+                prev = meta.get("chartPreviousClose") or meta.get("previousClose")
+                if prev and prev != 0:
+                    change_pct = (price - prev) / prev * 100
+            return {
+                "ticker":     ticker,
+                "sector":     _SECTOR_ETFS[ticker],
+                "change_pct": round(change_pct, 4) if change_pct is not None else 0.0,
+                "price":      round(price,      4) if price      is not None else None,
+            }
+        except Exception as exc:
+            logger.warning("sector ETF fetch failed for %s: %s", ticker, exc)
+            return None
+
+    result = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=11) as ex:
+        for entry in ex.map(_fetch_etf, list(_SECTOR_ETFS.keys())):
+            if entry is not None:
+                result.append(entry)
+
+    if result:
+        kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result, "cached": False})
 
 
 @app.route("/api/finviz/stock/<ticker>")

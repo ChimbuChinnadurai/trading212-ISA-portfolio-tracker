@@ -48,6 +48,27 @@ function _hideChartEmpty(canvas) {
     const el = wrap.querySelector('.chart-empty-state');
     if (el) el.classList.remove('visible');
 }
+
+/* ── Shared element loading helper (non-canvas containers) ─────────────────
+ * Replaces the element's content with the standard bar-chart animation.
+ * Call _hideElemLoading(el) to clear it before injecting real content.
+ * ─────────────────────────────────────────────────────────────────────── */
+function _showElemLoading(el, msg = 'Loading…') {
+    if (!el) return;
+    el.innerHTML =
+        '<div class="elem-loading-state">' +
+        '<div class="chart-empty-bars">' +
+        '<div class="chart-empty-bar"></div>'.repeat(7) +
+        '</div>' +
+        '<span class="chart-empty-text">' + msg + '</span>' +
+        '</div>';
+}
+function _hideElemLoading(el) {
+    if (!el) return;
+    const existing = el.querySelector('.elem-loading-state');
+    if (existing) existing.remove();
+}
+
 let _pvsShowSP = true;
 let _pvsShowPvs = true;
 let _signalsData = {};        // cache per signal type
@@ -820,7 +841,7 @@ async function loadMarketView(force = false) {
 async function loadMarketMonthlyPerf() {
     const container = document.getElementById('monthlyPerfHeatmap');
     if (!container) return;
-    container.innerHTML = '<div class="monthly-perf-loading">Loading monthly performance…</div>';
+    _showElemLoading(container, 'Loading monthly performance…');
     try {
         const res = await fetch('/api/pcombined/monthly-performance');
         const json = await res.json();
@@ -828,7 +849,7 @@ async function loadMarketMonthlyPerf() {
         window._marketMonthlyPerfData = json.data;
         if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(json.data);
     } catch (err) {
-        container.innerHTML = `<div class="monthly-perf-loading">Failed to load: ${err.message}</div>`;
+        _showElemLoading(container, 'Failed to load sector performance');
     }
 }
 
@@ -1253,27 +1274,42 @@ function _renderDivHistoryTimeline(data) {
 /* ─── S&P 500 Data + Sector Bars ─────────────────────────────────────────── */
 
 async function loadSP500Data() {
-    const el = document.getElementById('sectorBarsList');
-    if (el && !_sp500Data.length) {
-        const skelRow = `<div class="sector-bar-row"><div class="skeleton" style="height:10px;border-radius:4px"></div><div class="skeleton" style="height:5px;border-radius:3px"></div><div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div></div>`;
-        el.innerHTML = skelRow.repeat(8);
-    }
+    const canvas = document.getElementById('sectorRadialChart');
+    _showChartEmpty(canvas, 'Loading sector data…');
     try {
-        const res = await fetch('/api/finviz/sp500-heatmap');
+        const res = await fetch('/api/market/sector-performance');
         const json = await res.json();
         if (json.status === 'ok') {
             _sp500Data = json.data || [];
-            _renderSectorBars();
+            _drawSectorRadialChart();
         }
     } catch (err) {
         console.warn('[sp500Data]', err);
+        _showChartEmpty(canvas, 'Failed to load sector data');
     }
 }
 
-function _renderSectorBars() {
-    const el = document.getElementById('sectorBarsList');
-    if (!el || !_sp500Data.length) return;
+function _drawSectorRadialChart() {
+    const canvas = document.getElementById('sectorRadialChart');
+    if (!canvas || !_sp500Data.length) return;
+    _hideChartEmpty(canvas);
 
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth || canvas.parentElement.offsetWidth || 300;
+    const H = canvas.offsetHeight || canvas.parentElement.offsetHeight || 300;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const textPrimary   = isDark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.78)';
+    const textMuted     = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)';
+    const gridColor     = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
+
+    ctx.clearRect(0, 0, W, H);
+
+    // ── Build sector aggregates ─────────────────────────────────────────────
     const sectorMap = {};
     for (const s of _sp500Data) {
         const sec = s.sector || 'Other';
@@ -1282,28 +1318,114 @@ function _renderSectorBars() {
         sectorMap[sec].n++;
     }
     const sectors = Object.entries(sectorMap)
-        .map(([name, d]) => ({ name, avg: d.sum / d.n }))
+        .map(([name, d]) => ({
+            name: name
+                .replace('Consumer ', '').replace(' Services', '')
+                .replace('Basic Materials', 'Materials').replace('Financial Services', 'Financial'),
+            avg: d.sum / d.n
+        }))
         .sort((a, b) => b.avg - a.avg);
 
-    const maxAbs = Math.max(...sectors.map(s => Math.abs(s.avg)), 0.5);
+    const N = sectors.length;
+    if (!N) return;
 
-    el.innerHTML = sectors.map(s => {
-        const pct = s.avg;
-        const sign = pct >= 0 ? '+' : '';
-        const cls = pct >= 0 ? 'pos' : 'neg';
-        const barW = (Math.abs(pct) / maxAbs * 100).toFixed(1);
-        const color = pct >= 0 ? '#16a34a' : '#dc2626';
-        const label = s.name
-            .replace('Consumer ', '').replace(' Services', '')
-            .replace('Basic Materials', 'Materials').replace('Financial Services', 'Financials');
-        return `<div class="sector-bar-row">
-            <span class="sector-bar-name">${esc(label)}</span>
-            <div class="sector-bar-track">
-              <div class="sector-bar-fill" style="width:${barW}%;background:${color}"></div>
-            </div>
-            <span class="sector-bar-pct ${cls}">${sign}${pct.toFixed(2)}%</span>
-        </div>`;
-    }).join('');
+    const maxAbs  = Math.max(...sectors.map(s => Math.abs(s.avg)), 0.5);
+    const labelR  = 46;                              // pixels reserved outside max ring for labels
+    const maxR    = Math.min(W, H) / 2 - labelR - 4;
+    const cx      = W / 2;
+    const cy      = H / 2;
+    const sa      = (2 * Math.PI) / N;              // slice angle
+    const GAP     = 0.018;                           // small gap between slices (radians)
+
+    // ── Grid rings ──────────────────────────────────────────────────────────
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, maxR * i / 4, 0, Math.PI * 2);
+        ctx.strokeStyle = gridColor;
+        ctx.stroke();
+    }
+    ctx.setLineDash([]);
+
+    // ── Spoke lines ─────────────────────────────────────────────────────────
+    for (let i = 0; i < N; i++) {
+        const angle = -Math.PI / 2 + i * sa;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + maxR * Math.cos(angle), cy + maxR * Math.sin(angle));
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // ── Wedges ──────────────────────────────────────────────────────────────
+    for (let i = 0; i < N; i++) {
+        const s = sectors[i];
+        const startA = -Math.PI / 2 + i * sa + GAP;
+        const endA   = -Math.PI / 2 + (i + 1) * sa - GAP;
+        const r      = Math.max(maxR * Math.abs(s.avg) / maxAbs, 4);
+
+        const isPos = s.avg >  0.01;
+        const isNeg = s.avg < -0.01;
+        const fill  = isPos
+            ? (isDark ? 'rgba(34,197,94,0.70)'  : 'rgba(22,163,74,0.72)')
+            : isNeg
+            ? (isDark ? 'rgba(239,68,68,0.70)'  : 'rgba(220,38,38,0.70)')
+            : 'rgba(148,163,184,0.45)';
+        const stroke = isPos
+            ? (isDark ? 'rgba(34,197,94,0.30)'  : 'rgba(22,163,74,0.30)')
+            : isNeg
+            ? (isDark ? 'rgba(239,68,68,0.30)'  : 'rgba(220,38,38,0.30)')
+            : 'rgba(148,163,184,0.20)';
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, r, startA, endA);
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+    }
+
+    // ── Labels ──────────────────────────────────────────────────────────────
+    for (let i = 0; i < N; i++) {
+        const s      = sectors[i];
+        const midA   = -Math.PI / 2 + (i + 0.5) * sa;
+        const dist   = maxR + labelR * 0.52;
+        const lx     = cx + dist * Math.cos(midA);
+        const ly     = cy + dist * Math.sin(midA);
+
+        const sign   = s.avg >= 0 ? '+' : '';
+        const isPos  = s.avg >  0.01;
+        const isNeg  = s.avg < -0.01;
+        const pctCol = isPos
+            ? (isDark ? '#4ade80' : '#16a34a')
+            : isNeg
+            ? (isDark ? '#f87171' : '#dc2626')
+            : textMuted;
+
+        // Align based on position around circle
+        const cosA = Math.cos(midA);
+        ctx.textAlign    = cosA < -0.15 ? 'right' : cosA > 0.15 ? 'left' : 'center';
+        ctx.textBaseline = 'middle';
+
+        ctx.font      = `600 10px system-ui, sans-serif`;
+        ctx.fillStyle = textPrimary;
+        ctx.fillText(s.name, lx, ly - 7);
+
+        ctx.font      = `500 9.5px system-ui, sans-serif`;
+        ctx.fillStyle = pctCol;
+        ctx.fillText(`${sign}${s.avg.toFixed(2)}%`, lx, ly + 6);
+    }
+
+    // ── Centre dot ──────────────────────────────────────────────────────────
+    ctx.beginPath();
+    ctx.arc(cx, cy, 3, 0, Math.PI * 2);
+    ctx.fillStyle = gridColor;
+    ctx.fill();
 }
 
 /* ─── S&P 500 Chart ──────────────────────────────────────────────────────── */
@@ -1619,12 +1741,10 @@ function _drawPortfolioVsChart() {
     ctx.scale(dpr, dpr);
 
     if (!_portfolioVsData?.length || !_mktChartData?.GSPC) {
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.font = '12px system-ui,sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Collecting portfolio history…', W / 2, H / 2);
+        _showChartEmpty(canvas, 'Building portfolio history…');
         return;
     }
+    _hideChartEmpty(canvas);
 
     const sp = _mktChartData.GSPC;
     const spByDate = {};
@@ -2461,8 +2581,46 @@ function _renderFullSignals() {
     listEl.innerHTML = html;
 }
 
+function _showConfirmModal({ icon = '', title, body, okLabel, danger = false }) {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('confirmModalOverlay');
+        const modal   = document.getElementById('confirmModal');
+        document.getElementById('confirmModalIcon').textContent  = icon;
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalBody').textContent  = body;
+        const okBtn = document.getElementById('confirmModalOk');
+        okBtn.textContent = okLabel;
+        okBtn.classList.toggle('danger', danger);
+
+        const close = result => {
+            overlay.classList.remove('open');
+            modal.classList.remove('open');
+            okBtn.removeEventListener('click', onOk);
+            document.getElementById('confirmModalCancel').removeEventListener('click', onCancel);
+            overlay.removeEventListener('click', onCancel);
+            resolve(result);
+        };
+        const onOk     = () => close(true);
+        const onCancel = () => close(false);
+
+        okBtn.addEventListener('click', onOk);
+        document.getElementById('confirmModalCancel').addEventListener('click', onCancel);
+        overlay.addEventListener('click', onCancel);
+
+        overlay.classList.add('open');
+        modal.classList.add('open');
+    });
+}
+
 async function excludeTicker(ticker) {
-    if (!confirm(`Exclude ${ticker} from all trade signals?`)) return;
+    const confirmed = await _showConfirmModal({
+        icon: '🚫',
+        title: `Exclude ${ticker}?`,
+        body: `${ticker} will be hidden from all trade signal lists. You can re-include it from the Excluded tab.`,
+        okLabel: 'Exclude',
+        danger: true,
+    });
+    if (!confirmed) return;
     try {
         const res = await fetch('/api/trade-signals/exclude', {
             method: 'POST',
@@ -2470,7 +2628,6 @@ async function excludeTicker(ticker) {
             body: JSON.stringify({ ticker: ticker, excluded: true })
         });
         if (res.ok) {
-            // Refresh signals
             loadTradeSignals(true);
             if (document.getElementById('signalsSidebar').classList.contains('active')) {
                 switchSignalsTab('signals');
@@ -2480,6 +2637,14 @@ async function excludeTicker(ticker) {
 }
 
 async function includeTicker(ticker) {
+    const confirmed = await _showConfirmModal({
+        icon: '✅',
+        title: `Re-include ${ticker}?`,
+        body: `${ticker} will appear again in trade signal lists.`,
+        okLabel: 'Re-include',
+        danger: false,
+    });
+    if (!confirmed) return;
     try {
         const res = await fetch('/api/trade-signals/exclude', {
             method: 'POST',
@@ -2496,7 +2661,7 @@ async function includeTicker(ticker) {
 async function loadExcludedTickers() {
     const listEl = document.getElementById('ssListExcluded');
     if (!listEl) return;
-    listEl.innerHTML = '<div class="activity-loading">Loading exclusions…</div>';
+    _showElemLoading(listEl, 'Loading exclusions…');
     try {
         const res = await fetch('/api/trade-signals/excluded');
         const json = await res.json();
@@ -4090,7 +4255,7 @@ async function openWatchlistStockPanel(ticker, country) {
     if (analystSec) analystSec.style.display = 'none';
     if (fundSec) fundSec.style.display = 'none';
     const newsList = document.getElementById('spNewsList');
-    if (newsList) newsList.innerHTML = '<div class="activity-loading">Loading news…</div>';
+    if (newsList) _showElemLoading(newsList, 'Loading news…');
 
     document.getElementById('sidePanelBackdrop')?.classList.add('active');
     document.getElementById('sidePanel')?.classList.add('open');
@@ -4149,7 +4314,7 @@ async function openWatchlistStockPanel(ticker, country) {
         if (activitySec) {
             activitySec.style.display = '';
             const actList = document.getElementById('spActivityList');
-            if (actList) actList.innerHTML = '<div class="activity-loading">Loading Activity…</div>';
+            if (actList) _showElemLoading(actList, 'Loading activity…');
             window.PORTFOLIO_ID = portfolioRow.pid || 'combined';
             if (typeof window['loadStockActivity'] === 'function') window['loadStockActivity'](ticker);
         }

@@ -529,6 +529,8 @@ function toggleTheme() {
     html.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
     _updateThemeIcon(newTheme);
+    // Redraw theme-aware canvas charts
+    if (typeof _drawSectorRadialChart === 'function') _drawSectorRadialChart();
 }
 
 

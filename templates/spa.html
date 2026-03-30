@@ -439,7 +439,8 @@
 
                   </div>
                   <div>
-                    <a href="#" class="view-all-link" style="margin-left: 4px; padding: 2px 8px; font-size: 0.75rem;"
+                    <a href="#" class="view-all-link"
+                      style="margin-left: 4px; padding: 2px 8px; font-size: 0.75rem;color:var(--text-muted);text-decoration:none;"
                       onclick="openSignalsSidebar(); return false;">View All</a>
                   </div>
                 </div>
@@ -798,34 +799,41 @@
                 <table class="portfolio-table">
                   <thead>
                     <tr>
-                      <th data-colid="ticker" class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="company" class="th-sortable" data-col="company_name" onclick="sortTable(this)">Company <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="country" class="th-sortable" data-col="country" onclick="sortTable(this)">Country <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="trend" class="th-center" title="48-hour price movement">48h Trend</th>
-                      <th data-colid="shares" class="th-sortable th-right" data-col="quantity" onclick="sortTable(this)">Shares <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="avg_price" class="th-sortable th-right" data-col="avg_price" onclick="sortTable(this)">Avg Price <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="current_price" class="th-right">Current Price</th>
-                      <th data-colid="breakeven" class="th-right" title="Dividend-adjusted breakeven price per share. Green = in profit. Red = shows currency shortfall to break even.">Breakeven</th>
-                      <th data-colid="invested" class="th-sortable th-right" data-col="invested" onclick="sortTable(this)">Invested <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="value" class="th-sortable th-right" data-col="current_value" onclick="sortTable(this)">Value (GBP)
+                      <th data-colid="ticker" class="th-sortable" data-col="ticker" onclick="sortTable(this)">Ticker
                         <span class="sort-icon">↕</span>
                       </th>
-                      <th data-colid="weight" class="th-sortable th-right" data-col="weight" onclick="sortTable(this)">Weight <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="pnl" class="th-sortable th-right" data-col="total_returns" onclick="sortTable(this)">P&amp;L <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="fx_impact" class="th-sortable th-right" data-col="fx_impact" onclick="sortTable(this)"
+                      <th data-colid="company" class="th-sortable" data-col="company_name" onclick="sortTable(this)">
+                        Company <span class="sort-icon">↕</span></th>
+                      <th data-colid="country" class="th-sortable" data-col="country" onclick="sortTable(this)">Country
+                        <span class="sort-icon">↕</span>
+                      </th>
+                      <th data-colid="trend" class="th-center" title="48-hour price movement">48h Trend</th>
+                      <th data-colid="shares" class="th-sortable th-right" data-col="quantity"
+                        onclick="sortTable(this)">Shares <span class="sort-icon">↕</span></th>
+                      <th data-colid="avg_price" class="th-sortable th-right" data-col="avg_price"
+                        onclick="sortTable(this)">Avg Price <span class="sort-icon">↕</span></th>
+                      <th data-colid="current_price" class="th-right">Current Price</th>
+                      <th data-colid="breakeven" class="th-right"
+                        title="Dividend-adjusted breakeven price per share. Green = in profit. Red = shows currency shortfall to break even.">
+                        Breakeven</th>
+                      <th data-colid="invested" class="th-sortable th-right" data-col="invested"
+                        onclick="sortTable(this)">Invested <span class="sort-icon">↕</span></th>
+                      <th data-colid="value" class="th-sortable th-right" data-col="current_value"
+                        onclick="sortTable(this)">Value (GBP)
+                        <span class="sort-icon">↕</span>
+                      </th>
+                      <th data-colid="weight" class="th-sortable th-right" data-col="weight" onclick="sortTable(this)">
+                        Weight <span class="sort-icon">↕</span></th>
+                      <th data-colid="pnl" class="th-sortable th-right" data-col="total_returns"
+                        onclick="sortTable(this)">P&amp;L <span class="sort-icon">↕</span></th>
+                      <th data-colid="fx_impact" class="th-sortable th-right" data-col="fx_impact"
+                        onclick="sortTable(this)"
                         title="Gain or loss in GBP caused by currency movements since purchase.">FX Impact <span
                           class="sort-icon">↕</span></th>
-                      <th data-colid="returns_pct" class="th-sortable th-right" data-col="returns_pct" onclick="sortTable(this)">Returns % <span
-                          class="sort-icon">↕</span></th>
-                      <th data-colid="div_yield" class="th-sortable th-right" data-col="div_yield" onclick="sortTable(this)"
+                      <th data-colid="returns_pct" class="th-sortable th-right" data-col="returns_pct"
+                        onclick="sortTable(this)">Returns % <span class="sort-icon">↕</span></th>
+                      <th data-colid="div_yield" class="th-sortable th-right" data-col="div_yield"
+                        onclick="sortTable(this)"
                         title="Annual dividend yield based on dividends received vs current value">Div Yield <span
                           class="sort-icon">↕</span></th>
                       <th data-colid="rating" class="th-right" title="Analyst consensus rating">Rating</th>
@@ -1000,49 +1008,12 @@
               <section class="widget-panel widget-sectors">
                 <div class="panel-header">
                   <h3 class="panel-title">Sectors</h3>
-                  <span style="font-size:0.7rem;color:var(--text-muted)">Today</span>
+                  <a href="https://finviz.com/map.ashx" target="_blank" rel="noopener noreferrer"
+                    style="font-size:0.7rem;color:var(--text-muted);text-decoration:none;"
+                    title="View S&P 500 heatmap on Finviz">Today ↗</a>
                 </div>
-                <div id="sectorBarsList" class="sector-bars-list">
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
-                  <div class="sector-bar-row">
-                    <div class="skeleton" style="height:10px;border-radius:4px"></div>
-                    <div class="skeleton" style="height:5px;border-radius:3px"></div>
-                    <div class="skeleton" style="height:10px;width:40px;border-radius:4px;margin-left:auto"></div>
-                  </div>
+                <div class="sector-radial-wrap">
+                  <canvas id="sectorRadialChart"></canvas>
                 </div>
               </section>
 
@@ -1585,6 +1556,18 @@
     <div class="ss-body">
       <div id="ssListSignals" class="ss-list"></div>
       <div id="ssListExcluded" class="ss-list" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ═══ CONFIRM MODAL ═══ -->
+  <div class="confirm-modal-overlay" id="confirmModalOverlay"></div>
+  <div class="confirm-modal" id="confirmModal" role="dialog" aria-modal="true">
+    <div class="confirm-modal-icon" id="confirmModalIcon"></div>
+    <h3 class="confirm-modal-title" id="confirmModalTitle"></h3>
+    <p class="confirm-modal-body" id="confirmModalBody"></p>
+    <div class="confirm-modal-actions">
+      <button class="confirm-modal-btn confirm-modal-cancel" id="confirmModalCancel">Cancel</button>
+      <button class="confirm-modal-btn confirm-modal-ok" id="confirmModalOk"></button>
     </div>
   </div>
 
