@@ -1158,12 +1158,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const th = document.querySelector('[data-col="current_value"]');
   if (th) th.classList.add('sort-desc');
 
-  showState('table');   // show dashboard skeleton immediately
-  loadPortfolio();
+  showState('table');   // show dashboard skeleton immediately — router calls loadPortfolio()
 
-  // Auto-refresh every 5 minutes
+  // Auto-refresh every 5 minutes — only when a portfolio view is active
   setInterval(() => {
-    loadPortfolio();
+    if (!PORTFOLIO_ID) return;
+    const portfolioVisible = document.getElementById('view-portfolio')?.style.display !== 'none';
+    const stocksVisible    = document.getElementById('view-stocks')?.style.display !== 'none';
+    if (portfolioVisible || stocksVisible) loadPortfolio();
   }, 5 * 60 * 1000);
 });
 

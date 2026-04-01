@@ -1365,27 +1365,50 @@ def risk_metrics_endpoint():
                     combined_rows.extend(rows)
                     total_val += sum(r["current_value"] for r in rows)
             if total_val > 0:
-                pe_sum = pe_wt = 0.0
+                # Build per-row metadata and separate cached from uncached
+                row_meta = []
                 for row in combined_rows:
                     tk      = row["ticker"]
                     country = row.get("country", "US")
                     suffix  = _COUNTRY_YF_SUFFIX.get(country, "")
                     clean   = tk[:-1] if suffix == ".L" and tk.lower().endswith("l") else tk
                     yf_sym  = f"{clean}{suffix}"
-                    ck      = f"pe:{yf_sym}"
-                    pe_val  = kv_get(ck, 86400)
-                    if pe_val is None:
-                        try:
-                            summ   = _yf_summary(yf_sym, modules="summaryDetail,defaultKeyStatistics")
-                            detail = summ.get("summaryDetail", {})
-                            stats  = summ.get("defaultKeyStatistics", {})
-                            def _r(d, k):
-                                v = d.get(k); return v.get("raw") if isinstance(v, dict) else v
-                            raw_pe = _r(detail, "trailingPE") or _r(stats, "trailingPE")
-                            pe_val = round(raw_pe, 1) if raw_pe and 0 < raw_pe < 500 else None
-                        except Exception:
-                            pe_val = None
-                        kv_set(ck, pe_val)
+                    row_meta.append((row, yf_sym, f"pe:{yf_sym}"))
+
+                # Check cache first; collect symbols that need fetching
+                pe_map = {}
+                to_fetch = []
+                for row, yf_sym, ck in row_meta:
+                    cached_pe = kv_get(ck, 86400)
+                    if cached_pe is not None:
+                        pe_map[yf_sym] = cached_pe
+                    elif yf_sym not in pe_map:
+                        to_fetch.append((yf_sym, ck))
+
+                # Fetch uncached P/E values in parallel
+                def _fetch_pe(args):
+                    sym, ck = args
+                    try:
+                        summ   = _yf_summary(sym, modules="summaryDetail,defaultKeyStatistics")
+                        detail = summ.get("summaryDetail", {})
+                        stats  = summ.get("defaultKeyStatistics", {})
+                        def _r(d, k):
+                            v = d.get(k); return v.get("raw") if isinstance(v, dict) else v
+                        raw_pe = _r(detail, "trailingPE") or _r(stats, "trailingPE")
+                        val = round(raw_pe, 1) if raw_pe and 0 < raw_pe < 500 else None
+                    except Exception:
+                        val = None
+                    kv_set(ck, val)
+                    return sym, val
+
+                if to_fetch:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(to_fetch))) as ex:
+                        for sym, val in ex.map(_fetch_pe, to_fetch):
+                            pe_map[sym] = val
+
+                pe_sum = pe_wt = 0.0
+                for row, yf_sym, _ in row_meta:
+                    pe_val = pe_map.get(yf_sym)
                     if pe_val:
                         w = row["current_value"] / total_val
                         pe_sum += pe_val * w

@@ -866,6 +866,7 @@ async function loadMetricsView(force = false) {
         _portfolioVsData = null;
     }
     loadPortfolioVsMarket();
+    loadMarketChart();   // ensure S&P 500 series is available for portfolio vs chart
     loadRiskMetrics();
 }
 
