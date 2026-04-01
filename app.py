@@ -498,68 +498,78 @@ def diversification_details(pid):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+def _fetch_market_symbol(config):
+    """Fetch and process one Yahoo Finance index symbol. Returns (key, data_or_None)."""
+    symbol, label, ma_period = config
+    key = symbol.replace("^", "")
+    try:
+        resp = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+            params={"range": "2y", "interval": "1d"},
+            headers={"User-Agent": "Mozilla/5.0"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        chart = resp.json()["chart"]["result"][0]
+        timestamps = chart["timestamp"]
+        closes = chart["indicators"]["quote"][0]["close"]
+
+        pairs = [(t, c) for t, c in zip(timestamps, closes) if c is not None]
+        if len(pairs) < ma_period + 10:
+            return key, None
+
+        ts_list = [p[0] for p in pairs]
+        c_list  = [p[1] for p in pairs]
+
+        ma_list = [
+            sum(c_list[i - ma_period + 1 : i + 1]) / ma_period
+            if i >= ma_period - 1 else None
+            for i in range(len(c_list))
+        ]
+
+        n = 252  # display last 252 trading days (~1 year)
+        c_out  = [round(v, 2) for v in c_list[-n:]]
+        ma_out = [round(m, 2) if m is not None else None for m in ma_list[-n:]]
+        current    = c_out[-1]
+        current_ma = ma_out[-1]
+
+        return key, {
+            "label":      label,
+            "ma_period":  ma_period,
+            "timestamps": ts_list[-n:],
+            "values":     c_out,
+            "ma":         ma_out,
+            "current":    current,
+            "current_ma": current_ma,
+            "pct_vs_ma":  round((current / current_ma - 1) * 100, 2) if current_ma else None,
+        }
+    except Exception as exc:
+        logger.warning("market_indicators fetch failed for %s: %s", symbol, exc)
+        return key, None
+
+
+def _fetch_and_cache_market_indicators():
+    """Fetch GSPC, IXIC, VIX in parallel and cache the result. Returns the result dict."""
+    configs = [
+        ("^GSPC", "S&P 500", 125),
+        ("^IXIC", "NASDAQ",   50),
+        ("^VIX",  "VIX",      50),
+    ]
+    result = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
+        for key, data in ex.map(_fetch_market_symbol, configs):
+            result[key] = data
+    kv_set("market_indicators", result)
+    return result
+
+
 @app.route("/api/market-indicators")
 def market_indicators():
     """S&P 500 (125-day MA) and VIX (50-day MA) from Yahoo Finance, cached 30 min."""
     cached = kv_get("market_indicators", 1800)
     if cached is not None:
         return jsonify({"status": "ok", "data": cached})
-
-    result = {}
-    configs = [
-        ("^GSPC", "S&P 500", 125),
-        ("^IXIC", "NASDAQ",   50),
-        ("^VIX",  "VIX",      50),
-    ]
-    for symbol, label, ma_period in configs:
-        key = symbol.replace("^", "")
-        try:
-            resp = requests.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-                params={"range": "2y", "interval": "1d"},
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=10,
-            )
-            resp.raise_for_status()
-            chart = resp.json()["chart"]["result"][0]
-            timestamps = chart["timestamp"]
-            closes = chart["indicators"]["quote"][0]["close"]
-
-            pairs = [(t, c) for t, c in zip(timestamps, closes) if c is not None]
-            if len(pairs) < ma_period + 10:
-                result[key] = None
-                continue
-
-            ts_list = [p[0] for p in pairs]
-            c_list  = [p[1] for p in pairs]
-
-            ma_list = [
-                sum(c_list[i - ma_period + 1 : i + 1]) / ma_period
-                if i >= ma_period - 1 else None
-                for i in range(len(c_list))
-            ]
-
-            n = 252  # display last 252 trading days (~1 year)
-            c_out  = [round(v, 2) for v in c_list[-n:]]
-            ma_out = [round(m, 2) if m is not None else None for m in ma_list[-n:]]
-            current    = c_out[-1]
-            current_ma = ma_out[-1]
-
-            result[key] = {
-                "label":      label,
-                "ma_period":  ma_period,
-                "timestamps": ts_list[-n:],
-                "values":     c_out,
-                "ma":         ma_out,
-                "current":    current,
-                "current_ma": current_ma,
-                "pct_vs_ma":  round((current / current_ma - 1) * 100, 2) if current_ma else None,
-            }
-        except Exception as exc:
-            logger.warning("market_indicators fetch failed for %s: %s", symbol, exc)
-            result[key] = None
-
-    kv_set("market_indicators", result)
+    result = _fetch_and_cache_market_indicators()
     return jsonify({"status": "ok", "data": result})
 
 
@@ -1729,25 +1739,31 @@ def api_clear_cache():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-@app.route("/api/news")
-def api_news():
-    """Fetch general market news from Finnhub with caching."""
-    cache_key = "general_market_news"
-    cached = kv_get(cache_key, TTL_NEWS)
-    if cached:
-        return jsonify({"status": "ok", "data": cached})
-
+def _fetch_and_cache_news():
+    """Fetch general market news from Finnhub and store in cache. Returns news list or None."""
     token = os.environ.get("FINNHUB_TOKEN")
     if not token:
-        return jsonify({"status": "error", "message": "Finnhub token not configured"}), 500
-
+        return None
     url = f"https://finnhub.io/api/v1/news?category=general&token={token}"
+    resp = requests.get(url, timeout=10)
+    resp.raise_for_status()
+    news = resp.json()
+    kv_set("general_market_news", news)
+    return news
+
+
+@app.route("/api/news")
+def api_news():
+    """Fetch general market news from Finnhub with caching. ?force=1 bypasses cache."""
+    force = request.args.get("force") == "1"
+    if not force:
+        cached = kv_get("general_market_news", TTL_NEWS)
+        if cached:
+            return jsonify({"status": "ok", "data": cached})
     try:
-        resp = requests.get(url, timeout=10)
-        resp.raise_for_status()
-        news = resp.json()
-        # Finnhub returns news already sorted by time (latest first usually)
-        kv_set(cache_key, news)
+        news = _fetch_and_cache_news()
+        if news is None:
+            return jsonify({"status": "error", "message": "Finnhub token not configured"}), 500
         return jsonify({"status": "ok", "data": news})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -2255,6 +2271,40 @@ def _background_dividend_refresh():
 
 _div_refresh_thread = threading.Thread(target=_background_dividend_refresh, daemon=True, name="div-refresh")
 _div_refresh_thread.start()
+
+
+# ── Background market-indicators refresh ───────────────────────────────────────
+
+def _background_market_refresh():
+    """Daemon thread: keep market-indicators cache warm every 25 min (TTL is 30 min)."""
+    _log = logging.getLogger("market-refresh")
+    time.sleep(10)  # short startup delay; portfolio refresh runs at t=5s
+    while True:
+        try:
+            _fetch_and_cache_market_indicators()
+            _log.info("Market indicators cache refreshed")
+        except Exception as exc:
+            _log.error("Market indicators refresh failed: %s", exc)
+        time.sleep(1500)  # 25 min
+
+_market_refresh_thread = threading.Thread(target=_background_market_refresh, daemon=True, name="market-refresh")
+_market_refresh_thread.start()
+
+
+def _background_news_refresh():
+    """Daemon thread: keep news cache warm every 5 min."""
+    _log = logging.getLogger("news-refresh")
+    time.sleep(15)  # short startup delay
+    while True:
+        try:
+            _fetch_and_cache_news()
+            _log.info("News cache refreshed")
+        except Exception as exc:
+            _log.error("News refresh failed: %s", exc)
+        time.sleep(300)  # 5 min
+
+_news_refresh_thread = threading.Thread(target=_background_news_refresh, daemon=True, name="news-refresh")
+_news_refresh_thread.start()
 
 
 

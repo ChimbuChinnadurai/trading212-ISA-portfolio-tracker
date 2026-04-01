@@ -769,10 +769,10 @@
 
             <!-- Full-width holdings table -->
             <div class="table-wrapper card" id="stocksTableWrapper" style="display:none">
-              <div class="panel-header">
-                <!-- <h3 class="panel-title" id="stocksTableTitle">Holdings</h3> -->
+              <!-- <div class="panel-header">
+                <h3 class="panel-title" id="stocksTableTitle">Holdings</h3>
                 <div class="filter-bar" id="filterBar"></div>
-              </div>
+              </div> -->
               <div class="table-toolbar">
                 <div class="toolbar-left">
                   <div class="search-wrap">
@@ -854,39 +854,81 @@
         <!-- ═══ VIEW: NEWS ═══ -->
         <div id="view-news" class="spa-view" style="display:none">
           <div class="view-main">
-            <div class="section-header" style="margin-bottom:16px">
+            <!-- <div class="section-header" style="margin-bottom:16px">
               <h2 class="section-title">Market News</h2>
               <span class="rc-label-wrap">
-                <span class="panel-subtitle">General · CNBC</span>
                 <span id="rc-news" class="refresh-clock" data-refresh-secs="300"></span>
               </span>
-            </div>
+            </div> -->
             <div id="newsGrid" class="news-grid">
               <!-- skeleton -->
-              <div class="news-card skel-news-card">
-                <div class="skeleton skel-news-img-lg"></div>
-                <div class="skel-news-body">
-                  <div class="skeleton skel-line skel-w-30"></div>
-                  <div class="skeleton skel-line skel-w-90"></div>
-                  <div class="skeleton skel-line skel-w-70"></div>
-                </div>
-              </div>
-              <div class="news-card skel-news-card">
-                <div class="skeleton skel-news-img-lg"></div>
-                <div class="skel-news-body">
-                  <div class="skeleton skel-line skel-w-40"></div>
-                  <div class="skeleton skel-line skel-w-85"></div>
-                  <div class="skeleton skel-line skel-w-65"></div>
-                </div>
-              </div>
-              <div class="news-card skel-news-card">
-                <div class="skeleton skel-news-img-lg"></div>
-                <div class="skel-news-body">
-                  <div class="skeleton skel-line skel-w-35"></div>
-                  <div class="skeleton skel-line skel-w-80"></div>
-                  <div class="skeleton skel-line skel-w-60"></div>
-                </div>
-              </div>
+              <table class="news-table">
+                <thead>
+                  <tr>
+                    <th class="news-col-time">Time</th>
+                    <th class="news-col-provider">Provider</th>
+                    <th class="news-col-headline">Headline <span id="newsLastUpdated" class="news-last-updated"></span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="news-table-row">
+                    <td>
+                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-50" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-90" style="height:11px"></div>
+                    </td>
+                  </tr>
+                  <tr class="news-table-row">
+                    <td>
+                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-40" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-80" style="height:11px"></div>
+                    </td>
+                  </tr>
+                  <tr class="news-table-row">
+                    <td>
+                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-55" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-85" style="height:11px"></div>
+                    </td>
+                  </tr>
+                  <tr class="news-table-row">
+                    <td>
+                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-45" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-75" style="height:11px"></div>
+                    </td>
+                  </tr>
+                  <tr class="news-table-row">
+                    <td>
+                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-50" style="height:11px"></div>
+                    </td>
+                    <td>
+                      <div class="skeleton skel-line skel-w-70" style="height:11px"></div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div><!-- /view-news -->
@@ -1153,12 +1195,34 @@
                 <div class="panel-header">
                   <div class="mkt-chart-title-group">
                     <h3 class="panel-title">Portfolio vs S&amp;P 500</h3>
-                    <div class="mkt-pvs-legend">
-                      <span class="pvs-leg-dot" style="background:#60a5fa"></span><span
-                        class="pvs-leg-label">S&amp;P</span>
-                      <span class="pvs-leg-dot" style="background:#f59e0b"></span><span
-                        class="pvs-leg-label">Portfolio</span>
+                    <div style="display:flex;align-items:center;gap:8px;margin-left:10px">
+                      <button id="pvsLegSP" class="pvs-leg-check" data-series="sp"
+                        style="background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;gap:5px">
+                        <span class="pvs-leg-checkbox pvs-leg-checked" style="--chk-color:#ec4899"></span>
+                        <span class="pvs-leg-label-text" style="color:#ec4899">S&amp;P 500</span>
+                      </button>
+                      <button id="pvsLegPvs" class="pvs-leg-check" data-series="pvs"
+                        style="background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;gap:5px">
+                        <span class="pvs-leg-checkbox pvs-leg-checked" style="--chk-color:#f59e0b"></span>
+                        <span class="pvs-leg-label-text" style="color:#f59e0b">Portfolio</span>
+                      </button>
                     </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+                    <div id="pvsRangeTabs" class="mkt-range-tabs pvs-range-tabs">
+                      <button class="mkt-range-tab" data-range="1M">1M</button>
+                      <button class="mkt-range-tab" data-range="3M">3M</button>
+                      <button class="mkt-range-tab" data-range="6M">6M</button>
+                      <button class="mkt-range-tab active" data-range="1Y">1Y</button>
+                      <button class="mkt-range-tab" data-range="ALL">ALL</button>
+                    </div>
+                    <button id="pvsChartTypeBtn" class="pvs-chart-type-btn" data-type="line"
+                      title="Toggle line / bar chart">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <polyline points="1,13 5,7 9,10 15,3" stroke="currentColor" stroke-width="1.5"
+                          stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
                 <div class="mkt-chart-wrap">
@@ -1185,7 +1249,6 @@
 
               <!-- Row 1, Col 2: Portfolio Gain -->
               <section class="widget-panel pvs-gain-widget">
-                <div class="pvs-gain-accent"></div>
                 <div class="panel-header" style="padding: 10px 14px 8px">
                   <h3 class="panel-title">Portfolio Gain</h3>
                   <span style="font-size:0.7rem;color:var(--text-muted)">Combined · All time</span>

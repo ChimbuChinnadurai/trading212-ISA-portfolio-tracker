@@ -26,22 +26,22 @@ let _tickerChangeMap = {};    // ticker -> change_pct (today)
 
 /* ─── Column picker ─────────────────────────────────────────────────────── */
 const _COL_DEFS = [
-  { id: 'ticker',        label: 'Ticker',        locked: true },
-  { id: 'company',       label: 'Company'                     },
-  { id: 'country',       label: 'Country'                     },
-  { id: 'trend',         label: '48h Trend'                   },
-  { id: 'shares',        label: 'Shares'                      },
-  { id: 'avg_price',     label: 'Avg Price'                   },
-  { id: 'current_price', label: 'Current Price'               },
-  { id: 'breakeven',     label: 'Breakeven'                   },
-  { id: 'invested',      label: 'Invested'                    },
-  { id: 'value',         label: 'Value'                       },
-  { id: 'weight',        label: 'Weight'                      },
-  { id: 'pnl',           label: 'P&L'                        },
-  { id: 'fx_impact',     label: 'FX Impact'                   },
-  { id: 'returns_pct',   label: 'Returns %'                   },
-  { id: 'div_yield',     label: 'Div Yield'                   },
-  { id: 'rating',        label: 'Rating'                      },
+  { id: 'ticker', label: 'Ticker', locked: true },
+  { id: 'company', label: 'Company' },
+  { id: 'country', label: 'Country' },
+  { id: 'trend', label: '48h Trend' },
+  { id: 'shares', label: 'Shares' },
+  { id: 'avg_price', label: 'Avg Price' },
+  { id: 'current_price', label: 'Current Price' },
+  { id: 'breakeven', label: 'Breakeven' },
+  { id: 'invested', label: 'Invested' },
+  { id: 'value', label: 'Value' },
+  { id: 'weight', label: 'Weight' },
+  { id: 'pnl', label: 'P&L' },
+  { id: 'fx_impact', label: 'FX Impact' },
+  { id: 'returns_pct', label: 'Returns %' },
+  { id: 'div_yield', label: 'Div Yield' },
+  { id: 'rating', label: 'Rating' },
 ];
 
 function _loadColVis() {
@@ -2089,7 +2089,7 @@ function _saveRebalTargets(map) {
 }
 
 function openRebalancePanel() {
-  const panel    = document.getElementById('rebalancePanel');
+  const panel = document.getElementById('rebalancePanel');
   const backdrop = document.getElementById('rebalancePanelBackdrop');
   if (!panel) return;
   panel.classList.add('open');
@@ -2111,11 +2111,11 @@ function _renderRebalancePanel() {
 
   // ── Build sector totals from current rows ─────────────────────────────────
   const totalValue = allRows.reduce((s, r) => s + (r.current_value || 0), 0);
-  const sectorMap  = {};
+  const sectorMap = {};
   for (const r of allRows) {
     const sec = r.sector || 'Other';
     if (!sectorMap[sec]) sectorMap[sec] = { value: 0, tickers: [] };
-    sectorMap[sec].value    += r.current_value || 0;
+    sectorMap[sec].value += r.current_value || 0;
     sectorMap[sec].tickers.push(r.ticker);
   }
   const sectors = Object.entries(sectorMap)
@@ -2123,10 +2123,10 @@ function _renderRebalancePanel() {
     .sort((a, b) => b.value - a.value);
 
   // ── Load / default target weights ────────────────────────────────────────
-  const saved     = _loadRebalTargets();
-  const equalPct  = parseFloat((100 / sectors.length).toFixed(1));
-  const targets   = {};
-  let   targetSum = 0;
+  const saved = _loadRebalTargets();
+  const equalPct = parseFloat((100 / sectors.length).toFixed(1));
+  const targets = {};
+  let targetSum = 0;
   for (const s of sectors) {
     targets[s.name] = saved[s.name] != null ? saved[s.name] : equalPct;
     targetSum += targets[s.name];
@@ -2136,23 +2136,23 @@ function _renderRebalancePanel() {
   let totalBuy = 0, totalSell = 0;
   for (const s of sectors) {
     const delta = targets[s.name] - s.currentPct;
-    const amt   = Math.abs(delta / 100 * totalValue);
-    if (delta > 0.1)  totalBuy  += amt;
+    const amt = Math.abs(delta / 100 * totalValue);
+    if (delta > 0.1) totalBuy += amt;
     if (delta < -0.1) totalSell += amt;
   }
 
   // ── Build HTML ────────────────────────────────────────────────────────────
   const rows = sectors.map(s => {
-    const target  = targets[s.name];
-    const delta   = target - s.currentPct;
+    const target = targets[s.name];
+    const delta = target - s.currentPct;
     const absDelta = Math.abs(delta);
     const actionAmt = absDelta / 100 * totalValue;
     const deltaClass = delta > 0.5 ? 'under' : delta < -0.5 ? 'over' : 'ok';
-    const deltaSign  = delta > 0 ? '+' : '';
+    const deltaSign = delta > 0 ? '+' : '';
     let actionHtml;
-    if (delta > 0.5)       actionHtml = `<span class="buy">Buy ${fmt.currency(actionAmt)}</span>`;
+    if (delta > 0.5) actionHtml = `<span class="buy">Buy ${fmt.currency(actionAmt)}</span>`;
     else if (delta < -0.5) actionHtml = `<span class="sell">Sell ${fmt.currency(actionAmt)}</span>`;
-    else                   actionHtml = `<span class="hold">On target</span>`;
+    else actionHtml = `<span class="hold">On target</span>`;
 
     const barPct = Math.min(100, s.currentPct / Math.max(...sectors.map(x => x.currentPct)) * 100);
 
@@ -2553,7 +2553,7 @@ async function loadStocksView(force = false) {
       // titleEl.textContent = `Holdings · ${label}`;
     }
 
-    renderCountryFilters(allRows);
+    // renderCountryFilters(allRows);
     renderTable(allRows);
     loadAnalystRatings();
     _loadStockSparklines(allRows);
@@ -2677,9 +2677,9 @@ function _mphColor(pct) {
   // Monthly return bands — same gradient style as allocation heatmap (_pnlColor)
   // but with tighter thresholds suited to monthly % moves
   if (pct >= 10) return 'linear-gradient(135deg,#052e16,#15803d)';
-  if (pct >=  5) return 'linear-gradient(135deg,#14532d,#16a34a)';
-  if (pct >=  2) return 'linear-gradient(135deg,#166534,#22c55e)';
-  if (pct >=  0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+  if (pct >= 5) return 'linear-gradient(135deg,#14532d,#16a34a)';
+  if (pct >= 2) return 'linear-gradient(135deg,#166534,#22c55e)';
+  if (pct >= 0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
   if (pct >= -2) return 'linear-gradient(135deg,#78350f,#b45309)';
   if (pct >= -5) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
   return 'linear-gradient(135deg,#450a0a,#b91c1c)';
@@ -2736,8 +2736,8 @@ function _drawDynamicsChart() {
   const textCol = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
   const gridCol = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
   const zeroCol = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)';
-  const posCol  = '#4ade80';
-  const negCol  = '#f87171';
+  const posCol = '#4ade80';
+  const negCol = '#f87171';
 
   const PAD = { top: 32, right: 12, bottom: 44, left: 44 };
   const cW = W - PAD.left - PAD.right;
@@ -2750,11 +2750,11 @@ function _drawDynamicsChart() {
   const yMin = Math.floor(minVal * 1.25 / 5) * 5;
   const yRng = yMax - yMin;
 
-  const yOf     = v => PAD.top + (1 - (v - yMin) / yRng) * cH;
-  const y0      = yOf(0);
+  const yOf = v => PAD.top + (1 - (v - yMin) / yRng) * cH;
+  const y0 = yOf(0);
   const barStep = cW / data.length;
-  const barW    = Math.max(6, Math.min(44, barStep * 0.62));
-  const xOf     = i => PAD.left + (i + 0.5) * barStep;
+  const barW = Math.max(6, Math.min(44, barStep * 0.62));
+  const xOf = i => PAD.left + (i + 0.5) * barStep;
 
   // Y-axis gridlines + labels
   const yStep = yRng <= 15 ? 5 : yRng <= 40 ? 10 : 20;
@@ -2776,11 +2776,11 @@ function _drawDynamicsChart() {
 
   // Draw bars with rounded outer corners
   data.forEach((d, i) => {
-    const x   = xOf(i);
+    const x = xOf(i);
     const pos = d.pct >= 0;
     const bTop = pos ? yOf(d.pct) : y0;
-    const bH   = Math.max(1, Math.abs(yOf(d.pct) - y0));
-    const r    = Math.min(3, barW / 5);
+    const bH = Math.max(1, Math.abs(yOf(d.pct) - y0));
+    const r = Math.min(3, barW / 5);
 
     ctx.fillStyle = pos ? posCol : negCol;
     ctx.beginPath();

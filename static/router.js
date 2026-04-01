@@ -43,6 +43,10 @@ const _marketTimers = {
     signals: null,
 };
 
+const _newsTimers = {
+    autoRefresh: null,
+};
+
 /* ── View helpers ────────────────────────────────────────────────────────── */
 function _showView(name) {
     document.querySelectorAll('.spa-view').forEach(el => {
@@ -233,6 +237,7 @@ function _router() {
     else if (prev?.startsWith('portfolio/')) _deactivateDetailView();
     else if (prev === 'market') _deactivateMarketView();
     else if (prev === 'metrics') _deactivateMetricsView();
+    else if (prev === 'news') _stopNewsTimers();
 
     // Update shared UI
     _updateBreadcrumb(hash);
@@ -300,6 +305,7 @@ function _router() {
             if (typeof loadNewsView === 'function') loadNewsView();
             _newsInitialized = true;
         }
+        _startNewsTimers();
 
         /* ── Calendar ── */
     } else if (hash === 'calendar') {
@@ -426,6 +432,19 @@ function _startHomeTimers() {
 function _stopHomeTimers() {
     Object.keys(_homeTimers).forEach(k => {
         if (_homeTimers[k]) { clearInterval(_homeTimers[k]); _homeTimers[k] = null; }
+    });
+}
+
+/* ── News view lifecycle ─────────────────────────────────────────────────── */
+function _startNewsTimers() {
+    _stopNewsTimers();
+    if (typeof loadNewsView === 'function')
+        _newsTimers.autoRefresh = setInterval(() => loadNewsView(false), 300000); // 5 min
+}
+
+function _stopNewsTimers() {
+    Object.keys(_newsTimers).forEach(k => {
+        if (_newsTimers[k]) { clearInterval(_newsTimers[k]); _newsTimers[k] = null; }
     });
 }
 
