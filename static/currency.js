@@ -26,12 +26,38 @@ function setCurrency(c) {
   _updateCurrencyButtons();
   if (typeof onCurrencyChange === 'function') onCurrencyChange();
   if (typeof onHomeCurrencyChange === 'function') onHomeCurrencyChange();
+  _flashCurrencyValues();
+}
+
+function _flashCurrencyValues() {
+  const els = document.querySelectorAll(
+    '.s-card-value, .ov-main-val, .ov-returns, .ov-mini-val, .cell-num, .topbar-breadcrumb-value'
+  );
+  els.forEach(el => {
+    el.classList.remove('currency-flash');
+    // force reflow so re-adding the class retriggers the animation
+    void el.offsetWidth;
+    el.classList.add('currency-flash');
+  });
 }
 
 function _updateCurrencyButtons() {
   document.querySelectorAll('.currency-btn').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.currency === currentCurrency)
   );
+}
+
+/* ─── Shared UI feedback helpers ────────────────────────────────────────── */
+function showRefreshSuccess() {
+  const btn = document.getElementById('refreshBtn');
+  if (!btn) return;
+  const prev = btn.innerHTML;
+  btn.classList.add('btn-success');
+  btn.innerHTML = '<span class="material-symbols-outlined btn-icon" style="font-size:15px;line-height:1">check_circle</span> Updated';
+  setTimeout(() => {
+    btn.classList.remove('btn-success');
+    btn.innerHTML = prev;
+  }, 2200);
 }
 
 /* ─── Shared formatters (replaces per-page fmt objects) ─────────────────── */

@@ -118,8 +118,14 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
-      background: var(--bg-card);
+      background: rgba(247, 249, 251, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
       gap: 12px;
+    }
+
+    html[data-theme="dark"] .topbar {
+      background: rgba(8, 13, 24, 0.82);
     }
 
     .topbar-breadcrumb {
@@ -302,7 +308,7 @@
           </button>
           <button class="btn btn-digest" id="digestBtn" onclick="openDigestSidebar()" title="AI Market Digest">
             <span class="material-symbols-outlined btn-icon">newspaper</span>
-            Market Digest
+            <span class="btn-digest-label">Market Digest</span>
           </button>
           <button class="btn btn-refresh" id="refreshBtn" onclick="loadHomeData(true)">
             <span class="material-symbols-outlined btn-icon">refresh</span>
@@ -421,8 +427,8 @@
                 <div class="ov-header">
                   <span class="ov-label">Stocks Heatmap</span>
                   <span class="rc-label-wrap">
-                    <span style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
-                    <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="30"></span>
+                    <span id="heatmapSessionLabel" style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
+                    <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="15"></span>
                   </span>
                 </div>
                 <div id="heatmapContainer" class="heatmap-container">
@@ -592,7 +598,7 @@
               <div class="summary-row">
                 <div class="summary-row-header">
                   <span class="summary-title">Overview</span>
-                  <span class="summary-updated">Updated <span id="summaryTime">—</span></span>
+                  <span class="summary-updated" id="summaryUpdated" data-stale="true">as of <span id="summaryTime" style="font-weight:700">—</span></span>
                 </div>
                 <div class="summary-cards">
 
@@ -798,6 +804,10 @@
                     Export CSV
                   </button>
                 </div>
+              </div>
+              <div class="table-mobile-hint">
+                <span class="material-symbols-outlined" style="font-size:13px">info</span>
+                Tap a row to view details · Showing ticker, value &amp; P&amp;L
               </div>
               <div class="table-scroll">
                 <table class="portfolio-table">

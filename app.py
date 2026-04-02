@@ -18,7 +18,7 @@ import gemini_utils as _gemini
 
 
 from cache import (
-    TTL_DIV, TTL_NEWS, init_db, kv_age, kv_get, kv_set,
+    TTL_DIV, TTL_NEWS, init_db, kv_age, kv_get, kv_set, kv_delete,
     rows_get, rows_set, snapshot_add, snapshot_get,
     clear_all_cache, get_excluded_tickers, set_ticker_excluded
 )
@@ -559,16 +559,29 @@ def _fetch_and_cache_market_indicators():
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as ex:
         for key, data in ex.map(_fetch_market_symbol, configs):
             result[key] = data
-    kv_set("market_indicators", result)
+    # Only write to cache when at least one symbol returned valid data.
+    # Storing an all-None result would cause stale null data to be served
+    # for the full TTL window, preventing a successful retry.
+    if any(v is not None for v in result.values()):
+        kv_set("market_indicators", result)
     return result
+
+
+def _market_ind_valid(data) -> bool:
+    """Return True only if data is a dict with at least one non-None symbol."""
+    return isinstance(data, dict) and any(v is not None for v in data.values())
 
 
 @app.route("/api/market-indicators")
 def market_indicators():
     """S&P 500 (125-day MA) and VIX (50-day MA) from Yahoo Finance, cached 30 min."""
     cached = kv_get("market_indicators", 1800)
-    if cached is not None:
+    if _market_ind_valid(cached):
         return jsonify({"status": "ok", "data": cached})
+    # Stale all-null entry is in the cache — evict it so the background thread
+    # can write a fresh result on its next cycle without waiting for TTL expiry.
+    if cached is not None:
+        kv_delete("market_indicators")
     result = _fetch_and_cache_market_indicators()
     return jsonify({"status": "ok", "data": result})
 
@@ -642,17 +655,38 @@ def stock_tickers_api():
                 timeout=8,
             )
             resp.raise_for_status()
-            meta       = resp.json()["chart"]["result"][0]["meta"]
-            price      = meta.get("regularMarketPrice")
-            change     = meta.get("regularMarketChange")
-            change_pct = meta.get("regularMarketChangePercent")
-            currency   = meta.get("currency", "")
-            # Fallback: compute change from previous close when API omits it
+            meta         = resp.json()["chart"]["result"][0]["meta"]
+            currency     = meta.get("currency", "")
+            market_state = meta.get("marketState", "REGULAR")  # PRE / REGULAR / POST / POSTPOST
+
+            # Use extended-hours price when the regular session is closed
+            if market_state == "PRE":
+                price      = meta.get("preMarketPrice")
+                change     = meta.get("preMarketChange")
+                change_pct = meta.get("preMarketChangePercent")
+            elif market_state in ("POST", "POSTPOST"):
+                price      = meta.get("postMarketPrice")
+                change     = meta.get("postMarketChange")
+                change_pct = meta.get("postMarketChangePercent")
+            else:
+                price      = meta.get("regularMarketPrice")
+                change     = meta.get("regularMarketChange")
+                change_pct = meta.get("regularMarketChangePercent")
+
+            # Fallback: if the extended-hours fields are absent, fall back to regular
+            if price is None:
+                price      = meta.get("regularMarketPrice")
+                change     = meta.get("regularMarketChange")
+                change_pct = meta.get("regularMarketChangePercent")
+                market_state = "REGULAR"
+
+            # Compute change from previous close when API omits it
             if price is not None and (change is None or change_pct is None):
-                prev = meta.get("chartPreviousClose") or meta.get("previousClose")
-                if prev and prev != 0:
+                prev = meta.get("chartPreviousClose") or meta.get("previousClose") or meta.get("regularMarketPrice")
+                if prev and prev != 0 and prev != price:
                     change     = price - prev
                     change_pct = (change / prev) * 100
+
             if clean_ticker == "ATO":
                 clean_ticker == "ATO.PA"
             info = {
@@ -662,6 +696,7 @@ def stock_tickers_api():
                 "change":        round(change,     4) if change     is not None else None,
                 "change_pct":    round(change_pct, 4) if change_pct is not None else None,
                 "currency":      currency,
+                "market_state":  market_state,   # "PRE" | "REGULAR" | "POST" | "POSTPOST"
                 "current_value": row.get("current_value"),
                 "sector":        row.get("sector", "Other"),
                 # Full portfolio fields for stock side panel
@@ -672,7 +707,6 @@ def stock_tickers_api():
                 "returns_pct":   row.get("returns_pct"),
                 "country":       row.get("country"),
             }
-            # Only cache when we have complete data; otherwise it retries next refresh
             if change is not None and change_pct is not None:
                 kv_set(f"tick:{ticker}", info)
             return ticker, info
@@ -1613,6 +1647,8 @@ def _home_data_inner(force):
 
     # ── 4. Market indicators (cache only — background thread keeps this warm) ──
     market_ind_data = kv_get("market_indicators", 1800)
+    if not _market_ind_valid(market_ind_data):
+        market_ind_data = None
 
     # ── 5. FX rate ─────────────────────────────────────────────────────────────
     fx_rate = get_gbpusd_rate()

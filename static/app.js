@@ -285,6 +285,7 @@ async function loadPortfolio(force = false) {
   _todayReturnsPct = null;
   _dynamicsData = null;
   _dynamicsRange = '12m';
+  let _loadSuccess = false;
 
   try {
     const url = force ? `/api/p${PORTFOLIO_ID}/portfolio?force=1` : `/api/p${PORTFOLIO_ID}/portfolio`;
@@ -329,7 +330,11 @@ async function loadPortfolio(force = false) {
     const lastUpdated = document.getElementById('lastUpdated');
     if (lastUpdated) lastUpdated.textContent = ts;
     const summaryTime = document.getElementById('summaryTime');
-    if (summaryTime) summaryTime.textContent = ts;
+    if (summaryTime) {
+      summaryTime.textContent = ts;
+      const summaryUpdated = document.getElementById('summaryUpdated');
+      if (summaryUpdated) summaryUpdated.removeAttribute('data-stale');
+    }
 
     // Cache banner (CACHED badge)
     const cacheEl = document.getElementById('cacheBanner');
@@ -384,12 +389,14 @@ async function loadPortfolio(force = false) {
     loadDetailActivity();
     loadMonthlyDividends();
     loadDynamicsChart();
+    _loadSuccess = true;
 
   } catch (err) {
     showState('error', 'Network error: ' + err.message);
   } finally {
     document.getElementById('refreshBtn').disabled = false;
     hideSkeletons();
+    if (_loadSuccess && force) showRefreshSuccess();
   }
 }
 

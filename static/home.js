@@ -189,6 +189,8 @@ async function loadHomeData(refresh = false) {
         // Upcoming events (earnings + dividends in next 7 days)
         loadUpcomingEvents();
 
+        if (refresh) showRefreshSuccess();
+
     } catch (e) {
         console.error('Failed to load home data:', e);
     }
@@ -212,7 +214,7 @@ function _renderHomeTopUnder(top, under) {
         const barPct = Math.round(Math.abs(abs) / maxAbs * 100);
         const ticker = esc((r.ticker || '—').slice(0, 7));
         const absVal = fmt.currency(Math.abs(abs));
-        const valStr = `${isPos ? '+' : '-'}${absVal}`;
+        const valStr = `${absVal}`;
         const pctStr = `${sign}${pct.toFixed(1)}%`;
 
         const infoHtml = `<span class="cdiv-ticker">${ticker}</span>`
@@ -326,6 +328,19 @@ function esc(s) {
     return String(s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Returns an <img> tag for a stock logo.
+ * Tries FMP first (good US coverage), falls back to EODHD LSE (UK stocks),
+ * then hides on second failure.
+ */
+function _logoImg(ticker, cssClass) {
+    const t = encodeURIComponent(ticker);
+    const fmp  = `https://financialmodelingprep.com/image-stock/${t}.png`;
+    const lse  = `https://eodhd.com/img/logos/LSE/${t}.png`;
+    return `<img class="${cssClass}" src="${fmp}" alt="${esc(ticker)}" loading="lazy" ` +
+        `onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='${lse}';}else{this.style.display='none';}">`;
 }
 
 /* ─── Refresh Countdown Clocks ───────────────────────────────────────────── */
@@ -557,6 +572,12 @@ function _renderHeatmap(items) {
             const sign = pct > 0 ? '+' : '';
             const pctStr = `${sign}${pct.toFixed(2)}%`;
 
+            // Extended-hours badge: PRE / POST (only for US equities)
+            const ms = d.market_state || 'REGULAR';
+            const extBadge = ms === 'PRE' ? 'PRE'
+                           : (ms === 'POST' || ms === 'POSTPOST') ? 'POST'
+                           : '';
+
             // Format price with currency symbol
             const cMap = { USD: '$', GBP: '£', GBP2: '£', GBp: 'p', GBX: 'p', EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥', CHF: 'Fr' };
             const cur = d.currency || 'USD';
@@ -564,25 +585,30 @@ function _renderHeatmap(items) {
             const priceStr = d.price != null
                 ? (cur === 'GBp' || cur === 'GBX' ? `p${d.price.toFixed(2)}` : `${cSym}${d.price.toFixed(2)}`)
                 : '';
-            const title = `${d.company_name}\n${d.ticker}  ${priceStr}  ${pctStr}`;
+            const extLabel = extBadge ? ` (${extBadge})` : '';
+            const title = `${d.company_name}\n${d.ticker}  ${priceStr}  ${pctStr}${extLabel}`;
+
+            const badgeHtml = extBadge
+                ? `<span class="hm-ext-badge hm-ext-${extBadge.toLowerCase()}">${extBadge}</span>`
+                : '';
 
             const minDim = Math.min(celW, celH);
             let content = '';
             if (minDim >= 50 && celH >= 62) {
-                // Large: ticker + price + pct
+                // Large: ticker + price + pct + optional badge
                 content = `<span class="hm-t hm-tl">${esc(d.ticker)}</span>`
                     + `<span class="hm-price hm-pricem">${priceStr}</span>`
-                    + `<span class="hm-p hm-pm">${pctStr}</span>`;
+                    + `<span class="hm-p hm-pm">${pctStr}</span>`
+                    + badgeHtml;
             } else if (minDim >= 50) {
-                // Wide but not tall enough for price
-                content = `<span class="hm-t hm-tl">${esc(d.ticker)}</span><span class="hm-p hm-pm">${pctStr}</span>`;
+                content = `<span class="hm-t hm-tl">${esc(d.ticker)}</span><span class="hm-p hm-pm">${pctStr}</span>${badgeHtml}`;
             } else if (minDim >= 30 && celH >= 48) {
-                // Medium with room for price
                 content = `<span class="hm-t hm-tm">${esc(d.ticker)}</span>`
                     + `<span class="hm-price hm-prices">${priceStr}</span>`
-                    + `<span class="hm-p hm-ps">${pctStr}</span>`;
+                    + `<span class="hm-p hm-ps">${pctStr}</span>`
+                    + badgeHtml;
             } else if (minDim >= 30) {
-                content = `<span class="hm-t hm-tm">${esc(d.ticker)}</span><span class="hm-p hm-ps">${pctStr}</span>`;
+                content = `<span class="hm-t hm-tm">${esc(d.ticker)}</span><span class="hm-p hm-ps">${pctStr}</span>${badgeHtml}`;
             } else if (minDim >= 18) {
                 content = `<span class="hm-t hm-ts">${esc(d.ticker)}</span>`;
             } else if (celW >= 12 && celH >= 8) {
@@ -597,6 +623,17 @@ function _renderHeatmap(items) {
         }
     }
     container.innerHTML = html.join('');
+
+    // Update session label in the heatmap header
+    const sessionLabel = document.getElementById('heatmapSessionLabel');
+    if (sessionLabel) {
+        const states = valid.map(d => d.market_state || 'REGULAR');
+        const hasPost = states.some(s => s === 'POST' || s === 'POSTPOST');
+        const hasPre  = states.some(s => s === 'PRE');
+        sessionLabel.textContent = hasPre  ? 'Pre-market change'
+                                 : hasPost ? 'After-hours change'
+                                 :           "Today's change";
+    }
 
     // Randomise each cell's phase within the 10s cycle so they pulse out of sync
     container.querySelectorAll('.hm-cell').forEach(cell => {
@@ -874,7 +911,7 @@ async function loadRiskMetrics() {
     const grid = document.getElementById('riskMetricsGrid');
     if (!grid) return;
     try {
-        const res  = await fetch('/api/pcombined/risk-metrics');
+        const res = await fetch('/api/pcombined/risk-metrics');
         const json = await res.json();
         if (json.status !== 'ok') throw new Error(json.message || 'Failed');
         _renderRiskMetrics(json.data);
@@ -905,7 +942,7 @@ function _rmBadge(text, type) {
 function _rmTrack(value, min, max, markers) {
     // markers: [{label, val, accent}]
     const clamp = v => Math.max(0, Math.min(100, ((v - min) / (max - min)) * 100));
-    const dots  = (markers || []).map(m =>
+    const dots = (markers || []).map(m =>
         `<div class="rm-track-dot${m.accent ? ' rm-track-dot-accent' : ''}" style="left:${clamp(m.val).toFixed(1)}%">
            <div class="rm-track-label">${m.label}</div>
          </div>`
@@ -929,9 +966,9 @@ function _renderRiskMetrics(data) {
     const cards = [];
 
     // ── TWR ──────────────────────────────────────────────────────────────
-    const twrSign  = data.twr >= 0 ? '▲' : '▼';
+    const twrSign = data.twr >= 0 ? '▲' : '▼';
     const twrClass = data.twr >= 0 ? 'pos' : 'neg';
-    const spyChip  = data.spy_twr != null
+    const spyChip = data.spy_twr != null
         ? `<div class="rm-bench-chip">SPY: ${data.spy_twr > 0 ? '+' : ''}${data.spy_twr.toFixed(2)}%
              <span class="${data.twr_vs_spy >= 0 ? 'pos' : 'neg'}">
                (${data.twr_vs_spy >= 0 ? '▲' : '▼'}${Math.abs(data.twr_vs_spy).toFixed(2)}%)
@@ -954,8 +991,8 @@ function _renderRiskMetrics(data) {
     if (data.pe != null) {
         const peStatus = data.pe < 15 ? _rmBadge('undervalued', 'good')
             : data.pe < 25 ? _rmBadge('fair value', 'ok')
-            : data.pe < 35 ? _rmBadge('elevated', 'warn')
-            : _rmBadge('expensive', 'warn');
+                : data.pe < 35 ? _rmBadge('elevated', 'warn')
+                    : _rmBadge('expensive', 'warn');
         cards.push(`
           <div class="risk-metric-card">
             <div class="rm-header">
@@ -964,7 +1001,7 @@ function _renderRiskMetrics(data) {
             </div>
             <div class="rm-value neutral">${data.pe.toFixed(1)}×</div>
             <div class="rm-info-row">${peStatus}
-              ${_rmTrack(data.pe, 0, 70, [{label: 'Portfolio', val: data.pe, accent: true}])}
+              ${_rmTrack(data.pe, 0, 70, [{ label: 'Portfolio', val: data.pe, accent: true }])}
             </div>
           </div>`);
     }
@@ -973,10 +1010,10 @@ function _renderRiskMetrics(data) {
     if (data.beta != null) {
         const betaStatus = data.beta < 0.8 ? _rmBadge('lower than market', 'good')
             : data.beta < 1.1 ? _rmBadge('similar to market', 'ok')
-            : _rmBadge('higher than market', 'warn');
+                : _rmBadge('higher than market', 'warn');
         const betaTrack = _rmTrack(data.beta, 0, 2, [
-            {label: 'Market', val: 1.0, accent: false},
-            {label: 'Portfolio', val: data.beta, accent: true}
+            { label: 'Market', val: 1.0, accent: false },
+            { label: 'Portfolio', val: data.beta, accent: true }
         ]);
         const volStr = data.volatility != null ? ` · Vol ${data.volatility.toFixed(1)}% p.a.` : '';
         cards.push(`
@@ -997,10 +1034,10 @@ function _renderRiskMetrics(data) {
     if (data.sharpe != null) {
         const shStatus = data.sharpe > 2 ? _rmBadge('excellent', 'good')
             : data.sharpe > 1 ? _rmBadge('good', 'good')
-            : data.sharpe > 0.5 ? _rmBadge('adequate', 'ok')
-            : _rmBadge('requires attention', 'warn');
-        const shMarkers = [{label: 'Portfolio', val: data.sharpe, accent: true}];
-        if (data.spy_sharpe != null) shMarkers.unshift({label: 'SPY', val: data.spy_sharpe, accent: false});
+                : data.sharpe > 0.5 ? _rmBadge('adequate', 'ok')
+                    : _rmBadge('requires attention', 'warn');
+        const shMarkers = [{ label: 'Portfolio', val: data.sharpe, accent: true }];
+        if (data.spy_sharpe != null) shMarkers.unshift({ label: 'SPY', val: data.spy_sharpe, accent: false });
         cards.push(`
           <div class="risk-metric-card">
             <div class="rm-header">
@@ -1019,8 +1056,8 @@ function _renderRiskMetrics(data) {
     if (data.sortino != null) {
         const soStatus = data.sortino > 2 ? _rmBadge('excellent', 'good')
             : data.sortino > 1 ? _rmBadge('good', 'good')
-            : data.sortino > 0.5 ? _rmBadge('adequate', 'ok')
-            : _rmBadge('requires attention', 'warn');
+                : data.sortino > 0.5 ? _rmBadge('adequate', 'ok')
+                    : _rmBadge('requires attention', 'warn');
         cards.push(`
           <div class="risk-metric-card">
             <div class="rm-header">
@@ -1032,7 +1069,7 @@ function _renderRiskMetrics(data) {
               ${soStatus}
               <span class="rm-hint">Value above 2 is considered good</span>
             </div>
-            ${_rmTrack(data.sortino, -1, 4, [{label: 'Portfolio', val: data.sortino, accent: true}])}
+            ${_rmTrack(data.sortino, -1, 4, [{ label: 'Portfolio', val: data.sortino, accent: true }])}
           </div>`);
     }
 
@@ -1184,10 +1221,15 @@ function _renderActivityTimeline(data) {
           </div>
           <div class="div-tl-card">
             <div class="div-tl-card-top">
-              <span class="div-tl-ticker">${esc(ticker)}</span>
-              <div class="div-tl-company-block">
-                <span class="div-tl-company">${esc(company)}</span>
-                <span class="div-tl-type">${actionWord} · ${fmt.number(qty, 4)} shares</span>
+              <div class="div-tl-identity">
+                ${_logoImg(ticker, 'div-tl-logo')}
+                <div class="div-tl-name-stack">
+                  <span class="div-tl-ticker">${esc(ticker)}</span>
+                  <div class="div-tl-company-block">
+                    <span class="div-tl-company">${esc(company)}</span>
+                    <span class="div-tl-type">${actionWord} · ${fmt.number(qty, 4)} shares</span>
+                  </div>
+                </div>
               </div>
               <div class="div-tl-amount-block">
                 <span class="div-tl-value">${value}</span>
@@ -1248,9 +1290,14 @@ function _renderDivHistoryTimeline(data) {
           </div>
           <div class="div-tl-card">
             <div class="div-tl-card-top">
-              <span class="div-tl-ticker">${esc(ticker)}</span>
-              <div class="div-tl-company-block">
-                ${company ? `<span class="div-tl-company">${esc(company)}</span>` : ''}
+              <div class="div-tl-identity">
+                ${_logoImg(ticker, 'div-tl-logo')}
+                <div class="div-tl-name-stack">
+                  <span class="div-tl-ticker">${esc(ticker)}</span>
+                  <div class="div-tl-company-block">
+                    ${company ? `<span class="div-tl-company">${esc(company)}</span>` : ''}
+                  </div>
+                </div>
               </div>
               <div class="div-tl-amount-block">
                 <span class="div-tl-value pos">${amount}</span>
@@ -1304,8 +1351,8 @@ function _drawSectorRadialChart() {
     ctx.scale(dpr, dpr);
 
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-    const textPrimary   = isDark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.78)';
-    const gridColor     = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
+    const textPrimary = isDark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.78)';
+    const gridColor = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
 
     ctx.clearRect(0, 0, W, H);
 
@@ -1329,13 +1376,13 @@ function _drawSectorRadialChart() {
     const N = sectors.length;
     if (!N) return;
 
-    const maxAbs  = Math.max(...sectors.map(s => Math.abs(s.avg)), 0.5);
-    const labelR  = 46;                              // pixels reserved outside max ring for labels
-    const maxR    = Math.min(W, H) / 2 - labelR - 4;
-    const cx      = W / 2;
-    const cy      = H / 2;
-    const sa      = (2 * Math.PI) / N;              // slice angle
-    const GAP     = 0.018;                           // small gap between slices (radians)
+    const maxAbs = Math.max(...sectors.map(s => Math.abs(s.avg)), 0.5);
+    const labelR = 46;                              // pixels reserved outside max ring for labels
+    const maxR = Math.min(W, H) / 2 - labelR - 4;
+    const cx = W / 2;
+    const cy = H / 2;
+    const sa = (2 * Math.PI) / N;              // slice angle
+    const GAP = 0.018;                           // small gap between slices (radians)
 
     // ── Grid rings ──────────────────────────────────────────────────────────
     ctx.lineWidth = 1;
@@ -1362,20 +1409,20 @@ function _drawSectorRadialChart() {
     // ── Colour bands — same scheme as Monthly Performance heatmap ───────────
     const _sectorBandColors = pct => {
         if (pct >= 10) return ['#052e16', '#15803d'];
-        if (pct >=  5) return ['#14532d', '#16a34a'];
-        if (pct >=  2) return ['#166534', '#22c55e'];
-        if (pct >=  0) return ['#0f766e', '#14b8a6'];
+        if (pct >= 5) return ['#14532d', '#16a34a'];
+        if (pct >= 2) return ['#166534', '#22c55e'];
+        if (pct >= 0) return ['#0f766e', '#14b8a6'];
         if (pct >= -2) return ['#78350f', '#b45309'];
         if (pct >= -5) return ['#7f1d1d', '#dc2626'];
-        return                 ['#450a0a', '#b91c1c'];
+        return ['#450a0a', '#b91c1c'];
     };
 
     // ── Wedges ──────────────────────────────────────────────────────────────
     for (let i = 0; i < N; i++) {
         const s = sectors[i];
         const startA = -Math.PI / 2 + i * sa + GAP;
-        const endA   = -Math.PI / 2 + (i + 1) * sa - GAP;
-        const r      = Math.max(maxR * Math.abs(s.avg) / maxAbs, 4);
+        const endA = -Math.PI / 2 + (i + 1) * sa - GAP;
+        const r = Math.max(maxR * Math.abs(s.avg) / maxAbs, 4);
 
         const [c1, c2] = _sectorBandColors(s.avg);
         const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
@@ -1395,25 +1442,25 @@ function _drawSectorRadialChart() {
 
     // ── Labels ──────────────────────────────────────────────────────────────
     for (let i = 0; i < N; i++) {
-        const s      = sectors[i];
-        const midA   = -Math.PI / 2 + (i + 0.5) * sa;
-        const dist   = maxR + labelR * 0.52;
-        const lx     = cx + dist * Math.cos(midA);
-        const ly     = cy + dist * Math.sin(midA);
+        const s = sectors[i];
+        const midA = -Math.PI / 2 + (i + 0.5) * sa;
+        const dist = maxR + labelR * 0.52;
+        const lx = cx + dist * Math.cos(midA);
+        const ly = cy + dist * Math.sin(midA);
 
-        const sign   = s.avg >= 0 ? '+' : '';
+        const sign = s.avg >= 0 ? '+' : '';
         const pctCol = _sectorBandColors(s.avg)[1];
 
         // Align based on position around circle
         const cosA = Math.cos(midA);
-        ctx.textAlign    = cosA < -0.15 ? 'right' : cosA > 0.15 ? 'left' : 'center';
+        ctx.textAlign = cosA < -0.15 ? 'right' : cosA > 0.15 ? 'left' : 'center';
         ctx.textBaseline = 'middle';
 
-        ctx.font      = `600 10px system-ui, sans-serif`;
+        ctx.font = `600 10px system-ui, sans-serif`;
         ctx.fillStyle = textPrimary;
         ctx.fillText(s.name, lx, ly - 7);
 
-        ctx.font      = `500 9.5px system-ui, sans-serif`;
+        ctx.font = `500 9.5px system-ui, sans-serif`;
         ctx.fillStyle = pctCol;
         ctx.fillText(`${sign}${s.avg.toFixed(2)}%`, lx, ly + 6);
     }
@@ -1429,8 +1476,13 @@ function _drawSectorRadialChart() {
 
 const _MKT_RANGE_DAYS = { '1W': 5, '1M': 22, '3M': 66, '1Y': 252 };
 
+function _mktDataValid(d) {
+    // A market-indicators payload is valid only if at least one symbol has values
+    return d && (d.GSPC?.values?.length > 0 || d.IXIC?.values?.length > 0 || d.VIX?.values?.length > 0);
+}
+
 async function loadMarketChart() {
-    if (_mktChartData) {
+    if (_mktDataValid(_mktChartData)) {
         _drawMarketChart();
         _drawNasdaqChart();
         _updateMarketStats();
@@ -1439,10 +1491,12 @@ async function loadMarketChart() {
         if (_portfolioVsData) _drawPortfolioVsChart();
         return;
     }
+    // Reset any previously cached null-valued object so we always re-fetch
+    _mktChartData = null;
     try {
         const res = await fetch('/api/market-indicators');
         const json = await res.json();
-        if (json.status === 'ok') {
+        if (json.status === 'ok' && _mktDataValid(json.data)) {
             _mktChartData = json.data;
             if (!_marketIndData) _marketIndData = json.data;
             _drawMarketChart();
@@ -2331,7 +2385,7 @@ function _initDrawdownRangeTabs() {
         tooltip.innerHTML = `
             <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:2px">${dateStr}</div>
             <div style="font-size:0.8rem;font-weight:700;color:#ef4444">${fmt(pt.drawdown)}</div>
-            <div style="font-size:0.7rem;color:var(--text-muted)">Value: £${pt.value.toLocaleString('en-GB', {maximumFractionDigits:0})}</div>`;
+            <div style="font-size:0.7rem;color:var(--text-muted)">Value: £${pt.value.toLocaleString('en-GB', { maximumFractionDigits: 0 })}</div>`;
 
         const tx = Math.min(x + 8, m.W - 110);
         const ty = Math.max(m.PAD.top, y - 40);
@@ -2591,10 +2645,10 @@ function _renderFullSignals() {
 function _showConfirmModal({ icon = '', title, body, okLabel, danger = false }) {
     return new Promise(resolve => {
         const overlay = document.getElementById('confirmModalOverlay');
-        const modal   = document.getElementById('confirmModal');
-        document.getElementById('confirmModalIcon').textContent  = icon;
+        const modal = document.getElementById('confirmModal');
+        document.getElementById('confirmModalIcon').textContent = icon;
         document.getElementById('confirmModalTitle').textContent = title;
-        document.getElementById('confirmModalBody').textContent  = body;
+        document.getElementById('confirmModalBody').textContent = body;
         const okBtn = document.getElementById('confirmModalOk');
         okBtn.textContent = okLabel;
         okBtn.classList.toggle('danger', danger);
@@ -2607,7 +2661,7 @@ function _showConfirmModal({ icon = '', title, body, okLabel, danger = false }) 
             overlay.removeEventListener('click', onCancel);
             resolve(result);
         };
-        const onOk     = () => close(true);
+        const onOk = () => close(true);
         const onCancel = () => close(false);
 
         okBtn.addEventListener('click', onOk);
@@ -3034,7 +3088,7 @@ async function loadMarketIndicators() {
     try {
         const res = await fetch('/api/market-indicators');
         const json = await res.json();
-        if (json.status !== 'ok') return;
+        if (json.status !== 'ok' || !_mktDataValid(json.data)) return;
         _marketIndData = json.data;
         // If the panel is already open, refresh it
         if (document.getElementById('fgPanel')?.classList.contains('open')) {
@@ -3414,10 +3468,15 @@ function _renderDividendCalendar(data) {
           </div>
           <div class="div-tl-card">
             <div class="div-tl-card-top">
-              <span class="div-tl-ticker">${esc(d.ticker)}</span>
-              <div class="div-tl-company-block">
-                <span class="div-tl-company">${esc(d.company_name)}</span>
-                ${payout ? `<span class="div-tl-type">${perShare} per share</span>` : ''}
+              <div class="div-tl-identity">
+                ${_logoImg(d.ticker, 'div-tl-logo')}
+                <div class="div-tl-name-stack">
+                  <span class="div-tl-ticker">${esc(d.ticker)}</span>
+                  <div class="div-tl-company-block">
+                    <span class="div-tl-company">${esc(d.company_name)}</span>
+                    ${payout ? `<span class="div-tl-type">${perShare} per share</span>` : ''}
+                  </div>
+                </div>
               </div>
               <div class="div-tl-amount-block">
                 <span class="div-tl-value">${esc(payout)}</span>
@@ -3613,9 +3672,14 @@ function _renderEarnings(data) {
           </div>
           <div class="div-tl-card">
             <div class="div-tl-card-top">
-              <span class="div-tl-ticker">${esc(symbol)}</span>
-              <div class="div-tl-company-block">
-                <span class="div-tl-company">${esc(company)}</span>
+              <div class="div-tl-identity">
+                ${_logoImg(symbol, 'div-tl-logo')}
+                <div class="div-tl-name-stack">
+                  <span class="div-tl-ticker">${esc(symbol)}</span>
+                  <div class="div-tl-company-block">
+                    <span class="div-tl-company">${esc(company)}</span>
+                  </div>
+                </div>
               </div>
                 <div class="div-tl-date-col">
               <div class="div-tl-dates">
@@ -3852,7 +3916,7 @@ async function loadNewsView(force = false) {
 function _newsRelativeTime(dt) {
     const now = Date.now();
     const diff = Math.floor((now - dt.getTime()) / 1000);
-    if (diff < 60)  return `${diff}s ago`;
+    if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
@@ -4158,7 +4222,7 @@ function _renderWatchlistTable(list) {
         row.id = `wl-row-${ticker}`;
         row.className = 'wl-table-row';
         row.innerHTML = `
-            <td><span class="wl-ticker-chip">${esc(ticker)}</span></td>
+            <td><div class="wl-ticker-cell">${_logoImg(ticker, 'wl-logo')}<span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
             <td class="wl-company" id="wl-co-${ticker}">—</td>
             <td class="wl-price" id="wl-price-${ticker}">—</td>
             <td class="wl-change" id="wl-chg-${ticker}">—</td>
