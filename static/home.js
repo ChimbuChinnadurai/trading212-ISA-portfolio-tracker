@@ -866,6 +866,7 @@ async function loadMetricsView(force = false) {
         _portfolioVsData = null;
     }
     loadPortfolioVsMarket();
+    loadMarketChart();   // ensure S&P 500 series is available for portfolio vs chart
     loadRiskMetrics();
 }
 
@@ -1769,8 +1770,8 @@ function _drawPortfolioVsChart() {
     const spVals = dates.map(d => ((spByDate[d] / spBase) - 1) * 100);
     const pvsVals = dates.map(d => ((pvsByDate[d] / pvsBase) - 1) * 100);
 
-    const spColor = '#ec4899';   // pink
-    const pvsColor = '#3b82f6';  // blue
+    const spColor = '#ec4899';   // pink  — matches legend
+    const pvsColor = '#f59e0b';  // amber — matches legend
 
     // Right padding accounts for end-of-line labels
     const PAD = { top: 18, right: 58, bottom: 28, left: 48 };
@@ -1936,8 +1937,6 @@ function _initPvsHover(canvas) {
         const yOf = v => PAD.top + (1 - (v - minVP) / vRng) * cH;
 
         const hx = xOf(idx);
-        const spY = yOf(spVals[idx]);
-        const pvsY = yOf(pvsVals[idx]);
 
         // Vertical crosshair
         ctx.strokeStyle = 'rgba(255,255,255,0.18)';
@@ -1946,24 +1945,36 @@ function _initPvsHover(canvas) {
         ctx.beginPath(); ctx.moveTo(hx, PAD.top); ctx.lineTo(hx, PAD.top + cH); ctx.stroke();
         ctx.setLineDash([]);
 
-        // Hover dots for both lines
-        for (const [hy, col] of [[spY, spColor], [pvsY, pvsColor]]) {
-            ctx.beginPath(); ctx.arc(hx, hy, 6, 0, Math.PI * 2);
-            ctx.fillStyle = col + '30'; ctx.fill();
-            ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, Math.PI * 2);
-            ctx.fillStyle = col; ctx.fill();
+        // Hover dots — only for visible series
+        if (spVals) {
+            const spY = yOf(spVals[idx]);
+            ctx.beginPath(); ctx.arc(hx, spY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = spColor + '30'; ctx.fill();
+            ctx.beginPath(); ctx.arc(hx, spY, 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = spColor; ctx.fill();
+        }
+        if (pvsVals) {
+            const pvsY = yOf(pvsVals[idx]);
+            ctx.beginPath(); ctx.arc(hx, pvsY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = pvsColor + '30'; ctx.fill();
+            ctx.beginPath(); ctx.arc(hx, pvsY, 3.5, 0, Math.PI * 2);
+            ctx.fillStyle = pvsColor; ctx.fill();
         }
 
         const tooltip = document.getElementById('pvsChartTooltip');
         if (tooltip) {
             const d = new Date(dates[idx] + 'T12:00:00')
                 .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            const spTxt = (spVals[idx] >= 0 ? '+' : '') + spVals[idx].toFixed(2) + '%';
-            const pvsTxt = (pvsVals[idx] >= 0 ? '+' : '') + pvsVals[idx].toFixed(2) + '%';
-            tooltip.innerHTML =
-                `<span class="mkt-tt-date">${d}</span>` +
-                `<span class="pvs-tt-row"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${spColor};margin-right:5px;flex-shrink:0"></span><span style="color:${spColor};font-weight:600">${spTxt}</span><span style="color:rgba(255,255,255,0.45);margin-left:3px">S&P</span></span>` +
-                `<span class="pvs-tt-row"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${pvsColor};margin-right:5px;flex-shrink:0"></span><span style="color:${pvsColor};font-weight:600">${pvsTxt}</span><span style="color:rgba(255,255,255,0.45);margin-left:3px">Portfolio</span></span>`;
+            let html = `<span class="mkt-tt-date">${d}</span>`;
+            if (spVals) {
+                const spTxt = (spVals[idx] >= 0 ? '+' : '') + spVals[idx].toFixed(2) + '%';
+                html += `<span class="pvs-tt-row"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${spColor};margin-right:5px;flex-shrink:0"></span><span style="color:${spColor};font-weight:600">${spTxt}</span><span style="color:rgba(255,255,255,0.45);margin-left:3px">S&P 500</span></span>`;
+            }
+            if (pvsVals) {
+                const pvsTxt = (pvsVals[idx] >= 0 ? '+' : '') + pvsVals[idx].toFixed(2) + '%';
+                html += `<span class="pvs-tt-row"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${pvsColor};margin-right:5px;flex-shrink:0"></span><span style="color:${pvsColor};font-weight:600">${pvsTxt}</span><span style="color:rgba(255,255,255,0.45);margin-left:3px">Portfolio</span></span>`;
+            }
+            tooltip.innerHTML = html;
             const tx = Math.min(mx + 14, canvas.offsetWidth - 140);
             const ty = Math.max(e.clientY - rect.top - 58, 4);
             tooltip.style.cssText = `display:flex;flex-direction:column;gap:4px;left:${tx}px;top:${ty}px`;
@@ -3830,10 +3841,21 @@ async function loadNewsView(force = false) {
         if (json.status === 'ok') {
             _renderNewsGrid(json.data);
             resetClock('rc-news');
+            const el = document.getElementById('newsLastUpdated');
+            if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
         }
     } catch (err) {
         if (grid) grid.innerHTML = '<div class="activity-empty">Error loading news.</div>';
     }
+}
+
+function _newsRelativeTime(dt) {
+    const now = Date.now();
+    const diff = Math.floor((now - dt.getTime()) / 1000);
+    if (diff < 60)  return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
 }
 
 function _renderNewsGrid(data) {
@@ -3845,28 +3867,47 @@ function _renderNewsGrid(data) {
         return;
     }
 
-    grid.innerHTML = data.map(news => {
+    const now = Date.now();
+    const rows = data.map(news => {
         const title = news.headline || '—';
-        const source = news.source || 'News';
+        const source = news.source || '—';
         const url = news.url || '#';
-        const time = news.datetime
-            ? new Date(news.datetime * 1000).toLocaleString('en-GB', {
-                day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
-            })
-            : '—';
-        const img = news.image || '';
+        const dt = news.datetime ? new Date(news.datetime * 1000) : null;
+        const relTime = dt ? _newsRelativeTime(dt) : '—';
+        const fullTime = dt ? dt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+        const ageSecs = dt ? (now - dt.getTime()) / 1000 : Infinity;
+        const isFresh = ageSecs < 1800; // < 30 min
 
-        return `<a href="${url}" target="_blank" rel="noopener" class="news-card">
-            ${img
-                ? `<img src="${img}" class="news-card-img" alt="" loading="lazy" onerror="this.style.display='none'">`
-                : `<div class="news-card-img-placeholder">📰</div>`}
-            <div class="news-card-body">
-                <span class="news-card-source">${esc(source)}</span>
-                <span class="news-card-title">${esc(title)}</span>
-                <span class="news-card-time">${time}</span>
-            </div>
-        </a>`;
+        return `<tr class="news-table-row${isFresh ? ' news-row-fresh' : ''}">
+            <td class="news-col-time">
+                ${isFresh ? '<span class="news-fresh-dot"></span>' : '<span class="news-stale-dot"></span>'}
+                <div class="news-time-stack">
+                    <span class="news-time-rel">${esc(relTime)}</span>
+                    ${fullTime ? `<span class="news-time-full">${esc(fullTime)}</span>` : ''}
+                </div>
+            </td>
+            <td class="news-col-provider">
+                <span class="news-provider-badge">${esc(source)}</span>
+            </td>
+            <td class="news-col-headline">
+                <a href="${url}" target="_blank" rel="noopener" class="news-headline-link">
+                    ${esc(title)}
+                    <svg class="news-ext-icon" viewBox="0 0 12 12" fill="none"><path d="M2 10L10 2M10 2H5M10 2V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </a>
+            </td>
+        </tr>`;
     }).join('');
+
+    grid.innerHTML = `<table class="news-table">
+        <thead>
+            <tr>
+                <th class="news-col-time">Time</th>
+                <th class="news-col-provider">Provider</th>
+                <th class="news-col-headline">Headline</th>
+            </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+    </table>`;
 }
 
 
