@@ -118,7 +118,7 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
-      background: rgba(247, 249, 251, 0.88);
+      background: var(--bg);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       gap: 12px;
@@ -427,7 +427,8 @@
                 <div class="ov-header">
                   <span class="ov-label">Stocks Heatmap</span>
                   <span class="rc-label-wrap">
-                    <span id="heatmapSessionLabel" style="font-size:0.75rem;color:var(--text-secondary)">Today's change</span>
+                    <span id="heatmapSessionLabel" style="font-size:0.75rem;color:var(--text-secondary)">Today's
+                      change</span>
                     <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="15"></span>
                   </span>
                 </div>
@@ -437,7 +438,7 @@
               </div>
 
               <!-- Row 3: Latest Trade Signals -->
-              <div class="ov-card home-activity-card" style="margin-top:20px;">
+              <div class="ov-card home-activity-card">
                 <div class="ov-header" style="justify-content:space-between;border-bottom:none">
                   <div style="display:flex; align-items:center; gap:8px">
                     <span class="material-symbols-outlined" style="color:var(--text-muted)">analytics</span>
@@ -598,7 +599,8 @@
               <div class="summary-row">
                 <div class="summary-row-header">
                   <span class="summary-title">Overview</span>
-                  <span class="summary-updated" id="summaryUpdated" data-stale="true">as of <span id="summaryTime" style="font-weight:700">—</span></span>
+                  <span class="summary-updated" id="summaryUpdated" data-stale="true">as of <span id="summaryTime"
+                      style="font-weight:700">—</span></span>
                 </div>
                 <div class="summary-cards">
 
@@ -1344,7 +1346,7 @@
 
             <div class="cal-view-header watchlist-header">
               <div class="cal-view-title-block">
-                <h1 class="cal-view-title">Watchlist</h1>
+                <!-- <h1 class="cal-view-title">Watchlist</h1> -->
                 <p class="cal-view-subtitle">Track any stock — price, analyst targets and 48h movement</p>
               </div>
               <div class="watchlist-add-bar">

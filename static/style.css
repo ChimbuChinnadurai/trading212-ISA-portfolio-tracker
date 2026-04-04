@@ -8,11 +8,24 @@
 }
 
 /* JetBrains Mono: financial values & tabular numbers only */
-.ov-main-val, .ov-mini-val, .ov-returns, .ov-pct, .ov-24h,
-.s-card-value, .s-card-pct, .s-card-sub,
-.hm-price, .hm-chg, .hm-cell,
-.currency-btn, code, pre, .mono,
-.table-val, .table-pct, .alloc-pct {
+.ov-main-val,
+.ov-mini-val,
+.ov-returns,
+.ov-pct,
+.ov-24h,
+.s-card-value,
+.s-card-pct,
+.s-card-sub,
+.hm-price,
+.hm-chg,
+.hm-cell,
+.currency-btn,
+code,
+pre,
+.mono,
+.table-val,
+.table-pct,
+.alloc-pct {
   font-family: 'JetBrains Mono', monospace;
 }
 
@@ -102,7 +115,6 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="dark"] #ov2 {
-  background: rgba(15, 22, 41, 0.75);
   border: 1px solid #1e2d4a;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -456,15 +468,38 @@ html[data-theme="dark"] .header {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .4; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .4;
+  }
 }
 
 @keyframes currency-flash {
-  0%   { opacity: 1; transform: scale(1); }
-  25%  { opacity: 0.55; transform: scale(0.97); }
-  60%  { opacity: 0.9; transform: scale(1.02); color: var(--accent); }
-  100% { opacity: 1; transform: scale(1); }
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  25% {
+    opacity: 0.55;
+    transform: scale(0.97);
+  }
+
+  60% {
+    opacity: 0.9;
+    transform: scale(1.02);
+    color: var(--accent);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .currency-flash {
@@ -665,21 +700,8 @@ html[data-theme="light"] .s-card::before {
   border-radius: var(--radius) var(--radius) 0 0;
 }
 
-.s-card-blue::before {
-  background: linear-gradient(135deg, #0058be, #2170e4);
-}
-
-.s-card-teal::before {
-  background: linear-gradient(90deg, #06b6d4, #10b981);
-}
-
-
 .s-card-amber::before {
   background: linear-gradient(90deg, #f59e0b, #f97316);
-}
-
-.s-card-dynamic::before {
-  background: linear-gradient(90deg, #10b981, #06b6d4);
 }
 
 .s-card-dynamic[data-pnl="neg"]::before {
@@ -2293,8 +2315,13 @@ th.sort-desc .sort-icon::before {
   color: var(--text-primary);
 }
 
-.rebal-summary-pill .pill-val.pos { color: var(--green); }
-.rebal-summary-pill .pill-val.neg { color: var(--red); }
+.rebal-summary-pill .pill-val.pos {
+  color: var(--green);
+}
+
+.rebal-summary-pill .pill-val.neg {
+  color: var(--red);
+}
 
 .rebal-summary-pill .pill-label {
   font-size: 0.65rem;
@@ -2324,7 +2351,9 @@ th.sort-desc .sort-icon::before {
   white-space: nowrap;
 }
 
-.rebal-table th.th-r { text-align: right; }
+.rebal-table th.th-r {
+  text-align: right;
+}
 
 .rebal-table td {
   padding: 9px 12px;
@@ -2332,9 +2361,13 @@ th.sort-desc .sort-icon::before {
   vertical-align: middle;
 }
 
-.rebal-table tr:last-child td { border-bottom: none; }
+.rebal-table tr:last-child td {
+  border-bottom: none;
+}
 
-.rebal-table tr:hover td { background: var(--bg-hover); }
+.rebal-table tr:hover td {
+  background: var(--bg-hover);
+}
 
 .rebal-sector-name {
   font-weight: 600;
@@ -2342,7 +2375,10 @@ th.sort-desc .sort-icon::before {
   white-space: nowrap;
 }
 
-.rebal-val { text-align: right; color: var(--text-secondary); }
+.rebal-val {
+  text-align: right;
+  color: var(--text-secondary);
+}
 
 .rebal-target-wrap {
   display: flex;
@@ -2374,18 +2410,36 @@ th.sort-desc .sort-icon::before {
   white-space: nowrap;
 }
 
-.rebal-delta.over  { color: var(--red); }
-.rebal-delta.under { color: var(--green); }
-.rebal-delta.ok    { color: var(--text-muted); }
+.rebal-delta.over {
+  color: var(--red);
+}
+
+.rebal-delta.under {
+  color: var(--green);
+}
+
+.rebal-delta.ok {
+  color: var(--text-muted);
+}
 
 .rebal-action {
   text-align: right;
   white-space: nowrap;
 }
 
-.rebal-action .buy  { color: var(--green); font-weight: 600; }
-.rebal-action .sell { color: var(--red);   font-weight: 600; }
-.rebal-action .hold { color: var(--text-muted); }
+.rebal-action .buy {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.rebal-action .sell {
+  color: var(--red);
+  font-weight: 600;
+}
+
+.rebal-action .hold {
+  color: var(--text-muted);
+}
 
 .rebal-bar-wrap {
   width: 60px;
@@ -2435,7 +2489,9 @@ th.sort-desc .sort-icon::before {
   border-color: var(--accent);
 }
 
-.rebal-footer-btn.primary:hover { opacity: .88; }
+.rebal-footer-btn.primary:hover {
+  opacity: .88;
+}
 
 /* ─── Column picker ──────────────────────────────────────────────────────── */
 .col-hidden {
@@ -3461,7 +3517,6 @@ th.sort-desc .sort-icon::before {
 /* ── Fear & Greed Index card ─────────────────────────────────────────────── */
 .ov-card-fg {
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 27, 75, 0.6) 100%);
-  border-color: rgba(139, 92, 246, 0.45);
   cursor: pointer;
 }
 
@@ -3896,9 +3951,6 @@ html[data-theme="dark"] .ticker-chip {
 }
 
 /* ─── Calendar view ──────────────────────────────────────────────────────── */
-.cal-view-header {
-  padding: 28px 24px 4px;
-}
 
 .cal-view-title {
   font-size: 1.75rem;
@@ -6332,6 +6384,7 @@ html[data-theme="light"] .rating-strong-sell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  background: var(--bg);
 }
 
 .nav-item {
@@ -6502,8 +6555,8 @@ html[data-theme="dark"] .nav-group-header.active {
 
 .sidebar-footer {
   padding: 8px 6px;
-  border-top: 1px solid var(--border);
   flex-shrink: 0;
+  background: var(--bg);
 }
 
 .sidebar-collapse-btn {
@@ -7045,7 +7098,9 @@ html[data-theme="dark"] .nav-group-header.active {
 .news-table-row:hover td:first-child::before {
   content: '';
   position: absolute;
-  left: 0; top: 0; bottom: 0;
+  left: 0;
+  top: 0;
+  bottom: 0;
   width: 3px;
   background: var(--accent);
   border-radius: 0 2px 2px 0;
@@ -7077,7 +7132,7 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 /* Time cell inner layout */
-.news-col-time > * {
+.news-col-time>* {
   vertical-align: middle;
 }
 
@@ -7126,9 +7181,17 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 @keyframes news-pulse {
-  0%   { box-shadow: 0 0 0 0 rgba(16,185,129,.5); }
-  70%  { box-shadow: 0 0 0 5px rgba(16,185,129,0); }
-  100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, .5);
+  }
+
+  70% {
+    box-shadow: 0 0 0 5px rgba(16, 185, 129, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
 }
 
 /* Provider pill */
@@ -10295,7 +10358,7 @@ thead .mph-ticker-col {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 .confirm-modal.open {
@@ -10373,6 +10436,7 @@ thead .mph-ticker-col {
    All other columns are hidden. Clicking the card still opens the stock panel.
 ───────────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+
   /* Flatten the table so rows can use block/grid layout */
   .portfolio-table,
   .portfolio-table tbody {
