@@ -874,73 +874,25 @@
             </div> -->
             <div id="newsGrid" class="news-grid">
               <!-- skeleton -->
-              <table class="news-table">
-                <thead>
-                  <tr>
-                    <th class="news-col-time">Time</th>
-                    <th class="news-col-provider">Provider</th>
-                    <th class="news-col-headline">Headline <span id="newsLastUpdated" class="news-last-updated"></span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr class="news-table-row">
-                    <td>
-                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-50" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-90" style="height:11px"></div>
-                    </td>
-                  </tr>
-                  <tr class="news-table-row">
-                    <td>
-                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-40" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-80" style="height:11px"></div>
-                    </td>
-                  </tr>
-                  <tr class="news-table-row">
-                    <td>
-                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-55" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-85" style="height:11px"></div>
-                    </td>
-                  </tr>
-                  <tr class="news-table-row">
-                    <td>
-                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-45" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-75" style="height:11px"></div>
-                    </td>
-                  </tr>
-                  <tr class="news-table-row">
-                    <td>
-                      <div class="skeleton skel-line skel-w-60" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-50" style="height:11px"></div>
-                    </td>
-                    <td>
-                      <div class="skeleton skel-line skel-w-70" style="height:11px"></div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div class="news-feed">
+                <!-- Square Skeletons -->
+                <div class="news-card skel-news-card" style="opacity:1;transform:none">
+                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)"></div>
+                  <div class="news-card-content">
+                    <div class="skeleton skel-line" style="width:30%;height:10px;background:rgba(255,255,255,0.2)"></div>
+                    <div class="skeleton skel-line" style="width:90%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                    <div class="skeleton skel-line" style="width:70%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                  </div>
+                </div>
+                <div class="news-card skel-news-card" style="opacity:1;transform:none">
+                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)"></div>
+                  <div class="news-card-content">
+                    <div class="skeleton skel-line" style="width:25%;height:10px;background:rgba(255,255,255,0.2)"></div>
+                    <div class="skeleton skel-line" style="width:85%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                    <div class="skeleton skel-line" style="width:60%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div><!-- /view-news -->

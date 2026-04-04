@@ -3888,15 +3888,21 @@ async function loadMarketNews() {
 /** Load news for the dedicated news view (called by router) */
 async function loadNewsView(force = false) {
     const grid = document.getElementById('newsGrid');
-    if (grid) grid.innerHTML = `
-        <div class="news-card skel-news-card">
-          <div class="skel skel-news-img-lg"></div>
-          <div class="skel-news-body">
-            <div class="skel skel-line" style="width:30%"></div>
-            <div class="skel skel-line" style="width:90%"></div>
-            <div class="skel skel-line" style="width:70%"></div>
-          </div>
-        </div>`.repeat(6);
+    if (grid) {
+        let skeletonHtml = '';
+        for (let i = 0; i < 6; i++) {
+            skeletonHtml += `
+                <div class="news-card skel-news-card" style="opacity:1;transform:none">
+                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)"></div>
+                  <div class="news-card-content">
+                    <div class="skeleton skel-line" style="width:30%;height:10px;background:rgba(255,255,255,0.2)"></div>
+                    <div class="skeleton skel-line" style="width:90%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                    <div class="skeleton skel-line" style="width:70%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                  </div>
+                </div>`;
+        }
+        grid.innerHTML = `<div class="news-feed">${skeletonHtml}</div>`;
+    }
 
     try {
         const url = force ? '/api/news?force=1' : '/api/news';
@@ -3932,46 +3938,43 @@ function _renderNewsGrid(data) {
     }
 
     const now = Date.now();
-    const rows = data.map(news => {
+    const items = data.map((news, i) => {
         const title = news.headline || '—';
         const source = news.source || '—';
         const url = news.url || '#';
+        const img = news.image || `https://images.unsplash.com/photo-1611974717482-98246e7f293b?auto=format&fit=crop&q=80&w=800&h=800&market=${encodeURIComponent(source)}`;
         const dt = news.datetime ? new Date(news.datetime * 1000) : null;
         const relTime = dt ? _newsRelativeTime(dt) : '—';
-        const fullTime = dt ? dt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
         const ageSecs = dt ? (now - dt.getTime()) / 1000 : Infinity;
-        const isFresh = ageSecs < 1800; // < 30 min
+        
+        // Dynamic badges
+        let badgeClass = 'news-badge--update';
+        let badgeText = 'News Update';
+        if (ageSecs < 1200) { // < 20 min
+            badgeClass = 'news-badge--breaking';
+            badgeText = 'Breaking News';
+        } else if (title.toLowerCase().includes('earnings') || title.toLowerCase().includes('report')) {
+            badgeText = 'Earnings Report';
+        }
 
-        return `<tr class="news-table-row${isFresh ? ' news-row-fresh' : ''}">
-            <td class="news-col-time">
-                ${isFresh ? '<span class="news-fresh-dot"></span>' : '<span class="news-stale-dot"></span>'}
-                <div class="news-time-stack">
-                    <span class="news-time-rel">${esc(relTime)}</span>
-                    ${fullTime ? `<span class="news-time-full">${esc(fullTime)}</span>` : ''}
+        return `
+        <a href="${url}" target="_blank" rel="noopener" class="news-card" style="animation-delay: ${i * 0.08}s">
+            <img src="${img}" class="news-card-bg" alt="" loading="lazy" onerror="this.src='https://plus.unsplash.com/premium_photo-1681487769650-a0c3fbaed85a?q=80&w=800&h=800&auto=format&fit=crop'">
+            <div class="news-card-overlay"></div>
+            <div class="news-card-badge ${badgeClass}">${badgeText}</div>
+            <div class="news-card-footer-logo">You<b>News</b></div>
+            <div class="news-card-content">
+                <div class="news-card-source">${esc(source)}</div>
+                <h3 class="news-card-title">${esc(title)}</h3>
+                <div class="news-card-time">
+                    <span class="material-symbols-outlined" style="font-size:14px">schedule</span>
+                    ${esc(relTime)}
                 </div>
-            </td>
-            <td class="news-col-provider">
-                <span class="news-provider-badge">${esc(source)}</span>
-            </td>
-            <td class="news-col-headline">
-                <a href="${url}" target="_blank" rel="noopener" class="news-headline-link">
-                    ${esc(title)}
-                    <svg class="news-ext-icon" viewBox="0 0 12 12" fill="none"><path d="M2 10L10 2M10 2H5M10 2V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-                </a>
-            </td>
-        </tr>`;
+            </div>
+        </a>`;
     }).join('');
 
-    grid.innerHTML = `<table class="news-table">
-        <thead>
-            <tr>
-                <th class="news-col-time">Time</th>
-                <th class="news-col-provider">Provider</th>
-                <th class="news-col-headline">Headline</th>
-            </tr>
-        </thead>
-        <tbody>${rows}</tbody>
-    </table>`;
+    grid.innerHTML = `<div class="news-feed">${items}</div>`;
 }
 
 
