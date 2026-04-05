@@ -880,7 +880,10 @@ function renderTable(rows) {
         </div>
       </td>
       <td data-colid="country"><span class="${cbClass}">${esc(r.country)}</span></td>
-      <td data-colid="trend" class="td-center"><canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas></td>
+      <td data-colid="trend" class="td-center">
+        <div class="trend-skeleton"></div>
+        <canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas>
+      </td>
       <td data-colid="shares" class="td-right cell-num">${fmt.number(r.quantity, 6)}</td>
       <td data-colid="avg_price" class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
       <td data-colid="current_price" class="td-right cell-num">${currentPxCell}</td>
@@ -918,18 +921,42 @@ function renderTable(rows) {
 
 /* ─── Stock 48h Sparklines ────────────────────────────────────────────────── */
 
-async function _loadStockSparklines(rows) {
+let _sparklineVisibleMap = {}; // cache to track if we've already shown a sparkline
+
+async function _loadStockSparklines(rows, forceRefresh = false) {
   if (!rows.length) return;
   const tickers = rows.map(r => r.ticker).join(',');
   const countries = rows.map(r => r.country).join(',');
+
+  // Clear skeletons visually if this is a refresh
+  if (forceRefresh) {
+    document.querySelectorAll('[data-colid="trend"]').forEach(td => {
+      td.classList.remove('trend-refreshing');
+      void td.offsetWidth; // reflow
+      td.classList.add('trend-refreshing');
+      setTimeout(() => td.classList.remove('trend-refreshing'), 800);
+    });
+  }
+
   try {
     const res = await fetch(`/api/stock-sparklines?tickers=${encodeURIComponent(tickers)}&countries=${encodeURIComponent(countries)}`);
     const json = await res.json();
     if (json.status !== 'ok') return;
+
     for (const [ticker, points] of Object.entries(json.data)) {
       if (!points.length) continue;
-      const canvasId = 'sspark-' + ticker.replace(/[^a-zA-Z0-9]/g, '_');
+      const sparkId = ticker.replace(/[^a-zA-Z0-9]/g, '_');
+      const canvasId = 'sspark-' + sparkId;
+
+      // Draw the sparkline
       _drawStockSparkline(canvasId, points);
+
+      // Remove the skeleton for this ticker once data is ready
+      const canvas = document.getElementById(canvasId);
+      if (canvas) {
+        const skeleton = canvas.parentElement.querySelector('.trend-skeleton');
+        if (skeleton) skeleton.remove();
+      }
     }
   } catch (err) {
     console.warn('[stockSpark]', err);

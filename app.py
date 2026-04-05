@@ -598,7 +598,7 @@ def _yf_fetch_points(symbol, range_, interval_):
     """Fetch close prices from Yahoo Finance chart API, return [{ts, price}] list."""
     resp = requests.get(
         f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-        params={"range": range_, "interval": interval_},
+        params={"range": range_, "interval": interval_, "includePrePost": "true"},
         headers={"User-Agent": "Mozilla/5.0"},
         timeout=8,
     )
@@ -650,7 +650,7 @@ def stock_tickers_api():
         try:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
-                params={"range": "1d", "interval": "1d"},
+                params={"range": "1d", "interval": "1d", "includePrePost": "true"},
                 headers={"User-Agent": "Mozilla/5.0"},
                 timeout=8,
             )
@@ -659,7 +659,11 @@ def stock_tickers_api():
             currency     = meta.get("currency", "")
             market_state = meta.get("marketState", "REGULAR")  # PRE / REGULAR / POST / POSTPOST
 
-            # Use extended-hours price when the regular session is closed
+            # Normalize and prioritize extended-hours price when applicable
+            price = None
+            change = None
+            change_pct = None
+
             if market_state == "PRE":
                 price      = meta.get("preMarketPrice")
                 change     = meta.get("preMarketChange")
@@ -668,17 +672,14 @@ def stock_tickers_api():
                 price      = meta.get("postMarketPrice")
                 change     = meta.get("postMarketChange")
                 change_pct = meta.get("postMarketChangePercent")
-            else:
-                price      = meta.get("regularMarketPrice")
-                change     = meta.get("regularMarketChange")
-                change_pct = meta.get("regularMarketChangePercent")
-
-            # Fallback: if the extended-hours fields are absent, fall back to regular
+            
+            # Fallback 1: If extended fields are missing but meta says we are in those states
             if price is None:
+                # Sometimes Yahoo populates regularMarketPrice even in PRE/POST
+                # but we should check if they explicitly provided them.
                 price      = meta.get("regularMarketPrice")
                 change     = meta.get("regularMarketChange")
                 change_pct = meta.get("regularMarketChangePercent")
-                market_state = "REGULAR"
 
             # Compute change from previous close when API omits it
             if price is not None and (change is None or change_pct is None):
@@ -1163,16 +1164,31 @@ def watchlist_price():
         yf_sym       = f"{clean_ticker}{suffix}"
         resp = requests.get(
             f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
-            params={"range": "1d", "interval": "1d"},
+            params={"range": "1d", "interval": "1d", "includePrePost": "true"},
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=8,
         )
         resp.raise_for_status()
-        meta       = resp.json()["chart"]["result"][0]["meta"]
-        price      = meta.get("regularMarketPrice")
-        change_pct = meta.get("regularMarketChangePercent")
+        meta         = resp.json()["chart"]["result"][0]["meta"]
+        market_state = meta.get("marketState", "REGULAR")
+        
+        price = None
+        change_pct = None
+        
+        if market_state == "PRE":
+            price      = meta.get("preMarketPrice")
+            change_pct = meta.get("preMarketChangePercent")
+        elif market_state in ("POST", "POSTPOST"):
+            price      = meta.get("postMarketPrice")
+            change_pct = meta.get("postMarketChangePercent")
+            
+        if price is None:
+            price      = meta.get("regularMarketPrice")
+            change_pct = meta.get("regularMarketChangePercent")
+
         currency   = meta.get("currency", "")
         company    = meta.get("longName") or meta.get("shortName") or clean_ticker
+        
         if price is not None and change_pct is None:
             prev = meta.get("chartPreviousClose") or meta.get("previousClose")
             if prev and prev != 0:
@@ -2199,14 +2215,28 @@ def market_sector_performance():
         try:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}",
-                params={"range": "1d", "interval": "1d"},
+                params={"range": "1d", "interval": "1d", "includePrePost": "true"},
                 headers={"User-Agent": _YF_UA},
                 timeout=8,
             )
             resp.raise_for_status()
-            meta       = resp.json()["chart"]["result"][0]["meta"]
-            price      = meta.get("regularMarketPrice")
-            change_pct = meta.get("regularMarketChangePercent")
+            meta         = resp.json()["chart"]["result"][0]["meta"]
+            market_state = meta.get("marketState", "REGULAR")
+            
+            price = None
+            change_pct = None
+            
+            if market_state == "PRE":
+                price      = meta.get("preMarketPrice")
+                change_pct = meta.get("preMarketChangePercent")
+            elif market_state in ("POST", "POSTPOST"):
+                price      = meta.get("postMarketPrice")
+                change_pct = meta.get("postMarketChangePercent")
+                
+            if price is None:
+                price      = meta.get("regularMarketPrice")
+                change_pct = meta.get("regularMarketChangePercent")
+
             if price is not None and change_pct is None:
                 prev = meta.get("chartPreviousClose") or meta.get("previousClose")
                 if prev and prev != 0:

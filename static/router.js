@@ -36,6 +36,7 @@ const _homeTimers = {
     mkt: null,
     mktTick: null,
     digest: null,
+    sparklines: null,
 };
 
 const _marketTimers = {
@@ -520,11 +521,20 @@ function _activateDetailView() {
             }, 1000);
         }
     }
+    // 15s refresh for holdings sparklines (Trend column)
+    if (typeof _loadStockSparklines === 'function' && !_homeTimers.sparklines) {
+        _homeTimers.sparklines = setInterval(() => {
+            if (typeof allRows !== 'undefined' && allRows.length > 0) {
+                _loadStockSparklines(allRows, true);
+            }
+        }, 15000);
+    }
 }
 
 function _deactivateDetailView() {
     if (_homeTimers.mkt) { clearInterval(_homeTimers.mkt); _homeTimers.mkt = null; }
     if (_homeTimers.mktTick) { clearInterval(_homeTimers.mktTick); _homeTimers.mktTick = null; }
+    if (_homeTimers.sparklines) { clearInterval(_homeTimers.sparklines); _homeTimers.sparklines = null; }
 }
 
 /* ── Bootstrap ───────────────────────────────────────────────────────────── */

@@ -337,8 +337,8 @@ function esc(s) {
  */
 function _logoImg(ticker, cssClass) {
     const t = encodeURIComponent(ticker);
-    const fmp  = `https://financialmodelingprep.com/image-stock/${t}.png`;
-    const lse  = `https://eodhd.com/img/logos/LSE/${t}.png`;
+    const fmp = `https://financialmodelingprep.com/image-stock/${t}.png`;
+    const lse = `https://eodhd.com/img/logos/LSE/${t}.png`;
     return `<img class="${cssClass}" src="${fmp}" alt="${esc(ticker)}" loading="lazy" ` +
         `onerror="if(!this.dataset.fb){this.dataset.fb='1';this.src='${lse}';}else{this.style.display='none';}">`;
 }
@@ -575,8 +575,8 @@ function _renderHeatmap(items) {
             // Extended-hours badge: PRE / POST (only for US equities)
             const ms = d.market_state || 'REGULAR';
             const extBadge = ms === 'PRE' ? 'PRE'
-                           : (ms === 'POST' || ms === 'POSTPOST') ? 'POST'
-                           : '';
+                : (ms === 'POST' || ms === 'POSTPOST') ? 'POST'
+                    : '';
 
             // Format price with currency symbol
             const cMap = { USD: '$', GBP: '£', GBP2: '£', GBp: 'p', GBX: 'p', EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥', CHF: 'Fr' };
@@ -629,10 +629,10 @@ function _renderHeatmap(items) {
     if (sessionLabel) {
         const states = valid.map(d => d.market_state || 'REGULAR');
         const hasPost = states.some(s => s === 'POST' || s === 'POSTPOST');
-        const hasPre  = states.some(s => s === 'PRE');
-        sessionLabel.textContent = hasPre  ? 'Pre-market change'
-                                 : hasPost ? 'After-hours change'
-                                 :           "Today's change";
+        const hasPre = states.some(s => s === 'PRE');
+        sessionLabel.textContent = hasPre ? 'Pre-market change'
+            : hasPost ? 'After-hours change'
+                : "Today's change";
     }
 
     // Randomise each cell's phase within the 10s cycle so they pulse out of sync
@@ -3946,7 +3946,7 @@ function _renderNewsGrid(data) {
         const dt = news.datetime ? new Date(news.datetime * 1000) : null;
         const relTime = dt ? _newsRelativeTime(dt) : '—';
         const ageSecs = dt ? (now - dt.getTime()) / 1000 : Infinity;
-        
+
         // Dynamic badges
         let badgeClass = 'news-badge--update';
         let badgeText = 'News Update';
@@ -4225,7 +4225,7 @@ function _renderWatchlistTable(list) {
         row.id = `wl-row-${ticker}`;
         row.className = 'wl-table-row';
         row.innerHTML = `
-            <td><div class="wl-ticker-cell">${_logoImg(ticker, 'wl-logo')}<span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
+            <td><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
             <td class="wl-company" id="wl-co-${ticker}">—</td>
             <td class="wl-price" id="wl-price-${ticker}">—</td>
             <td class="wl-change" id="wl-chg-${ticker}">—</td>
