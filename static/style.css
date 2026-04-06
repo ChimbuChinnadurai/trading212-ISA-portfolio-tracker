@@ -114,8 +114,36 @@ html[data-theme="dark"] {
   box-shadow: var(--shadow);
 }
 
+/* #2 — Per-portfolio identity: left border + gradient tint */
+#ov1 {
+  border-left: 3px solid #3b82f6;
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(59, 130, 246, 0.06));
+}
+
+#ov2 {
+  border-left: 3px solid #10b981;
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(16, 185, 129, 0.06));
+  /* background: linear-gradient(135deg, rgba(16, 185, 129, 0.04) 0%, rgba(255, 255, 255, 0) 60%); */
+}
+
+.ov-card.ov-card-combined {
+  border-left: 3px solid rgb(139, 92, 246);
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(139, 92, 246, 0.06));
+}
+
+div#ov-fg {
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(245, 158, 11, 0.06));
+  border-left: 3px solid var(--amber);
+}
+
+html[data-theme="dark"] #ov1 {
+  border-left: 3px solid #3b82f6;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(15, 22, 41, 0) 60%);
+}
+
 html[data-theme="dark"] #ov2 {
-  border: 1px solid #1e2d4a;
+  border-left: 3px solid #10b981;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(15, 22, 41, 0) 60%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -123,6 +151,15 @@ html[data-theme="dark"] #ov2 {
 html[data-theme="dark"] .ov-card-combined {
   background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(15, 22, 41, 0.8) 100%);
   border: 1px solid rgba(59, 130, 246, 0.2);
+  border-left: 3px solid #8b5cf6;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* #6 — Glass on FG card in dark mode */
+html[data-theme="dark"] .ov-card-fg {
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.18);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -500,6 +537,35 @@ html[data-theme="dark"] .header {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* #4 — Heatmap price tick flash (green = up, red = down) */
+@keyframes hm-tick-up {
+  0% {
+    background: rgba(16, 185, 129, 0.55);
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
+@keyframes hm-tick-down {
+  0% {
+    background: rgba(244, 63, 94, 0.55);
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
+.hm-tick-up {
+  animation: hm-tick-up 0.6s ease-out forwards;
+}
+
+.hm-tick-down {
+  animation: hm-tick-down 0.6s ease-out forwards;
 }
 
 .currency-flash {
@@ -1931,15 +1997,21 @@ th.sort-desc .sort-icon::before {
   border: 1px solid rgba(244, 63, 94, .25);
 }
 
-/* Breakeven column */
+/* #10 — Breakeven column with tinted pill */
 .be-profit {
   color: var(--green);
   font-weight: 600;
+  background: rgba(16, 185, 129, 0.1);
+  padding: 1px 6px;
+  border-radius: 99px;
 }
 
 .be-loss {
   color: var(--red);
   font-weight: 600;
+  background: rgba(244, 63, 94, 0.1);
+  padding: 1px 6px;
+  border-radius: 99px;
 }
 
 .be-needed-tag {
@@ -2132,9 +2204,13 @@ th.sort-desc .sort-icon::before {
 }
 
 .hm-cell:hover {
-  filter: brightness(1.35) !important;
+  filter: brightness(1.4) !important;
+  transform: scale(1.06);
   z-index: 3;
   animation-play-state: paused;
+  outline: 1.5px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  transition: transform 0.12s ease, filter 0.12s ease;
 }
 
 .hm-t {
@@ -3329,6 +3405,7 @@ th.sort-desc .sort-icon::before {
   padding: 12px 16px;
   cursor: pointer;
   box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   transition: box-shadow 0.25s, transform 0.25s, border-color 0.25s;
   display: flex;
   flex-direction: column;
@@ -3341,13 +3418,18 @@ th.sort-desc .sort-icon::before {
 }
 
 .ov-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0px 16px 40px rgba(25, 28, 30, .1);
+  transform: translateY(-3px);
+  box-shadow: 0px 20px 48px rgba(25, 28, 30, .14);
   border-color: var(--border-bright);
 }
 
+html[data-theme="dark"] .ov-card:hover {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, .6), 0 0 0 1px var(--border-bright);
+}
+
 .ov-card-combined {
-  background: linear-gradient(135deg, rgba(0, 88, 190, 0.04) 0%, rgba(33, 112, 228, 0.04) 100%);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(255, 255, 255, 0) 60%);
+  border-left: 3px solid #8b5cf6;
   cursor: pointer;
 }
 
@@ -4818,10 +4900,30 @@ html[data-theme="dark"] .div-tl-status--pending {
   color: var(--text-primary);
 }
 
+/* #5 — Side panel custom scrollbar */
 .side-panel-content {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-bright) transparent;
+}
+
+.side-panel-content::-webkit-scrollbar {
+  width: 5px;
+}
+
+.side-panel-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.side-panel-content::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 99px;
+}
+
+.side-panel-content::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }
 
 .sp-price-chart-section {
@@ -4835,19 +4937,25 @@ html[data-theme="dark"] .div-tl-status--pending {
 
 .sp-chart-type-btn {
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: 99px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.72rem;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
+}
+
+.sp-chart-type-btn:hover:not(.active) {
+  background: var(--bg-hover);
+  border-color: var(--border-bright);
 }
 
 .sp-chart-type-btn.active {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+  transform: scale(1.04);
 }
 
 .sp-range-tabs {
@@ -4859,19 +4967,35 @@ html[data-theme="dark"] .div-tl-status--pending {
 .sp-range-tab {
   flex: 1;
   padding: 4px 0;
-  border-radius: 6px;
+  border-radius: 99px;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
   font-size: 0.72rem;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
+}
+
+.sp-range-tab:hover:not(.active) {
+  background: var(--bg-hover);
+  border-color: var(--border-bright);
 }
 
 .sp-range-tab.active {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+  transform: scale(1.04);
+}
+
+/* Apply same pill style to mkt-range-tabs */
+.mkt-range-tab {
+  border-radius: 99px;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
+}
+
+.mkt-range-tab.active {
+  transform: scale(1.04);
 }
 
 .sp-chart-wrap {
@@ -8377,24 +8501,26 @@ html[data-theme="dark"] .nav-group-header.active {
 .mkt-range-tab {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 99px;
   color: var(--text-secondary);
   cursor: pointer;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 3px 8px;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  padding: 3px 10px;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.1s ease;
 }
 
-.mkt-range-tab:hover {
+.mkt-range-tab:hover:not(.active) {
   background: var(--bg-hover);
   color: var(--text-primary);
+  border-color: var(--border-bright);
 }
 
 .mkt-range-tab.active {
   background: var(--accent);
   border-color: var(--accent);
   color: #fff;
+  transform: scale(1.04);
 }
 
 .mkt-chart-wrap {
@@ -8777,9 +8903,32 @@ html[data-theme="dark"] .nav-group-header.active {
   color: var(--text-muted);
 }
 
-/* Watchlist row clickable */
+/* #9 — Watchlist row hover with left highlight bar */
 .wl-table-row {
   cursor: pointer;
+  transition: background 0.15s ease;
+  position: relative;
+}
+
+/* .wl-table-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+} */
+
+.wl-table-row:hover {
+  background: var(--bg-hover);
+}
+
+.wl-table-row:hover::before {
+  opacity: 1;
 }
 
 /* Responsive */
@@ -8849,6 +8998,105 @@ div#sectorBarsList {
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/* Type toggle (Stock / ETF) */
+.wl-type-toggle {
+  display: flex;
+  background: var(--bg-row-alt);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.wl-type-btn {
+  padding: 3px 12px;
+  border-radius: 99px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.wl-type-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Tabs */
+.wl-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 24px 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+
+.wl-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.wl-tab:hover:not(.active) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.wl-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.wl-tab-count {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 99px;
+  font-size: 0.65rem;
+  padding: 0 5px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.wl-tab:not(.active) .wl-tab-count {
+  background: var(--bg-row-alt);
+  color: var(--text-muted);
+}
+
+/* Type badges in ticker cell */
+.wl-type-badge {
+  display: inline-block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  vertical-align: middle;
+}
+
+.wl-type-stock {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.wl-type-etf {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.25);
 }
 
 .watchlist-input {
@@ -8977,9 +9225,15 @@ div#sectorBarsList {
 
 .wl-company {
   color: var(--text-secondary);
-  max-width: 160px;
+  max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-company .wl-type-badge {
+  vertical-align: middle;
+  margin-right: 4px;
 }
 
 .wl-price {
@@ -8999,15 +9253,15 @@ div#sectorBarsList {
 }
 
 .wl-pre-badge {
-  background: rgba(251,191,36,0.18);
+  background: rgba(251, 191, 36, 0.18);
   color: #f59e0b;
-  border: 1px solid rgba(251,191,36,0.3);
+  border: 1px solid rgba(251, 191, 36, 0.3);
 }
 
 .wl-post-badge {
-  background: rgba(139,92,246,0.18);
+  background: rgba(139, 92, 246, 0.18);
   color: #a78bfa;
-  border: 1px solid rgba(139,92,246,0.3);
+  border: 1px solid rgba(139, 92, 246, 0.3);
 }
 
 .wl-change.pos {
@@ -9101,7 +9355,7 @@ div#sectorBarsList {
   text-align: right;
 }
 
-/* P/S multiple badge — colour-coded by valuation tier */
+/* P/S + P/E multiple badge — colour-coded by valuation tier */
 .wl-ps-badge {
   display: inline-block;
   padding: 2px 7px;
@@ -9112,6 +9366,7 @@ div#sectorBarsList {
   white-space: nowrap;
 }
 
+/* P/S: lower = cheaper = green */
 .wl-ps-badge.high {
   background: rgba(16, 185, 129, 0.15);
   color: #34d399;
@@ -9125,6 +9380,51 @@ div#sectorBarsList {
 .wl-ps-badge.low {
   background: rgba(239, 68, 68, 0.12);
   color: #f87171;
+}
+
+/* P/E: low-pe = cheap (green), mid-pe = moderate (amber), high-pe = expensive (red) */
+.wl-ps-badge.low-pe {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.wl-ps-badge.mid-pe {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.wl-ps-badge.high-pe {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+/* N/A placeholder */
+.wl-na {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* Return columns */
+.wl-ret-col {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.wl-ret-pos {
+  color: var(--green);
+  background: rgba(16, 185, 129, 0.1);
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+.wl-ret-neg {
+  color: var(--red);
+  background: rgba(239, 68, 68, 0.1);
+  padding: 2px 6px;
+  border-radius: 5px;
 }
 
 
@@ -10672,6 +10972,36 @@ thead .mph-ticker-col {
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.dv-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+/* Card 1 — Total Received: green tint */
+.dv-kpi-card:nth-child(1) {
+  border-left: 3px solid #10b981;
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(16, 185, 129, 0.06));
+}
+
+/* Card 2 — This Year: blue tint */
+.dv-kpi-card:nth-child(2) {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(59, 130, 246, 0.06));
+}
+
+/* Card 3 — Projected Annual: amber tint */
+.dv-kpi-card:nth-child(3) {
+  border-left: 3px solid var(--amber);
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(245, 158, 11, 0.06));
+}
+
+/* Card 4 — Avg Monthly: purple tint */
+.dv-kpi-card:nth-child(4) {
+  border-left: 3px solid var(--purple);
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(139, 92, 246, 0.06));
 }
 
 .dv-kpi-card--accent {
@@ -10688,6 +11018,22 @@ thead .mph-ticker-col {
 
 .dv-kpi-card--accent .dv-kpi-icon {
   color: #10b981;
+}
+
+.dv-kpi-card:nth-child(1) .dv-kpi-icon {
+  color: #10b981;
+}
+
+.dv-kpi-card:nth-child(2) .dv-kpi-icon {
+  color: var(--accent);
+}
+
+.dv-kpi-card:nth-child(3) .dv-kpi-icon {
+  color: var(--amber);
+}
+
+.dv-kpi-card:nth-child(4) .dv-kpi-icon {
+  color: var(--purple);
 }
 
 .dv-kpi-content {

@@ -216,10 +216,10 @@
         </div>
 
         <!-- Activity -->
-        <a class="nav-item" data-route="activity" onclick="navigate('activity')">
+        <!-- <a class="nav-item" data-route="activity" onclick="navigate('activity')">
           <span class="material-symbols-outlined nav-icon">history</span>
           <span class="nav-label">Activity</span>
-        </a>
+        </a> -->
 
         <!-- Calendar -->
         <!-- <a class="nav-item" data-route="calendar" onclick="navigate('calendar')">
@@ -893,13 +893,13 @@
         </div><!-- /view-news -->
 
         <!-- ═══ VIEW: ACTIVITY ═══ -->
-        <div id="view-activity" class="spa-view" style="display:none">
+        <!-- <div id="view-activity" class="spa-view" style="display:none">
           <div class="view-main">
             <p class="act-view-subtitle">Recent trades and dividend payments across all portfolios</p>
-            <div class="act-layout">
+            <div class="act-layout"> -->
 
-              <!-- Left: Recent Activity -->
-              <section class="widget-panel act-panel">
+        <!-- Left: Recent Activity -->
+        <!-- <section class="widget-panel act-panel">
                 <div class="panel-header">
                   <h3 class="panel-title">Recent Activity</h3>
                 </div>
@@ -921,10 +921,10 @@
                     <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
-              </section>
+              </section> -->
 
-              <!-- Right: Dividend History -->
-              <section class="widget-panel act-panel">
+        <!-- Right: Dividend History -->
+        <!-- <section class="widget-panel act-panel">
                 <div class="panel-header">
                   <h3 class="panel-title">Dividend History</h3>
                 </div>
@@ -946,12 +946,12 @@
                     <div class="skeleton skel-amount"></div>
                   </div>
                 </div>
-              </section>
+              </section> -->
 
-            </div><!-- /act-layout -->
+        <!-- </div>/act-layout -->
 
-          </div><!-- /view-main -->
-        </div><!-- /view-activity -->
+        <!-- </div>/view-main -->
+        <!-- </div>/view-activity -->
 
         <!-- ═══ VIEW: CALENDAR ═══ -->
         <!-- <div id="view-calendar" class="spa-view" style="display:none">
@@ -1413,7 +1413,6 @@
 
             <div class="cal-view-header watchlist-header">
               <div class="cal-view-title-block">
-                <!-- <h1 class="cal-view-title">Watchlist</h1> -->
                 <p class="cal-view-subtitle">Track any stock — price, analyst targets and 48h movement</p>
               </div>
               <div class="watchlist-add-bar">
@@ -1429,6 +1428,16 @@
                   <option value="AU">AU</option>
                   <option value="JP">JP</option>
                 </select>
+                <div class="wl-type-toggle">
+                  <button class="wl-type-btn active" id="wlTypeStock" onclick="_wlSetAddType('stock')">Stock</button>
+                  <button class="wl-type-btn" id="wlTypeEtf" onclick="_wlSetAddType('etf')">ETF</button>
+                </div>
+                <div class="col-picker-wrap">
+                  <button class="btn btn-col-picker" id="wlColPickerBtn" onclick="toggleWlColPicker()">
+                    <span class="material-symbols-outlined btn-icon">view_column</span>
+                    Columns
+                  </button>
+                </div>
                 <button class="btn btn-accent watchlist-add-btn" onclick="addWatchlistTicker()">
                   <span class="material-symbols-outlined" style="font-size:16px;line-height:1">add</span>
                   Add
@@ -1437,6 +1446,22 @@
             </div>
 
             <div class="watchlist-wrap">
+              <!-- Tabs -->
+              <div class="wl-tabs">
+                <button class="wl-tab active" id="wlTabAll" onclick="_wlSwitchTab('all')">All</button>
+                <button class="wl-tab" id="wlTabStock" onclick="_wlSwitchTab('stock')">
+                  <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-3px">trending_up</span>
+                  Stocks
+                  <span class="wl-tab-count" id="wlTabStockCount"></span>
+                </button>
+                <button class="wl-tab" id="wlTabEtf" onclick="_wlSwitchTab('etf')">
+                  <span class="material-symbols-outlined"
+                    style="font-size:14px;vertical-align:-3px">account_balance</span>
+                  ETFs
+                  <span class="wl-tab-count" id="wlTabEtfCount"></span>
+                </button>
+              </div>
+
               <div id="watchlistEmpty" class="watchlist-empty" style="display:none">
                 <span class="material-symbols-outlined"
                   style="font-size:2rem;color:var(--text-muted)">bookmark_border</span>
@@ -1446,21 +1471,23 @@
                 <table class="watchlist-table">
                   <thead>
                     <tr>
-                      <th>Ticker</th>
-                      <th>Company</th>
-                      <th>Price</th>
-                      <th>Change</th>
-                      <th class="wl-target-col">Min Target</th>
-                      <th class="wl-target-col">Avg Target</th>
-                      <th class="wl-target-col">Max Target</th>
-                      <th>Signal</th>
-                      <th class="wl-fund-col">Mkt Cap</th>
-                      <th class="wl-fund-col">Revenue LTM</th>
-                      <th class="wl-fund-col">P/S</th>
-                      <th class="wl-fund-col">P/E</th>
-                      <th class="wl-fund-col">Fwd P/E</th>
-                      <th class="wl-fund-col">5yr P/E</th>
-                      <th>48h Chart</th>
+                      <th data-colid="wl-ticker">Ticker</th>
+                      <th data-colid="wl-company">Company</th>
+                      <th data-colid="wl-price">Price</th>
+                      <th data-colid="wl-change">Change</th>
+                      <th data-colid="wl-min" class="wl-target-col">Min Target</th>
+                      <th data-colid="wl-avg" class="wl-target-col">Avg Target</th>
+                      <th data-colid="wl-max" class="wl-target-col">Max Target</th>
+                      <th data-colid="wl-signal">Signal</th>
+                      <th data-colid="wl-mktcap" class="wl-fund-col">Mkt Cap</th>
+                      <th data-colid="wl-revenue" class="wl-fund-col">Revenue LTM</th>
+                      <th data-colid="wl-ps" class="wl-fund-col">P/S</th>
+                      <th data-colid="wl-pe" class="wl-fund-col">P/E</th>
+                      <th data-colid="wl-fpe" class="wl-fund-col">Fwd P/E</th>
+                      <th data-colid="wl-5pe" class="wl-fund-col">5yr P/E</th>
+                      <th data-colid="wl-ret6m" class="wl-ret-col">6M Return</th>
+                      <th data-colid="wl-ret1y" class="wl-ret-col">1Y Return</th>
+                      <th data-colid="wl-chart">48h Chart</th>
                       <th></th>
                     </tr>
                   </thead>

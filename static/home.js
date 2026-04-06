@@ -413,16 +413,39 @@ function resetClock(id) {
 let _tickerData = null;
 let _tickerDataMap = {};
 let _tickerRetryTimer = null;
+let _prevPriceMap = {};
 
 async function loadStockTicker() {
     try {
         const res = await fetch('/api/stock-tickers');
         const json = await res.json();
         if (json.status === 'ok' && json.data.length > 0) {
-            _tickerData = json.data;
+            const newData = json.data;
+            // Capture changed tickers before updating the map
+            const changed = {};
+            for (const d of newData) {
+                const prev = _prevPriceMap[d.ticker];
+                if (prev != null && d.price != null && d.price !== prev) {
+                    changed[d.ticker] = d.price > prev ? 'up' : 'dn';
+                }
+                if (d.price != null) _prevPriceMap[d.ticker] = d.price;
+            }
+            _tickerData = newData;
             _tickerDataMap = {};
             for (const d of _tickerData) _tickerDataMap[d.ticker] = d;
             _renderHeatmap(_tickerData);
+            // Flash cells whose price changed
+            if (Object.keys(changed).length) {
+                requestAnimationFrame(() => {
+                    for (const [ticker, dir] of Object.entries(changed)) {
+                        const cell = document.querySelector(`.hm-cell[data-ticker="${ticker}"]`);
+                        if (!cell) continue;
+                        cell.classList.remove('hm-tick-up', 'hm-tick-down');
+                        void cell.offsetWidth; // reflow to restart animation
+                        cell.classList.add(dir === 'up' ? 'hm-tick-up' : 'hm-tick-down');
+                    }
+                });
+            }
             resetClock('rc-heatmap');
             if (_tickerRetryTimer) { clearTimeout(_tickerRetryTimer); _tickerRetryTimer = null; }
         } else if (!_tickerData) {
@@ -4134,6 +4157,27 @@ function closeDigestModal() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const _WL_STORAGE_KEY = 'wl:tickers:v1';
+let _wlActiveTab = 'all';
+let _wlAddType = 'stock';
+
+function _wlSetAddType(type) {
+    _wlAddType = type;
+    document.getElementById('wlTypeStock').classList.toggle('active', type === 'stock');
+    document.getElementById('wlTypeEtf').classList.toggle('active', type === 'etf');
+}
+
+function _wlSwitchTab(tab) {
+    _wlActiveTab = tab;
+    ['all', 'stock', 'etf'].forEach(t => {
+        const btn = document.getElementById('wlTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+    // Show/hide rows based on type
+    document.querySelectorAll('#watchlistTableBody .wl-table-row').forEach(row => {
+        const rtype = row.dataset.type || 'stock';
+        row.style.display = (tab === 'all' || rtype === tab) ? '' : 'none';
+    });
+}
 
 async function _wlLoad() {
     try {
@@ -4188,7 +4232,7 @@ async function addWatchlistTicker() {
         input.value = '';
         return; // already in list
     }
-    list.push({ ticker, country });
+    list.push({ ticker, country, type: _wlAddType });
     await _wlSave(list);
     input.value = '';
     _renderWatchlistTable(list);
@@ -4220,28 +4264,47 @@ function _renderWatchlistTable(list) {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    list.forEach(({ ticker, country }) => {
+    // Update tab counts
+    const stockCount = list.filter(r => (r.type || 'stock') === 'stock').length;
+    const etfCount = list.filter(r => (r.type || 'stock') === 'etf').length;
+    const scEl = document.getElementById('wlTabStockCount');
+    const ecEl = document.getElementById('wlTabEtfCount');
+    if (scEl) scEl.textContent = stockCount || '';
+    if (ecEl) ecEl.textContent = etfCount || '';
+
+    list.forEach(({ ticker, country, type }) => {
+        const itemType = type || 'stock';
         const row = document.createElement('tr');
         row.id = `wl-row-${ticker}`;
         row.className = 'wl-table-row';
+        row.dataset.type = itemType;
+        // Apply active tab filter immediately
+        if (_wlActiveTab !== 'all' && itemType !== _wlActiveTab) row.style.display = 'none';
+
+        const typeBadge = itemType === 'etf'
+            ? `<span class="wl-type-badge wl-type-etf">ETF</span>`
+            : `<span class="wl-type-badge wl-type-stock">Stock</span>`;
+
         row.innerHTML = `
-            <td><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
-            <td class="wl-company" id="wl-co-${ticker}">—</td>
-            <td class="wl-price" id="wl-price-${ticker}">—</td>
-            <td class="wl-change" id="wl-chg-${ticker}">—</td>
-            <td class="wl-target-col wl-target-min" id="wl-min-${ticker}">—</td>
-            <td class="wl-target-col wl-target-avg" id="wl-avg-${ticker}">—</td>
-            <td class="wl-target-col wl-target-max" id="wl-max-${ticker}">—</td>
-            <td id="wl-sig-${ticker}">—</td>
-            <td class="wl-fund-col" id="wl-mktcap-${ticker}">—</td>
-            <td class="wl-fund-col" id="wl-rev-${ticker}">—</td>
-            <td class="wl-fund-col" id="wl-ps-${ticker}">—</td>
-            <td class="wl-fund-col" id="wl-pe-${ticker}">—</td>
-            <td class="wl-fund-col" id="wl-fpe-${ticker}">—</td>
-            <td class="wl-fund-col" id="wl-5pe-${ticker}">—</td>
-            <td><canvas id="wl-spark-${ticker}" class="wl-spark-canvas" width="100" height="36"></canvas></td>
+            <td data-colid="wl-ticker"><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
+            <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}">${typeBadge} —</td>
+            <td data-colid="wl-price" class="wl-price" id="wl-price-${ticker}">—</td>
+            <td data-colid="wl-change" class="wl-change" id="wl-chg-${ticker}">—</td>
+            <td data-colid="wl-min" class="wl-target-col wl-target-min" id="wl-min-${ticker}">—</td>
+            <td data-colid="wl-avg" class="wl-target-col wl-target-avg" id="wl-avg-${ticker}">—</td>
+            <td data-colid="wl-max" class="wl-target-col wl-target-max" id="wl-max-${ticker}">—</td>
+            <td data-colid="wl-signal" id="wl-sig-${ticker}">—</td>
+            <td data-colid="wl-mktcap" class="wl-fund-col" id="wl-mktcap-${ticker}">—</td>
+            <td data-colid="wl-revenue" class="wl-fund-col" id="wl-rev-${ticker}">—</td>
+            <td data-colid="wl-ps" class="wl-fund-col" id="wl-ps-${ticker}">—</td>
+            <td data-colid="wl-pe" class="wl-fund-col" id="wl-pe-${ticker}">—</td>
+            <td data-colid="wl-fpe" class="wl-fund-col" id="wl-fpe-${ticker}">—</td>
+            <td data-colid="wl-5pe" class="wl-fund-col" id="wl-5pe-${ticker}">—</td>
+            <td data-colid="wl-ret6m" class="wl-ret-col" id="wl-ret6m-${ticker}">—</td>
+            <td data-colid="wl-ret1y" class="wl-ret-col" id="wl-ret1y-${ticker}">—</td>
+            <td data-colid="wl-chart"><canvas id="wl-spark-${ticker}" class="wl-spark-canvas" width="100" height="36"></canvas></td>
             <td>
-              <button class="wl-remove-btn" onclick="event.stopPropagation();removeWatchlistTicker('${ticker}')" title="Remove">
+              <button class="wl-remove-btn" onclick="event.stopPropagation();removeWatchlistTicker('${esc(ticker)}')" title="Remove">
                 <span class="material-symbols-outlined" style="font-size:16px;line-height:1">close</span>
               </button>
             </td>`;
@@ -4249,7 +4312,104 @@ function _renderWatchlistTable(list) {
         tbody.appendChild(row);
         _loadWatchlistRow(ticker, country);
     });
+    // Apply saved column visibility to newly rendered rows
+    _applyWlColVis(_loadWlColVis());
 }
+
+// ── Watchlist column picker ───────────────────────────────────────────────────
+const _WL_COL_DEFS = [
+    { id: 'wl-ticker',  label: 'Ticker',      locked: true },
+    { id: 'wl-company', label: 'Company',      locked: true },
+    { id: 'wl-price',   label: 'Price' },
+    { id: 'wl-change',  label: 'Change' },
+    { id: 'wl-min',     label: 'Min Target' },
+    { id: 'wl-avg',     label: 'Avg Target' },
+    { id: 'wl-max',     label: 'Max Target' },
+    { id: 'wl-signal',  label: 'Signal' },
+    { id: 'wl-mktcap',  label: 'Mkt Cap' },
+    { id: 'wl-revenue', label: 'Revenue LTM' },
+    { id: 'wl-ps',      label: 'P/S' },
+    { id: 'wl-pe',      label: 'P/E' },
+    { id: 'wl-fpe',     label: 'Fwd P/E' },
+    { id: 'wl-5pe',     label: '5yr P/E' },
+    { id: 'wl-ret6m',   label: '6M Return' },
+    { id: 'wl-ret1y',   label: '1Y Return' },
+    { id: 'wl-chart',   label: '48h Chart' },
+];
+
+function _loadWlColVis() {
+    try {
+        const stored = JSON.parse(localStorage.getItem('wlColVisibility') || '{}');
+        const map = {};
+        _WL_COL_DEFS.forEach(c => {
+            map[c.id] = c.locked ? true : (stored[c.id] !== undefined ? stored[c.id] : true);
+        });
+        return map;
+    } catch { return Object.fromEntries(_WL_COL_DEFS.map(c => [c.id, true])); }
+}
+
+function _saveWlColVis(map) {
+    localStorage.setItem('wlColVisibility', JSON.stringify(map));
+}
+
+function _applyWlColVis(map) {
+    _WL_COL_DEFS.forEach(c => {
+        document.querySelectorAll(`.watchlist-table [data-colid="${c.id}"]`).forEach(el => {
+            el.classList.toggle('col-hidden', map[c.id] === false);
+        });
+    });
+}
+
+function toggleWlColPicker() {
+    let dropdown = document.getElementById('wlColPickerDropdown');
+    if (!dropdown) {
+        const map = _loadWlColVis();
+        const wrap = document.getElementById('wlColPickerBtn').closest('.col-picker-wrap');
+        dropdown = document.createElement('div');
+        dropdown.id = 'wlColPickerDropdown';
+        dropdown.className = 'col-picker-dropdown';
+        dropdown.innerHTML = `
+          <div class="col-picker-header">
+            <span>Toggle Columns</span>
+            <button class="col-picker-reset" onclick="_resetWlColVis()">Reset all</button>
+          </div>
+          <div class="col-picker-list">
+            ${_WL_COL_DEFS.map(c => `
+              <label class="col-picker-item${c.locked ? ' col-picker-locked' : ''}">
+                <input type="checkbox" data-col="${c.id}" ${map[c.id] !== false ? 'checked' : ''} ${c.locked ? 'disabled' : ''} onchange="_onWlColToggle(this)">
+                <span>${c.label}</span>
+              </label>
+            `).join('')}
+          </div>`;
+        wrap.appendChild(dropdown);
+    }
+    dropdown.classList.toggle('open');
+}
+
+function _onWlColToggle(cb) {
+    const map = _loadWlColVis();
+    map[cb.dataset.col] = cb.checked;
+    _saveWlColVis(map);
+    _applyWlColVis(map);
+}
+
+function _resetWlColVis() {
+    localStorage.removeItem('wlColVisibility');
+    const map = _loadWlColVis();
+    document.querySelectorAll('#wlColPickerDropdown input[type=checkbox]').forEach(cb => {
+        cb.checked = map[cb.dataset.col] !== false;
+    });
+    _applyWlColVis(map);
+}
+
+document.addEventListener('click', e => {
+    const dropdown = document.getElementById('wlColPickerDropdown');
+    if (dropdown && dropdown.classList.contains('open')) {
+        if (!dropdown.contains(e.target) && !e.target.closest('#wlColPickerBtn')) {
+            dropdown.classList.remove('open');
+        }
+    }
+});
 
 function _fmtMarketVal(v) {
     if (v == null) return '—';
@@ -4274,13 +4434,18 @@ async function _loadWatchlistRow(ticker, country) {
         const coEl = document.getElementById(`wl-co-${ticker}`);
         const priceEl = document.getElementById(`wl-price-${ticker}`);
         const chgEl = document.getElementById(`wl-chg-${ticker}`);
-        if (coEl) coEl.textContent = d.company || ticker;
+        if (coEl) {
+            // Preserve the type badge that was rendered at row-build time
+            const badge = coEl.querySelector('.wl-type-badge');
+            const badgeHtml = badge ? badge.outerHTML : '';
+            coEl.innerHTML = `${badgeHtml} ${esc(d.company || ticker)}`;
+        }
         if (priceEl) {
             const sym = { USD: '$', GBP: '£', GBp: 'p', GBX: 'p', EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥' }[d.currency] || '';
             const ms = d.market_state || 'REGULAR';
             const badge = ms === 'PRE' ? '<span class="wl-ext-badge wl-pre-badge">PRE</span>'
                 : (ms === 'POST' || ms === 'POSTPOST') ? '<span class="wl-ext-badge wl-post-badge">POST</span>'
-                : '';
+                    : '';
             priceEl.innerHTML = d.price != null ? `${badge}${sym}${d.price.toLocaleString()}` : '—';
         }
         if (chgEl && d.change_pct != null) {
@@ -4318,46 +4483,44 @@ async function _loadWatchlistRow(ticker, country) {
         }
     }
 
-    // Fundamentals: market cap, revenue LTM, P/S, P/E, Forward P/E, 5yr P/E
+    // Fundamentals + returns
     if (fundRes.status === 'fulfilled' && fundRes.value?.status === 'ok') {
         const d = fundRes.value.data;
-        const capEl  = document.getElementById(`wl-mktcap-${ticker}`);
-        const revEl  = document.getElementById(`wl-rev-${ticker}`);
-        const psEl   = document.getElementById(`wl-ps-${ticker}`);
-        const peEl   = document.getElementById(`wl-pe-${ticker}`);
-        const fpeEl  = document.getElementById(`wl-fpe-${ticker}`);
-        const pe5El  = document.getElementById(`wl-5pe-${ticker}`);
+
+        const _peBadge = (val, title = '') => {
+            if (val == null) return '<span class="wl-na">N/A</span>';
+            const tier = val < 15 ? 'low-pe' : val < 30 ? 'mid-pe' : 'high-pe';
+            return `<span class="wl-ps-badge ${tier}" ${title ? `title="${title}"` : ''}>${val.toFixed(1)}x</span>`;
+        };
+        const _psBadge = val => {
+            if (val == null) return '<span class="wl-na">N/A</span>';
+            const tier = val < 3 ? 'low-pe' : val < 10 ? 'mid-pe' : 'high-pe';
+            return `<span class="wl-ps-badge ${tier}">${val.toFixed(1)}x</span>`;
+        };
+        const _retBadge = val => {
+            if (val == null) return '<span class="wl-na">N/A</span>';
+            const sign = val >= 0 ? '+' : '';
+            const cls = val >= 0 ? 'wl-ret-pos' : 'wl-ret-neg';
+            return `<span class="${cls}">${sign}${val.toFixed(2)}%</span>`;
+        };
+
+        const capEl = document.getElementById(`wl-mktcap-${ticker}`);
+        const revEl = document.getElementById(`wl-rev-${ticker}`);
+        const psEl = document.getElementById(`wl-ps-${ticker}`);
+        const peEl = document.getElementById(`wl-pe-${ticker}`);
+        const fpeEl = document.getElementById(`wl-fpe-${ticker}`);
+        const pe5El = document.getElementById(`wl-5pe-${ticker}`);
+        const ret6mEl = document.getElementById(`wl-ret6m-${ticker}`);
+        const ret1yEl = document.getElementById(`wl-ret1y-${ticker}`);
+
         if (capEl) capEl.textContent = _fmtMarketVal(d.market_cap);
         if (revEl) revEl.textContent = _fmtMarketVal(d.revenue);
-        if (psEl && d.rev_multiple != null) {
-            const ps = d.rev_multiple;
-            const tier = ps >= 10 ? 'high' : ps >= 3 ? 'mid' : 'low';
-            psEl.innerHTML = `<span class="wl-ps-badge ${tier}">${ps.toFixed(1)}x</span>`;
-        }
-        if (peEl) {
-            if (d.pe_ratio != null) {
-                const tier = d.pe_ratio < 15 ? 'high' : d.pe_ratio < 30 ? 'mid' : 'low';
-                peEl.innerHTML = `<span class="wl-ps-badge ${tier}">${d.pe_ratio.toFixed(1)}x</span>`;
-            } else {
-                peEl.textContent = 'N/A';
-            }
-        }
-        if (fpeEl) {
-            if (d.forward_pe != null) {
-                const tier = d.forward_pe < 15 ? 'high' : d.forward_pe < 30 ? 'mid' : 'low';
-                fpeEl.innerHTML = `<span class="wl-ps-badge ${tier}">${d.forward_pe.toFixed(1)}x</span>`;
-            } else {
-                fpeEl.textContent = 'N/A';
-            }
-        }
-        if (pe5El) {
-            if (d.pe_5yr_avg != null) {
-                const tier = d.pe_5yr_avg < 15 ? 'high' : d.pe_5yr_avg < 30 ? 'mid' : 'low';
-                pe5El.innerHTML = `<span class="wl-ps-badge ${tier}" title="Average P/E over last ~4 fiscal years">${d.pe_5yr_avg.toFixed(1)}x</span>`;
-            } else {
-                pe5El.textContent = 'N/A';
-            }
-        }
+        if (psEl) psEl.innerHTML = _psBadge(d.rev_multiple);
+        if (peEl) peEl.innerHTML = _peBadge(d.pe_ratio);
+        if (fpeEl) fpeEl.innerHTML = _peBadge(d.forward_pe);
+        if (pe5El) pe5El.innerHTML = _peBadge(d.pe_5yr_avg, 'Average P/E over last ~4 fiscal years');
+        if (ret6mEl) ret6mEl.innerHTML = _retBadge(d.return_6m);
+        if (ret1yEl) ret1yEl.innerHTML = _retBadge(d.return_1y);
     }
 }
 
@@ -4579,7 +4742,7 @@ function _dvDrawAnnualChart(annual) {
     const dpr = window.devicePixelRatio || 1;
     const W = canvas.offsetWidth || 400;
     const H = canvas.offsetHeight || 200;
-    canvas.width  = Math.round(W * dpr);
+    canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
@@ -4591,7 +4754,7 @@ function _dvDrawAnnualChart(annual) {
     const maxAmt = Math.max(...annual.map(a => a.amount));
     const n = annual.length;
     const barW = Math.max(16, (cW / n) * 0.6);
-    const gap  = cW / n;
+    const gap = cW / n;
 
     const accentColor = '#10b981';  // green
 
@@ -4611,11 +4774,11 @@ function _dvDrawAnnualChart(annual) {
 
     // Bars + x labels
     annual.forEach((a, i) => {
-        const x   = PAD.left + i * gap + gap / 2;
+        const x = PAD.left + i * gap + gap / 2;
         const pct = maxAmt > 0 ? a.amount / maxAmt : 0;
-        const bH  = Math.max(2, pct * cH);
-        const bX  = x - barW / 2;
-        const bY  = PAD.top + cH - bH;
+        const bH = Math.max(2, pct * cH);
+        const bX = x - barW / 2;
+        const bY = PAD.top + cH - bH;
 
         // Bar gradient
         const grad = ctx.createLinearGradient(0, bY, 0, bY + bH);
@@ -4644,12 +4807,12 @@ function _dvDrawAnnualChart(annual) {
 
     // Tooltip on hover
     canvas._dvData = annual;
-    canvas._dvPAD  = PAD;
-    canvas._dvGap  = gap;
+    canvas._dvPAD = PAD;
+    canvas._dvGap = gap;
     canvas._dvBarW = barW;
     canvas._dvMaxAmt = maxAmt;
-    canvas._dvCH   = cH;
-    canvas._dvH    = H;
+    canvas._dvCH = cH;
+    canvas._dvH = H;
     canvas.onmousemove = (e) => {
         const rect = canvas.getBoundingClientRect();
         const mx = (e.clientX - rect.left) * (canvas.width / rect.width / dpr);
@@ -4657,7 +4820,7 @@ function _dvDrawAnnualChart(annual) {
         const idx = Math.floor((mx - PAD.left) / canvas._dvGap);
         if (idx >= 0 && idx < data.length) {
             const item = data[idx];
-            showTooltip(e, `<strong>${item.year}</strong><br/>£${item.amount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`);
+            showTooltip(e, `<strong>${item.year}</strong><br/>£${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
         } else {
             hideTooltip();
         }
@@ -4683,7 +4846,7 @@ function _dvDrawMonthlyChart(monthly) {
     const dpr = window.devicePixelRatio || 1;
     const W = canvas.offsetWidth || 400;
     const H = canvas.offsetHeight || 200;
-    canvas.width  = Math.round(W * dpr);
+    canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
@@ -4692,10 +4855,10 @@ function _dvDrawMonthlyChart(monthly) {
     const cW = W - PAD.left - PAD.right;
     const cH = H - PAD.top - PAD.bottom;
 
-    const maxAmt  = Math.max(...recent.map(a => a.amount), 0.01);
-    const n       = recent.length;
-    const barW    = Math.max(4, (cW / n) * 0.65);
-    const gap     = cW / n;
+    const maxAmt = Math.max(...recent.map(a => a.amount), 0.01);
+    const n = recent.length;
+    const barW = Math.max(4, (cW / n) * 0.65);
+    const gap = cW / n;
 
     // Color by year: alternate slightly different tones
     const yearColors = { prev: '#3b82f6', curr: '#10b981' };
@@ -4717,11 +4880,11 @@ function _dvDrawMonthlyChart(monthly) {
 
     // Bars
     recent.forEach((a, i) => {
-        const x    = PAD.left + i * gap + gap / 2;
-        const pct  = a.amount / maxAmt;
-        const bH   = Math.max(a.amount > 0 ? 2 : 0, pct * cH);
-        const bX   = x - barW / 2;
-        const bY   = PAD.top + cH - bH;
+        const x = PAD.left + i * gap + gap / 2;
+        const pct = a.amount / maxAmt;
+        const bH = Math.max(a.amount > 0 ? 2 : 0, pct * cH);
+        const bX = x - barW / 2;
+        const bY = PAD.top + cH - bH;
         const year = a.month.slice(0, 4);
         const baseColor = year === thisYear ? yearColors.curr : yearColors.prev;
 
@@ -4770,8 +4933,8 @@ function _dvDrawMonthlyChart(monthly) {
 
     // Hover tooltip
     canvas._dvData = recent;
-    canvas._dvPAD  = PAD;
-    canvas._dvGap  = gap;
+    canvas._dvPAD = PAD;
+    canvas._dvGap = gap;
     canvas.onmousemove = (e) => {
         const rect = canvas.getBoundingClientRect();
         const mx = (e.clientX - rect.left) * (canvas.width / rect.width / dpr);
@@ -4779,7 +4942,7 @@ function _dvDrawMonthlyChart(monthly) {
         if (idx >= 0 && idx < recent.length) {
             const item = recent[idx];
             const label = new Date(item.month + '-01').toLocaleString('en-GB', { month: 'long', year: 'numeric' });
-            showTooltip(e, `<strong>${label}</strong><br/>£${item.amount.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 })}`);
+            showTooltip(e, `<strong>${label}</strong><br/>£${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
         } else {
             hideTooltip();
         }
@@ -4814,12 +4977,12 @@ function _dvRenderTopPayers(byTicker, totalReceived) {
                     </div>
                 </div>
             </td>
-            <td class="dv-col-r dv-val-green">£${t.dividends.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 })}</td>
+            <td class="dv-col-r dv-val-green">£${t.dividends.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             <td class="dv-col-r">${divYield}</td>
             <td class="dv-col-r">${yoc}</td>
             <td class="dv-col-r">
                 <div class="dv-share-cell">
-                    <div class="dv-share-bar-bg"><div class="dv-share-bar-fill" style="width:${Math.min(100,pct).toFixed(1)}%"></div></div>
+                    <div class="dv-share-bar-bg"><div class="dv-share-bar-fill" style="width:${Math.min(100, pct).toFixed(1)}%"></div></div>
                     <span class="dv-share-pct">${pct.toFixed(1)}%</span>
                 </div>
             </td>
@@ -4864,15 +5027,15 @@ function _dvRenderCalendar(data) {
     }
 
     el.innerHTML = upcoming.map(d => {
-        const payDate   = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
-        const diff      = Math.round((payDate - today) / 86400000);
-        const relLabel  = diff === 0 ? 'TODAY' : diff === 1 ? 'TOMORROW' : `IN ${diff}d`;
-        const month     = payDate.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
-        const day       = payDate.getDate();
-        const payout    = d.expected_payout > 0 ? `£${d.expected_payout.toFixed(2)}` : '';
-        const perShare  = d.amount_per_share > 0 ? `${d.amount_per_share.toFixed(4)} per share` : '';
-        const exFmt     = d.ex_dividend_date ? new Date(d.ex_dividend_date + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
-        const payFmt    = d.payment_date     ? new Date(d.payment_date     + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
+        const payDate = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
+        const diff = Math.round((payDate - today) / 86400000);
+        const relLabel = diff === 0 ? 'TODAY' : diff === 1 ? 'TOMORROW' : `IN ${diff}d`;
+        const month = payDate.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+        const day = payDate.getDate();
+        const payout = d.expected_payout > 0 ? `£${d.expected_payout.toFixed(2)}` : '';
+        const perShare = d.amount_per_share > 0 ? `${d.amount_per_share.toFixed(4)} per share` : '';
+        const exFmt = d.ex_dividend_date ? new Date(d.ex_dividend_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
+        const payFmt = d.payment_date ? new Date(d.payment_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '—';
 
         return `<div class="dv-cal-item">
             <div class="dv-cal-date">
@@ -4912,13 +5075,13 @@ function _dvRenderHistory(data) {
         let dayStr = '—', monthStr = '—', timeStr = '';
         if (rawDate) {
             const dt = new Date(rawDate + (rawDate.includes('T') ? '' : 'T00:00:00'));
-            dayStr   = dt.getDate();
+            dayStr = dt.getDate();
             monthStr = dt.toLocaleString('en-GB', { month: 'short' }).toUpperCase();
-            timeStr  = dt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            timeStr = dt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
         }
-        const ticker  = (d.ticker || '').split('_')[0];
+        const ticker = (d.ticker || '').split('_')[0];
         const company = d.company_name || ticker;
-        const amount  = d.amount > 0 ? `+£${Number(d.amount).toFixed(2)}` : '—';
+        const amount = d.amount > 0 ? `+£${Number(d.amount).toFixed(2)}` : '—';
 
         return `<div class="dv-hist-item">
             <div class="dv-hist-date">
