@@ -438,7 +438,7 @@ function _startHomeTimers() {
     if (typeof loadMarketIndicators === 'function')
         setInterval(loadMarketIndicators, 1800000);
     if (typeof loadStockTicker === 'function') {
-        _homeTimers.heatmap = setInterval(loadStockTicker, 15000);
+        _homeTimers.heatmap = setInterval(loadStockTicker, 5000);
         _homeTimers.hmScan = setInterval(() => {
             const c = document.querySelector('.heatmap-container');
             if (!c) return;

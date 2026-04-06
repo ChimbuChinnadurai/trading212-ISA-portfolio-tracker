@@ -738,72 +738,75 @@ def stock_tickers_api():
     for row in unique:
         ticker    = row['ticker']
         cache_key = f"tick:{ticker}"
-        cached    = kv_get(cache_key, 60)
+        cached    = kv_get(cache_key, 5)
         if cached is not None:
             result_map[ticker] = cached
         else:
             needs_fetch.append(row)
 
-    def _fetch_one(row):
-        ticker       = row['ticker']
-        country      = row.get('country', 'US')
-        suffix       = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
-        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-        yf_sym       = f"{clean_ticker}{suffix}"
+    if needs_fetch:
+        # Build yf_sym → row mapping for batch lookup
+        sym_to_row = {}
+        for row in needs_fetch:
+            ticker  = row['ticker']
+            country = row.get('country', 'US')
+            suffix  = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
+            clean   = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+            sym_to_row[f"{clean}{suffix}"] = (ticker, clean, row)
+
         try:
+            crumb, cookies = _yf_crumb()
             resp = requests.get(
-                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
-                params={"range": "1d", "interval": "1d", "includePrePost": "true"},
-                headers={"User-Agent": "Mozilla/5.0"},
-                timeout=8,
+                "https://query1.finance.yahoo.com/v7/finance/quote",
+                params={"symbols": ",".join(sym_to_row.keys()), "crumb": crumb},
+                headers={"User-Agent": _YF_UA, "Cookie": cookies},
+                timeout=12,
             )
             resp.raise_for_status()
-            meta         = resp.json()["chart"]["result"][0]["meta"]
-            currency     = meta.get("currency", "")
-            market_state = meta.get("marketState", "REGULAR")  # PRE / REGULAR / POST / POSTPOST
+            quotes = resp.json().get("quoteResponse", {}).get("result", [])
+        except Exception as exc:
+            logger.warning("stock_tickers batch quote failed: %s", exc)
+            quotes = []
 
-            # Normalize and prioritize extended-hours price when applicable
-            price = None
-            change = None
-            change_pct = None
+        for q in quotes:
+            yf_sym = q.get("symbol", "")
+            if yf_sym not in sym_to_row:
+                continue
+            ticker, clean_ticker, row = sym_to_row[yf_sym]
+            market_state = q.get("marketState", "REGULAR")
 
+            price = change = change_pct = None
             if market_state == "PRE":
-                price      = meta.get("preMarketPrice")
-                change     = meta.get("preMarketChange")
-                change_pct = meta.get("preMarketChangePercent")
+                price      = q.get("preMarketPrice")
+                change     = q.get("preMarketChange")
+                change_pct = q.get("preMarketChangePercent")
             elif market_state in ("POST", "POSTPOST"):
-                price      = meta.get("postMarketPrice")
-                change     = meta.get("postMarketChange")
-                change_pct = meta.get("postMarketChangePercent")
-            
-            # Fallback 1: If extended fields are missing but meta says we are in those states
-            if price is None:
-                # Sometimes Yahoo populates regularMarketPrice even in PRE/POST
-                # but we should check if they explicitly provided them.
-                price      = meta.get("regularMarketPrice")
-                change     = meta.get("regularMarketChange")
-                change_pct = meta.get("regularMarketChangePercent")
+                price      = q.get("postMarketPrice")
+                change     = q.get("postMarketChange")
+                change_pct = q.get("postMarketChangePercent")
 
-            # Compute change from previous close when API omits it
+            if price is None:
+                price      = q.get("regularMarketPrice")
+                change     = q.get("regularMarketChange")
+                change_pct = q.get("regularMarketChangePercent")
+
+            # Compute change from previous close if API omitted it
             if price is not None and (change is None or change_pct is None):
-                prev = meta.get("chartPreviousClose") or meta.get("previousClose") or meta.get("regularMarketPrice")
+                prev = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
                 if prev and prev != 0 and prev != price:
                     change     = price - prev
                     change_pct = (change / prev) * 100
 
-            if clean_ticker == "ATO":
-                clean_ticker == "ATO.PA"
             info = {
                 "ticker":        clean_ticker,
                 "company_name":  row.get("company_name", ticker),
                 "price":         round(price,      4) if price      is not None else None,
                 "change":        round(change,     4) if change     is not None else None,
                 "change_pct":    round(change_pct, 4) if change_pct is not None else None,
-                "currency":      currency,
-                "market_state":  market_state,   # "PRE" | "REGULAR" | "POST" | "POSTPOST"
+                "currency":      q.get("currency", ""),
+                "market_state":  market_state,
                 "current_value": row.get("current_value"),
                 "sector":        row.get("sector", "Other"),
-                # Full portfolio fields for stock side panel
                 "quantity":      row.get("quantity"),
                 "avg_price":     row.get("avg_price"),
                 "invested":      row.get("invested"),
@@ -813,16 +816,7 @@ def stock_tickers_api():
             }
             if change is not None and change_pct is not None:
                 kv_set(f"tick:{ticker}", info)
-            return ticker, info
-        except Exception as exc:
-            logger.warning("stock_ticker failed for %s: %s", yf_sym, exc)
-            return ticker, None
-
-    if needs_fetch:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=min(10, len(needs_fetch))) as ex:
-            for ticker, info in ex.map(_fetch_one, needs_fetch):
-                if info is not None:
-                    result_map[ticker] = info
+            result_map[ticker] = info
 
     # Preserve original dedup order
     result = [result_map[row['ticker']] for row in unique if row['ticker'] in result_map]
@@ -1368,43 +1362,45 @@ def watchlist_price():
         suffix       = _COUNTRY_YF_SUFFIX.get(country, "")
         clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
         yf_sym       = f"{clean_ticker}{suffix}"
+
+        crumb, cookies = _yf_crumb()
         resp = requests.get(
-            f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
-            params={"range": "1d", "interval": "1d", "includePrePost": "true"},
-            headers={"User-Agent": "Mozilla/5.0"},
+            "https://query1.finance.yahoo.com/v7/finance/quote",
+            params={"symbols": yf_sym, "crumb": crumb},
+            headers={"User-Agent": _YF_UA, "Cookie": cookies},
             timeout=8,
         )
         resp.raise_for_status()
-        meta         = resp.json()["chart"]["result"][0]["meta"]
-        market_state = meta.get("marketState", "REGULAR")
-        
-        price = None
-        change_pct = None
-        
-        if market_state == "PRE":
-            price      = meta.get("preMarketPrice")
-            change_pct = meta.get("preMarketChangePercent")
-        elif market_state in ("POST", "POSTPOST"):
-            price      = meta.get("postMarketPrice")
-            change_pct = meta.get("postMarketChangePercent")
-            
-        if price is None:
-            price      = meta.get("regularMarketPrice")
-            change_pct = meta.get("regularMarketChangePercent")
+        quotes = resp.json().get("quoteResponse", {}).get("result", [])
+        q = quotes[0] if quotes else {}
 
-        currency   = meta.get("currency", "")
-        company    = meta.get("longName") or meta.get("shortName") or clean_ticker
-        
+        market_state = q.get("marketState", "REGULAR")
+        price = change_pct = None
+
+        if market_state == "PRE":
+            price      = q.get("preMarketPrice")
+            change_pct = q.get("preMarketChangePercent")
+        elif market_state in ("POST", "POSTPOST"):
+            price      = q.get("postMarketPrice")
+            change_pct = q.get("postMarketChangePercent")
+
+        if price is None:
+            price      = q.get("regularMarketPrice")
+            change_pct = q.get("regularMarketChangePercent")
+
         if price is not None and change_pct is None:
-            prev = meta.get("chartPreviousClose") or meta.get("previousClose")
+            prev = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
             if prev and prev != 0:
                 change_pct = ((price - prev) / prev) * 100
+
+        company = q.get("longName") or q.get("shortName") or clean_ticker
         result = {
-            "ticker":      clean_ticker,
-            "company":     company,
-            "price":       round(price, 4) if price is not None else None,
-            "change_pct":  round(change_pct, 4) if change_pct is not None else None,
-            "currency":    currency,
+            "ticker":       clean_ticker,
+            "company":      company,
+            "price":        round(price, 4) if price is not None else None,
+            "change_pct":   round(change_pct, 4) if change_pct is not None else None,
+            "currency":     q.get("currency", ""),
+            "market_state": market_state,
         }
         kv_set(cache_key, result)
         return jsonify({"status": "ok", "data": result})

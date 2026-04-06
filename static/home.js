@@ -4277,7 +4277,11 @@ async function _loadWatchlistRow(ticker, country) {
         if (coEl) coEl.textContent = d.company || ticker;
         if (priceEl) {
             const sym = { USD: '$', GBP: '£', GBp: 'p', GBX: 'p', EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥' }[d.currency] || '';
-            priceEl.textContent = d.price != null ? `${sym}${d.price.toLocaleString()}` : '—';
+            const ms = d.market_state || 'REGULAR';
+            const badge = ms === 'PRE' ? '<span class="wl-ext-badge wl-pre-badge">PRE</span>'
+                : (ms === 'POST' || ms === 'POSTPOST') ? '<span class="wl-ext-badge wl-post-badge">POST</span>'
+                : '';
+            priceEl.innerHTML = d.price != null ? `${badge}${sym}${d.price.toLocaleString()}` : '—';
         }
         if (chgEl && d.change_pct != null) {
             const sign = d.change_pct >= 0 ? '+' : '';
