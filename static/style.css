@@ -3518,6 +3518,8 @@ th.sort-desc .sort-icon::before {
 .ov-card-fg {
   background: linear-gradient(135deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 27, 75, 0.6) 100%);
   cursor: pointer;
+  flex: 0 0 auto;
+  /* don't stretch — keep natural height so history rows are fully visible */
 }
 
 .ov-card-fg:hover {
@@ -3584,11 +3586,13 @@ th.sort-desc .sort-icon::before {
 }
 
 .fg-history {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
 }
 
 .fg-hist-row {
@@ -4820,6 +4824,102 @@ html[data-theme="dark"] .div-tl-status--pending {
   padding: 24px;
 }
 
+.sp-price-chart-section {
+  margin-top: 10px;
+}
+
+.sp-chart-type-toggle {
+  display: flex;
+  gap: 4px;
+}
+
+.sp-chart-type-btn {
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sp-chart-type-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sp-range-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.sp-range-tab {
+  flex: 1;
+  padding: 4px 0;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sp-range-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sp-chart-wrap {
+  position: relative;
+  height: 200px;
+  width: 100%;
+}
+
+.sp-chart-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.sp-chart-tooltip {
+  position: absolute;
+  display: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.72rem;
+  color: var(--text-primary);
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  min-width: 110px;
+}
+
+.sp-tt-date {
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-size: 0.68rem;
+}
+
+.sp-tt-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sp-chart-loading {
+  text-align: center;
+  padding: 40px 0;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
 .sp-metrics-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -4874,9 +4974,11 @@ html[data-theme="dark"] .div-tl-status--pending {
 }
 
 .sp-section-title {
-  font-size: 0.95rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
 }
 
 .sp-chart-select {
@@ -6335,13 +6437,11 @@ html[data-theme="light"] .rating-strong-sell {
   bottom: 0;
   left: 0;
   transform: translateX(-100%);
-  background-image: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0,
-    rgba(255, 255, 255, 0.05) 20%,
-    rgba(255, 255, 255, 0.1) 60%,
-    rgba(255, 255, 255, 0)
-  );
+  background-image: linear-gradient(90deg,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.05) 20%,
+      rgba(255, 255, 255, 0.1) 60%,
+      rgba(255, 255, 255, 0));
   animation: shimmer 2s infinite;
 }
 
@@ -6353,19 +6453,17 @@ html[data-theme="light"] .rating-strong-sell {
   left: 0;
   width: 50%;
   height: 100%;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.08) 50%,
-    transparent 100%
-  );
+  background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.08) 50%,
+      transparent 100%);
   animation: hm-scan 0.8s ease-in-out forwards;
   pointer-events: none;
   z-index: 5;
 }
 
 /* Hide canvas while skeleton is shown */
-.trend-skeleton ~ .stock-spark {
+.trend-skeleton~.stock-spark {
   display: none;
 }
 
@@ -7522,6 +7620,7 @@ html[data-theme="dark"] .nav-group-header.active {
   flex-direction: column;
   gap: 14px;
   min-height: 0;
+  overflow: hidden;
 }
 
 /* Row 1: 3 portfolio cards */
@@ -7654,9 +7753,13 @@ html[data-theme="dark"] .nav-group-header.active {
   flex-direction: column;
 }
 
-/* Upcoming Events — size to content, don't stretch */
+/* Upcoming Events — fill remaining sidebar space, scroll inside */
 #ov-upcoming-events {
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-height: 120px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Contributors to Returns — size to content, show all rows */
@@ -7765,6 +7868,9 @@ html[data-theme="dark"] .nav-group-header.active {
 /* ── Upcoming Events ─────────────────────────────────────────────────────── */
 .upcoming-events-body {
   padding: 2px 0 0;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .ue-table {
@@ -10512,4 +10618,535 @@ thead .mph-ticker-col {
 /* Hide the hint on desktop */
 .table-mobile-hint {
   display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DIVIDENDS VIEW
+═══════════════════════════════════════════════════════════════ */
+
+.dv-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px;
+  overflow-y: auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* ── KPI Cards ─────────────────────────────────────────────── */
+.dv-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.dv-kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.dv-kpi-card--accent {
+  border-color: #10b98140;
+  background: linear-gradient(135deg, var(--bg-card) 60%, #10b98108);
+}
+
+.dv-kpi-icon {
+  font-size: 22px;
+  color: var(--accent);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.dv-kpi-card--accent .dv-kpi-icon {
+  color: #10b981;
+}
+
+.dv-kpi-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dv-kpi-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dv-kpi-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.dv-kpi-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.dv-kpi-sub .pos {
+  color: var(--green);
+}
+
+.dv-kpi-sub .neg {
+  color: var(--red);
+}
+
+/* ── Charts Row ─────────────────────────────────────────────── */
+.dv-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 12px;
+}
+
+.dv-chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 210px;
+}
+
+.dv-chart-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.dv-chart-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.dv-chart-sub {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.dv-chart-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 150px;
+}
+
+.dv-chart-wrap canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.dv-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+/* ── Bottom Row ─────────────────────────────────────────────── */
+.dv-bottom-row {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 12px;
+  min-height: 320px;
+}
+
+/* ── Shared card style ──────────────────────────────────────── */
+.dv-payers-card,
+.dv-calendar-card,
+.dv-history-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dv-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.dv-section-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  flex: 1;
+}
+
+.dv-section-badge {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+/* ── Top Payers Table ───────────────────────────────────────── */
+.dv-payers-wrap {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dv-payers-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.dv-payers-table th {
+  text-align: left;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 8px 8px 8px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-card);
+  z-index: 1;
+}
+
+.dv-col-r {
+  text-align: right !important;
+}
+
+.dv-payers-table td {
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.dv-payer-row:last-child td {
+  border-bottom: none;
+}
+
+.dv-stock-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dv-stock-logo {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: contain;
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.dv-stock-ticker {
+  display: block;
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.dv-stock-name {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  max-width: 130px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv-val-green {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.dv-share-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.dv-share-bar-bg {
+  width: 50px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.dv-share-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.dv-share-pct {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* ── Calendar ───────────────────────────────────────────────── */
+.dv-calendar-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dv-cal-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dv-cal-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+
+.dv-cal-month {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dv-cal-day {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.dv-cal-rel {
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+.dv-cal-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dv-cal-top {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.dv-cal-ticker {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+}
+
+.dv-cal-company {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.dv-cal-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+
+.dv-cal-pershare {
+  font-size: 0.7rem;
+  color: var(--green);
+}
+
+.dv-cal-dates {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.dv-cal-payout {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--green);
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* ── Dividend History ───────────────────────────────────────── */
+.dv-history-card {
+  max-height: 280px;
+}
+
+.dv-history-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.dv-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.dv-hist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.dv-hist-date {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 30px;
+  flex-shrink: 0;
+}
+
+.dv-hist-month {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.dv-hist-day {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.dv-hist-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.dv-hist-ticker {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+
+.dv-hist-company {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dv-hist-time {
+  font-size: 0.63rem;
+  color: var(--text-muted);
+}
+
+.dv-hist-amount {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--green);
+  flex-shrink: 0;
+}
+
+/* ── Shared utilities ───────────────────────────────────────── */
+.dv-empty,
+.dv-loading {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .dv-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .dv-charts-row {
+    grid-template-columns: 1fr;
+  }
+
+  .dv-bottom-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .dv-body {
+    padding: 12px;
+  }
+
+  .dv-kpi-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .dv-history-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dv-bottom-row {
+    min-height: unset;
+  }
+
+  .dv-history-card {
+    max-height: unset;
+  }
 }

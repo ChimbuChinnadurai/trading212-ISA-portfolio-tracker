@@ -1198,7 +1198,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     if (!PORTFOLIO_ID) return;
     const portfolioVisible = document.getElementById('view-portfolio')?.style.display !== 'none';
-    const stocksVisible    = document.getElementById('view-stocks')?.style.display !== 'none';
+    const stocksVisible = document.getElementById('view-stocks')?.style.display !== 'none';
     if (portfolioVisible || stocksVisible) loadPortfolio();
   }, 5 * 60 * 1000);
 });
@@ -1575,7 +1575,7 @@ window.openStockPanel = function (r) {
   document.getElementById('spQuantity').textContent = fmt.number(r.quantity, 4);
   document.getElementById('spAvgPrice').textContent = fmt.currency(r.avg_price, 4);
   document.getElementById('spCurrentPrice').textContent = fmt.currency((r.current_value / (r.quantity || 1)), 4);
-  document.getElementById('spSector').textContent = r.sector || 'Unknown';
+  // document.getElementById('spSector').textContent = r.sector || 'Unknown';
 
   // Breakeven: dividend-adjusted cost per share
   const qty = r.quantity || 1;
@@ -1600,6 +1600,17 @@ window.openStockPanel = function (r) {
   document.getElementById('sidePanelBackdrop').classList.add('active');
   document.getElementById('sidePanel').classList.add('open');
 
+  // Load price chart
+  _spChartTicker = r.ticker;
+  _spChartCountry = r.country || 'US';
+  _spChartPeriod = '1w';
+  _spChartType = 'candle';
+  _spChartData = null;
+  document.querySelectorAll('.sp-range-tab').forEach(b => b.classList.toggle('active', b.dataset.period === '1w'));
+  document.getElementById('spChartTypeCandle').classList.add('active');
+  document.getElementById('spChartTypeLine').classList.remove('active');
+  _spLoadChart();
+
   // Load activity, news, and fundamentals
   window.loadStockActivity(r.ticker);
   window.loadStockNews(r.ticker);
@@ -1623,6 +1634,270 @@ window.openStockPanel = function (r) {
 window.closeStockPanel = function () {
   document.getElementById('sidePanelBackdrop').classList.remove('active');
   document.getElementById('sidePanel').classList.remove('open');
+}
+
+// ── Stock Price Chart ──────────────────────────────────────────────────────────
+let _spChartTicker = null;
+let _spChartCountry = 'US';
+let _spChartPeriod = '1w';
+let _spChartType = 'candle';
+let _spChartData = null;
+
+function _spSetPeriod(period) {
+  _spChartPeriod = period;
+  document.querySelectorAll('.sp-range-tab').forEach(b => b.classList.toggle('active', b.dataset.period === period));
+  _spLoadChart();
+}
+
+function _spSetChartType(type) {
+  _spChartType = type;
+  document.getElementById('spChartTypeCandle').classList.toggle('active', type === 'candle');
+  document.getElementById('spChartTypeLine').classList.toggle('active', type === 'line');
+  if (_spChartData) _spDrawChart(_spChartData);
+}
+
+async function _spLoadChart() {
+  if (!_spChartTicker) return;
+  const wrap = document.getElementById('spChartWrap');
+  const loading = document.getElementById('spChartLoading');
+  wrap.style.display = 'none';
+  loading.style.display = 'block';
+  loading.textContent = 'Loading chart…';
+  try {
+    const res = await fetch(`/api/stock-chart/${encodeURIComponent(_spChartTicker)}?period=${_spChartPeriod}&country=${_spChartCountry}`);
+    const json = await res.json();
+    if (json.status !== 'ok' || !json.data.candles.length) {
+      loading.textContent = 'No chart data available.';
+      return;
+    }
+    _spChartData = json.data;
+    loading.style.display = 'none';
+    wrap.style.display = 'block';
+    requestAnimationFrame(() => _spDrawChart(_spChartData));
+  } catch (e) {
+    loading.textContent = 'Failed to load chart.';
+  }
+}
+
+function _spDrawChart(data) {
+  if (_spChartType === 'candle') _spDrawCandle(data.candles);
+  else _spDrawLine(data.candles);
+}
+
+function _spDrawCandle(candles) {
+  const canvas = document.getElementById('spPriceCanvas');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 380;
+  const H = canvas.offsetHeight || 200;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 12, right: 8, bottom: 28, left: 48 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+
+  const highs = candles.map(c => c.h);
+  const lows = candles.map(c => c.l);
+  const minP = Math.min(...lows);
+  const maxP = Math.max(...highs);
+  const range = (maxP - minP) || 1;
+
+  const yOf = v => pad.top + ch - ((v - minP) / range) * ch;
+  const n = candles.length;
+  const candleW = Math.max(1, Math.floor((cw / n) * 0.7));
+
+  // Y-axis grid
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const gridCol = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textCol = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.fillStyle = textCol;
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const v = minP + (range * i / steps);
+    const y = yOf(v);
+    ctx.strokeStyle = gridCol;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.textAlign = 'right';
+    ctx.fillText(v.toFixed(v >= 100 ? 0 : 2), pad.left - 4, y + 3);
+  }
+
+  // X-axis labels
+  const labelIdxs = _spPickXLabels(candles, _spChartPeriod);
+  ctx.textAlign = 'center';
+  labelIdxs.forEach(i => {
+    const x = pad.left + (i / (n - 1)) * cw;
+    ctx.fillStyle = textCol;
+    ctx.fillText(_spFmtXLabel(candles[i].ts, _spChartPeriod), x, H - 4);
+    ctx.strokeStyle = gridCol;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, H - pad.bottom); ctx.stroke();
+  });
+
+  // Candles
+  candles.forEach((c, i) => {
+    const x = pad.left + (i / Math.max(n - 1, 1)) * cw;
+    const bullish = c.c >= c.o;
+    const col = bullish ? '#10b981' : '#ef4444';
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+
+    // Wick
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, yOf(c.h));
+    ctx.lineTo(x, yOf(c.l));
+    ctx.stroke();
+
+    // Body
+    const yO = yOf(c.o), yC = yOf(c.c);
+    const bodyY = Math.min(yO, yC);
+    const bodyH = Math.max(Math.abs(yC - yO), 1);
+    ctx.fillRect(x - candleW / 2, bodyY, candleW, bodyH);
+  });
+
+  // Hover tooltip
+  _spAttachHover(canvas, candles, pad, cw, ch, yOf, 'candle');
+}
+
+function _spDrawLine(candles) {
+  const canvas = document.getElementById('spPriceCanvas');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth || 380;
+  const H = canvas.offsetHeight || 200;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 12, right: 8, bottom: 28, left: 48 };
+  const cw = W - pad.left - pad.right;
+  const ch = H - pad.top - pad.bottom;
+  const vals = candles.map(c => c.c);
+  const minP = Math.min(...vals);
+  const maxP = Math.max(...vals);
+  const range = (maxP - minP) || 1;
+  const yOf = v => pad.top + ch - ((v - minP) / range) * ch;
+  const n = candles.length;
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const gridCol = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const textCol = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+  ctx.font = '10px system-ui,sans-serif';
+
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const v = minP + (range * i / steps);
+    const y = yOf(v);
+    ctx.strokeStyle = gridCol;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.fillStyle = textCol;
+    ctx.textAlign = 'right';
+    ctx.fillText(v.toFixed(v >= 100 ? 0 : 2), pad.left - 4, y + 3);
+  }
+
+  const labelIdxs = _spPickXLabels(candles, _spChartPeriod);
+  ctx.textAlign = 'center';
+  labelIdxs.forEach(i => {
+    const x = pad.left + (i / (n - 1)) * cw;
+    ctx.fillStyle = textCol;
+    ctx.fillText(_spFmtXLabel(candles[i].ts, _spChartPeriod), x, H - 4);
+    ctx.strokeStyle = gridCol;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, H - pad.bottom); ctx.stroke();
+  });
+
+  // Gradient fill
+  const isUp = candles[n - 1].c >= candles[0].c;
+  const lineCol = isUp ? '#10b981' : '#ef4444';
+  const grad = ctx.createLinearGradient(0, pad.top, 0, H - pad.bottom);
+  grad.addColorStop(0, isUp ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  candles.forEach((c, i) => {
+    const x = pad.left + (i / (n - 1)) * cw;
+    i === 0 ? ctx.moveTo(x, yOf(c.c)) : ctx.lineTo(x, yOf(c.c));
+  });
+  const lastX = pad.left + cw;
+  ctx.lineTo(lastX, H - pad.bottom);
+  ctx.lineTo(pad.left, H - pad.bottom);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  candles.forEach((c, i) => {
+    const x = pad.left + (i / (n - 1)) * cw;
+    i === 0 ? ctx.moveTo(x, yOf(c.c)) : ctx.lineTo(x, yOf(c.c));
+  });
+  ctx.strokeStyle = lineCol;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  _spAttachHover(canvas, candles, pad, cw, ch, yOf, 'line');
+}
+
+function _spPickXLabels(candles, period) {
+  const n = candles.length;
+  if (n < 2) return [];
+  const maxLabels = period === '1d' ? 6 : period === '1w' ? 5 : period === '1m' ? 4 : 5;
+  const step = Math.ceil(n / maxLabels);
+  const idxs = [];
+  for (let i = 0; i < n; i += step) idxs.push(i);
+  if (idxs[idxs.length - 1] !== n - 1) idxs.push(n - 1);
+  return idxs;
+}
+
+function _spFmtXLabel(ts, period) {
+  const d = new Date(ts * 1000);
+  if (period === '1d') return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  if (period === '1w') return d.toLocaleDateString('en-GB', { weekday: 'short' });
+  if (period === '1m') return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+}
+
+function _spAttachHover(canvas, candles, pad, cw, _ch, yOf, mode) {
+  const tooltip = document.getElementById('spChartTooltip');
+  const n = candles.length;
+
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const idx = Math.round((mx - pad.left) / cw * (n - 1));
+    if (idx < 0 || idx >= n) { tooltip.style.display = 'none'; return; }
+    const c = candles[idx];
+    const d = new Date(c.ts * 1000);
+    const dateStr = d.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' });
+
+    let html;
+    if (mode === 'candle') {
+      const col = c.c >= c.o ? '#10b981' : '#ef4444';
+      html = `<div class="sp-tt-date">${dateStr}</div>
+        <div class="sp-tt-row"><span>O</span><span>${c.o.toFixed(2)}</span></div>
+        <div class="sp-tt-row"><span>H</span><span>${c.h.toFixed(2)}</span></div>
+        <div class="sp-tt-row"><span>L</span><span>${c.l.toFixed(2)}</span></div>
+        <div class="sp-tt-row" style="color:${col}"><span>C</span><span>${c.c.toFixed(2)}</span></div>`;
+    } else {
+      html = `<div class="sp-tt-date">${dateStr}</div>
+        <div class="sp-tt-row"><span>Price</span><span>${c.c.toFixed(2)}</span></div>`;
+    }
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    const left = Math.min(mx + 12, canvas.offsetWidth - 130);
+    const top = Math.max(pad.top, yOf(c.c) - 60);
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  };
+  canvas.onmouseleave = () => { tooltip.style.display = 'none'; };
 }
 
 window.loadStockActivity = async function (ticker) {

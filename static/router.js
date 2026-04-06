@@ -25,6 +25,7 @@ let _marketInitialized = false;
 let _metricsInitialized = false;
 let _watchlistInitialized = false;
 let _aiInitialized = false;
+let _dividendsInitialized = false;
 
 
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
@@ -86,6 +87,9 @@ function _updateBreadcrumb(route) {
         'market': 'Market',
         'metrics': 'Metrics',
         'watchlist': 'Watchlist',
+        'dividends/combined': 'Dividends & Income',
+        'dividends/1': 'Dividends & Income',
+        'dividends/2': 'Dividends & Income',
     };
 
     if (route === 'home') {
@@ -119,13 +123,13 @@ function _updatePidSwitcher(route) {
     const btnCombined = document.getElementById('pidBtnCombined');
     if (!switcher) return;
 
-    // Only show on portfolio/stocks routes
-    const isRelevant = route.startsWith('portfolio/') || route.startsWith('stocks/');
+    // Show on portfolio/stocks/dividends routes
+    const isRelevant = route.startsWith('portfolio/') || route.startsWith('stocks/') || route.startsWith('dividends/');
     switcher.style.display = isRelevant ? 'flex' : 'none';
 
     document.querySelectorAll('.pid-btn').forEach(b => b.classList.remove('active'));
 
-    if (route.startsWith('portfolio/') || route.startsWith('stocks/')) {
+    if (isRelevant) {
         const pid = route.split('/')[1];
         const activeBtn = document.getElementById(
             pid === 'combined' ? 'pidBtnCombined' :
@@ -138,7 +142,9 @@ function _updatePidSwitcher(route) {
 /* Switch pid — stays in same view type, defaults to portfolio from other routes */
 function switchPid(pid) {
     const route = _currentRoute || '';
-    const viewType = route.startsWith('stocks/') ? 'stocks' : 'portfolio';
+    const viewType = route.startsWith('stocks/') ? 'stocks'
+        : route.startsWith('dividends/') ? 'dividends'
+        : 'portfolio';
     navigate(`${viewType}/${pid}`);
 }
 
@@ -164,6 +170,8 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadMetricsView(true);
     } else if (view === 'watchlist') {
         btn.onclick = () => loadWatchlistView();
+    } else if (view === 'dividends') {
+        btn.onclick = () => loadDividendsView(true, window.DIVIDENDS_PID || 'combined');
     } else if (view === 'ai-intelligence') {
         // AI view has its own refresh buttons per section
         btn.style.display = 'none';
@@ -177,8 +185,9 @@ function _updateSidebarActive(route) {
         el.classList.remove('active');
     });
 
-    // Exact match first
-    const exact = document.querySelector(`.nav-item[data-route="${route}"]`);
+    // Exact match first; dividends sub-routes all highlight the dividends/combined nav item
+    const navRoute = route.startsWith('dividends/') ? 'dividends/combined' : route;
+    const exact = document.querySelector(`.nav-item[data-route="${navRoute}"]`);
     if (exact) exact.classList.add('active');
 
     // Highlight group header when a sub-route is active
@@ -360,6 +369,19 @@ function _router() {
         if (!_watchlistInitialized) {
             if (typeof loadWatchlistView === 'function') loadWatchlistView();
             _watchlistInitialized = true;
+        }
+
+        /* ── Dividends ── */
+    } else if (hash.startsWith('dividends/')) {
+        const dvPid = hash.split('/')[1] || 'combined';
+        _showView('dividends');
+        _updateRefreshBtn('dividends');
+        document.title = 'Dividends & Income — Portfolio Tracker';
+        window.DIVIDENDS_PID = dvPid;
+        if (!_dividendsInitialized || window._dividendsActivePid !== dvPid) {
+            window._dividendsActivePid = dvPid;
+            _dividendsInitialized = true;
+            if (typeof loadDividendsView === 'function') loadDividendsView(false, dvPid);
         }
 
         /* ── AI Intelligence ── */

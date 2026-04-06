@@ -267,6 +267,109 @@ def dividend_monthly_combined():
         return jsonify({"status": "ok", "data": [], "warning": str(e)})
 
 
+@app.route("/api/dividends/overview")
+def dividends_overview():
+    """Consolidated dividend analytics for the Dividends view.
+    ?pid=combined|1|2  — filter to a specific portfolio (default: combined). Cached 15 min."""
+    pid_param = request.args.get("pid", "combined").strip()
+    # Resolve which API keys to use
+    if pid_param in ("1", "2") and API_KEYS.get(pid_param):
+        pids_to_use = {pid_param: API_KEYS[pid_param]}
+    else:
+        pids_to_use = {k: v for k, v in API_KEYS.items() if v}
+        pid_param = "combined"
+
+    try:
+        cache_key = f"dividends:overview:v2:{pid_param}"
+        cached = kv_get(cache_key, 900)
+        if cached is not None:
+            return jsonify({"status": "ok", "data": cached})
+
+        today = date.today()
+        this_year_str = str(today.year)
+        last_year_str = str(today.year - 1)
+
+        # ── Monthly data ─────────────────────────────────────────────────────
+        combined_monthly = defaultdict(float)
+        for pid, key in pids_to_use.items():
+            items = get_dividends_raw(key, pid)
+            for it in items:
+                date_str = it.get("paidOn") or it.get("date") or ""
+                if not date_str:
+                    continue
+                month = str(date_str)[:7]
+                combined_monthly[month] += float(it.get("amount") or 0)
+
+        monthly = [{"month": m, "amount": round(a, 2)} for m, a in sorted(combined_monthly.items())]
+
+        # ── Annual totals ────────────────────────────────────────────────────
+        annual_map = defaultdict(float)
+        for item in monthly:
+            annual_map[item["month"][:4]] += item["amount"]
+        annual = [{"year": y, "amount": round(a, 2)} for y, a in sorted(annual_map.items())]
+
+        # ── KPIs ─────────────────────────────────────────────────────────────
+        total_received = round(sum(i["amount"] for i in monthly), 2)
+        this_year      = round(sum(i["amount"] for i in monthly if i["month"].startswith(this_year_str)), 2)
+        last_year_amt  = round(sum(i["amount"] for i in monthly if i["month"].startswith(last_year_str)), 2)
+
+        # TTM: trailing 12 calendar months
+        ttm_months = set()
+        d = today.replace(day=1)
+        for _ in range(12):
+            ttm_months.add(str(d)[:7])
+            d = (d - timedelta(days=1)).replace(day=1)
+        ttm = round(sum(i["amount"] for i in monthly if i["month"] in ttm_months), 2)
+        avg_monthly_ttm = round(ttm / 12, 2)
+
+        # ── Per-ticker breakdown ─────────────────────────────────────────────
+        ticker_map = {}
+        for pid in pids_to_use:
+            rows, _ = fetch_and_cache_portfolio(pid)
+            if not rows:
+                continue
+            for r in rows:
+                t   = r["ticker"]
+                div = float(r.get("dividends") or 0)
+                if t not in ticker_map:
+                    ticker_map[t] = {
+                        "ticker":        t,
+                        "company_name":  r.get("company_name", ""),
+                        "sector":        r.get("sector", ""),
+                        "dividends":     div,
+                        "div_yield":     float(r.get("div_yield") or 0),
+                        "yoc":           float(r.get("yoc") or 0),
+                        "quantity":      float(r.get("quantity") or 0),
+                        "current_value": float(r.get("current_value") or 0),
+                        "country":       r.get("country", "US"),
+                    }
+                else:
+                    ticker_map[t]["dividends"]     = round(ticker_map[t]["dividends"] + div, 4)
+                    ticker_map[t]["quantity"]      += float(r.get("quantity") or 0)
+                    ticker_map[t]["current_value"] += float(r.get("current_value") or 0)
+
+        by_ticker = sorted(
+            [v for v in ticker_map.values() if v["dividends"] > 0],
+            key=lambda x: x["dividends"], reverse=True
+        )
+
+        data = {
+            "monthly":         monthly,
+            "annual":          annual,
+            "by_ticker":       by_ticker[:50],
+            "total_received":  total_received,
+            "this_year":       this_year,
+            "last_year":       last_year_amt,
+            "ttm":             ttm,
+            "avg_monthly_ttm": avg_monthly_ttm,
+            "pid":             pid_param,
+        }
+        kv_set(cache_key, data)
+        return jsonify({"status": "ok", "data": data})
+    except Exception as e:
+        logger.error("dividends_overview error: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route("/api/p<pid>/stock-activity/<ticker>")
 def stock_activity(pid, ticker):
@@ -886,6 +989,75 @@ def earnings():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@app.route("/api/stock-chart/<ticker>")
+def stock_chart(ticker):
+    """OHLCV candle data for a ticker. ?period=1d|1w|1m|1y|5y  ?country=US|UK|..."""
+    ticker  = ticker.upper()
+    period  = request.args.get("period", "1w").strip()
+    country = request.args.get("country", "US").strip().upper()
+
+    PERIOD_MAP = {
+        "1d": ("1d",  "5m"),
+        "1w": ("5d",  "1h"),
+        "1m": ("1mo", "1d"),
+        "1y": ("1y",  "1d"),
+        "5y": ("5y",  "1wk"),
+    }
+    if period not in PERIOD_MAP:
+        period = "1w"
+    range_, interval_ = PERIOD_MAP[period]
+
+    suffix = _COUNTRY_YF_SUFFIX.get(country, "")
+    clean  = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+    symbol = f"{clean}{suffix}"
+
+    cache_key = f"stock:chart:v1:{symbol}:{period}"
+    TTL = 60 if period == "1d" else 300 if period == "1w" else 3600
+
+    try:
+        data = kv_get(cache_key, TTL)
+        if data is None:
+            resp = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+                params={"range": range_, "interval": interval_, "includePrePost": "false"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            result = resp.json()["chart"]["result"][0]
+            ts_list = result.get("timestamp", [])
+            q       = result["indicators"]["quote"][0]
+            opens   = q.get("open",   [])
+            highs   = q.get("high",   [])
+            lows    = q.get("low",    [])
+            closes  = q.get("close",  [])
+            volumes = q.get("volume", [])
+            candles = []
+            for i, t in enumerate(ts_list):
+                o = opens[i] if i < len(opens) else None
+                h = highs[i] if i < len(highs) else None
+                l = lows[i]  if i < len(lows)  else None
+                c = closes[i] if i < len(closes) else None
+                v = volumes[i] if i < len(volumes) else None
+                if None in (o, h, l, c):
+                    continue
+                candles.append({
+                    "ts": int(t),
+                    "o": round(float(o), 4),
+                    "h": round(float(h), 4),
+                    "l": round(float(l), 4),
+                    "c": round(float(c), 4),
+                    "v": int(v) if v else 0,
+                })
+            currency = result.get("meta", {}).get("currency", "")
+            data = {"candles": candles, "currency": currency}
+            if candles:
+                kv_set(cache_key, data)
+        return jsonify({"status": "ok", "data": data})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route("/api/stock-metrics/<ticker>")
 def stock_metrics(ticker):
     """Return fundamental metrics for a US ticker, cached 24 hours."""
@@ -1104,13 +1276,13 @@ def _yf_summary(yf_sym, modules="financialData,defaultKeyStatistics,summaryDetai
 
 @app.route("/api/watchlist/fundamentals")
 def watchlist_fundamentals():
-    """Market cap, LTM revenue, and P/S (revenue multiple) for a ticker. Cached 24h."""
+    """Market cap, LTM revenue, P/S, trailing P/E, forward P/E, and 5-year avg P/E for a ticker. Cached 24h."""
     ticker  = request.args.get("ticker", "").strip().upper()
     country = request.args.get("country", "US").strip().upper()
     if not ticker:
         return jsonify({"status": "error", "message": "ticker required"}), 400
     try:
-        cache_key = f"wl:fundamentals:{ticker}:{country}"
+        cache_key = f"wl:fundamentals2:{ticker}:{country}"
         cached = kv_get(cache_key, TTL_EARNINGS)
         if cached is not None:
             return jsonify({"status": "ok", "data": cached})
@@ -1119,7 +1291,7 @@ def watchlist_fundamentals():
         clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
         yf_sym       = f"{clean_ticker}{suffix}"
 
-        summary = _yf_summary(yf_sym)
+        summary = _yf_summary(yf_sym, modules="financialData,defaultKeyStatistics,summaryDetail,incomeStatementHistory")
         fin     = summary.get("financialData", {})
         stats   = summary.get("defaultKeyStatistics", {})
         detail  = summary.get("summaryDetail", {})
@@ -1131,14 +1303,48 @@ def watchlist_fundamentals():
         market_cap    = _raw(stats, "marketCap") or _raw(detail, "marketCap")
         total_revenue = _raw(fin, "totalRevenue")
         trailing_pe   = _raw(detail, "trailingPE") or _raw(stats, "trailingPE")
+        forward_pe_val = _raw(stats, "forwardPE") or _raw(detail, "forwardPE")
 
         rev_multiple = None
         if market_cap and total_revenue and total_revenue > 0:
             rev_multiple = round(market_cap / total_revenue, 1)
 
-        pe_ratio = round(trailing_pe, 1) if trailing_pe and trailing_pe > 0 else None
+        pe_ratio    = round(trailing_pe, 1)    if trailing_pe    and trailing_pe    > 0 else None
+        forward_pe  = round(forward_pe_val, 1) if forward_pe_val and forward_pe_val > 0 else None
 
-        data = {"market_cap": market_cap, "revenue": total_revenue, "rev_multiple": rev_multiple, "pe_ratio": pe_ratio}
+        # 5-year average P/E — computed from annual EPS history + matching historical prices
+        pe_5yr_avg = None
+        try:
+            statements = summary.get("incomeStatementHistory", {}).get("incomeStatementHistory", [])
+            if statements:
+                price_points = _yf_fetch_points(yf_sym, "5y", "1mo")
+                if price_points:
+                    pe_values = []
+                    for stmt in statements[:5]:
+                        end_date = stmt.get("endDate")
+                        end_ts   = end_date.get("raw") if isinstance(end_date, dict) else None
+                        basic_eps_raw = stmt.get("basicEps")
+                        eps_val = basic_eps_raw.get("raw") if isinstance(basic_eps_raw, dict) else basic_eps_raw
+                        if not end_ts or not eps_val or eps_val <= 0:
+                            continue
+                        closest = min(price_points, key=lambda p: abs(p["ts"] - end_ts))
+                        if abs(closest["ts"] - end_ts) < 120 * 86400:  # within 120 days
+                            pe = closest["price"] / eps_val
+                            if 0 < pe < 2000:  # sanity check — exclude negative/absurd P/Es
+                                pe_values.append(pe)
+                    if pe_values:
+                        pe_5yr_avg = round(sum(pe_values) / len(pe_values), 1)
+        except Exception:
+            pass
+
+        data = {
+            "market_cap":  market_cap,
+            "revenue":     total_revenue,
+            "rev_multiple": rev_multiple,
+            "pe_ratio":    pe_ratio,
+            "forward_pe":  forward_pe,
+            "pe_5yr_avg":  pe_5yr_avg,
+        }
         kv_set(cache_key, data)
         return jsonify({"status": "ok", "data": data})
     except Exception as e:

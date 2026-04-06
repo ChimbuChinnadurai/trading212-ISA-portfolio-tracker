@@ -5,9 +5,10 @@
 Flask + Vanilla JS web app that fetches Trading212 ISA positions and displays them in an
 interactive dashboard. Supports **2 named portfolios** simultaneously, plus an aggregated
 **Combined** view. Data is enriched with FX conversion, sector classification, dividend history,
-Yahoo Finance stock data, and market indicators.
+Yahoo Finance stock data, Finviz market data, TradingView signals, and AI-generated market digests.
 
-> **No Gemini AI integration exists yet** — the repo name is aspirational/planned.
+> **Gemini AI is integrated** via `gemini_utils.py` (market digest, trade signals, chat).
+> Claude and Finviz digest providers are also available via `/api/market-digest?provider=claude|finviz`.
 
 ---
 
@@ -16,10 +17,11 @@ Yahoo Finance stock data, and market indicators.
 | Layer | Technology |
 |-------|-----------|
 | Backend | Python 3, Flask |
-| Data sources | Trading212 REST API v0, Yahoo Finance (yfinance), CNBC/CNN Fear & Greed |
+| Data sources | Trading212 REST API v0, Yahoo Finance (direct HTTP), Finnhub, Finviz, TradingView, CNBC RSS |
+| AI | Google Gemini (`gemini_utils.py`), Finviz AI digest (`ai_digest.py`) |
 | Cache | SQLite (default) or PostgreSQL (via `DATABASE_URL`) with per-key TTLs |
 | Frontend | Vanilla JS (ES2020+), no bundler, no frameworks |
-| Styling | Plain CSS with CSS variables (dark/light themes) |
+| Styling | Plain CSS with CSS variables (dark/light/glass themes) |
 | Deployment | Docker / Google Cloud Run |
 
 ---
@@ -29,21 +31,27 @@ Yahoo Finance stock data, and market indicators.
 ```
 Trading212 API (per portfolio API key)
     ↓
-t212.py          — REST client, pagination, order normalisation
+t212.py              — REST client, pagination, order normalisation
     ↓
-cache.py         — SQLite/PostgreSQL KV store with TTL
+cache.py             — SQLite/PostgreSQL KV store with TTL
     ↓
-portfolio.py     — enrichment: FX conversion, sector, weight, YOC, div yield
+portfolio.py         — enrichment: FX conversion, sector, weight, YOC, div yield
+sectors.py           — ticker→sector map + keyword fallback
+fx.py                — GBP/USD rate, GBX→GBP, ISIN→country
     ↓
-app.py           — 30 Flask REST endpoints + Jinja page routes
+app.py               — 50+ Flask REST endpoints + Jinja page routes
+finviz_data.py       — Finviz scraping (news, signals, insider, sector perf, stock details)
+ai_digest.py         — Finviz AI digest wrapper
+gemini_utils.py      — Gemini AI market summary, trade signals, chat
+snowball_dividends.py — Dividend data fetcher
     ↓
-home.js          — Home/overview view JS
-app.js           — Portfolio detail view JS
-router.js        — Hash-based SPA router
-currency.js      — Currency formatting helpers (shared)
+home.js              — Home / Market / Watchlist / AI views
+app.js               — Portfolio detail view
+router.js            — Hash-based SPA router
+currency.js          — Currency formatting helpers (shared)
     ↓
-spa.html         — SPA shell (all views rendered client-side via hash routing)
-style.css        — All styles, dark/light theme, responsive
+spa.html             — SPA shell (all views rendered client-side via hash routing)
+style.css            — All styles, dark/light/glass theme, responsive
 ```
 
 ---
@@ -52,18 +60,22 @@ style.css        — All styles, dark/light theme, responsive
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `app.py` | Flask app, all API endpoints, background refresh threads | ~1565 |
+| `app.py` | Flask app, all API endpoints (~50), background refresh threads | ~2500 |
 | `t212.py` | Trading212 API client, pagination, instrument cache | ~220 |
 | `portfolio.py` | Builds enriched row dicts from raw T212 data | ~64 |
 | `cache.py` | SQLite/Postgres KV store: `kv_get/set`, `rows_get/set`, `snapshot_get/add` | ~107 |
 | `fx.py` | GBP/USD rate (Yahoo), GBX pence→GBP, ISIN→country | ~76 |
 | `sectors.py` | Hardcoded ticker→sector map + keyword fallback | ~76 |
-| `static/app.js` | Detail view: portfolio table, allocation bars, price charts, side panel, CSV export | ~2374 |
-| `static/home.js` | Home/market view: overview cards, heatmap, sparklines, fear & greed, market charts, drawdown, signals | ~3800 |
+| `finviz_data.py` | Finviz scraper: news, signals, insider, sector performance, stock details, market digest | ~varies |
+| `ai_digest.py` | Multi-provider market digest (Finviz/Claude/Gemini) | ~varies |
+| `gemini_utils.py` | Gemini AI: market summary, trade signals, portfolio chat | ~varies |
+| `snowball_dividends.py` | Dividend data fetch + background refresh | ~varies |
+| `static/app.js` | Detail view: portfolio table, allocation bars, price charts, side panel, CSV export | ~2400 |
+| `static/home.js` | Home / Market / Watchlist / AI views: heatmap, sparklines, F&G, drawdown, signals, watchlist | ~4200 |
 | `static/router.js` | Hash-based SPA router: view lifecycle, timers, back button, header updates | ~530 |
 | `static/currency.js` | `setCurrency()`, GBP↔USD display conversion | small |
-| `static/style.css` | Dark/light CSS vars, all component styles, responsive breakpoints | ~8100 |
-| `templates/spa.html` | SPA shell — all views rendered client-side via hash routing (Jinja: `names`) | ~1300 |
+| `static/style.css` | Dark/light/glass CSS vars, all component styles, responsive breakpoints | ~8100 |
+| `templates/spa.html` | SPA shell — all views rendered client-side via hash routing (Jinja: `names`, `show_ai`) | ~1350 |
 
 ---
 
@@ -80,8 +92,8 @@ style.css        — All styles, dark/light theme, responsive
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /api/overview` | Combined overview: portfolio values, 24h change, total returns, PAI |
-| `GET /api/home-data` | All landing-page data in one call: overview + activity + performers + dividends |
+| `GET /api/overview` | Combined overview: portfolio values, returns, positions |
+| `GET /api/home-data` | Single call: overview + activity + performers + indicators + fx |
 | `GET /api/p<pid>/portfolio` | Full enriched position rows for one portfolio |
 | `GET /api/pcombined/portfolio` | Merged rows across both portfolios |
 | `GET /api/p<pid>/activity` | Trade/order history for one portfolio |
@@ -93,19 +105,40 @@ style.css        — All styles, dark/light theme, responsive
 | `GET /api/pcombined/dividend-monthly` | Combined monthly dividend totals |
 | `GET /api/p<pid>/pai-details` | Projected Annual Income breakdown per stock |
 | `GET /api/p<pid>/diversification-details` | Sector/country/currency allocation detail |
-| `GET /api/p<pid>/history` | Portfolio value snapshots over time (sparkline data) |
+| `GET /api/p<pid>/history` | Portfolio value snapshots (sparkline data) |
+| `GET /api/p<pid>/monthly-returns` | Monthly return % per month (last 12 months) |
+| `GET /api/p<pid>/monthly-performance` | Per-ticker monthly returns heatmap (last 12 months) |
 | `GET /api/p<pid>/stock-activity/<ticker>` | Buy/sell history for a specific ticker |
+| `GET /api/pcombined/daily-history` | Daily portfolio value vs S&P 500 for charts |
+| `GET /api/pcombined/risk-metrics` | TWR, Beta, Sharpe, Sortino, Volatility, weighted P/E |
 | `GET /api/stock-tickers` | Real-time prices + % change for all held tickers (Yahoo Finance) |
-| `GET /api/stock-sparklines` | 5-day OHLC sparkline data per ticker (Yahoo Finance) |
-| `GET /api/stock-metrics/<ticker>` | P/E, market cap, 52-week range, beta (Yahoo Finance) |
-| `GET /api/stock-news/<ticker>` | Company-specific news (Yahoo Finance) |
+| `GET /api/stock-sparklines` | 48h sparkline data per ticker (Yahoo Finance) |
+| `GET /api/stock-metrics/<ticker>` | Fundamentals via Finnhub (P/E, market cap, 52w range, beta) |
+| `GET /api/stock-news/<ticker>` | Company-specific news via Finnhub |
 | `GET /api/market-indicators` | Fear & Greed index history, S&P 500 + VIX sparklines |
 | `GET /api/market-status` | NASDAQ + LSE open/close status with schedule |
 | `GET /api/earnings` | Upcoming earnings dates for held tickers |
 | `GET /api/upcoming-dividends` | Upcoming ex-div + pay dates for held tickers |
-| `GET /api/analyst-ratings` | Analyst buy/hold/sell consensus per held ticker |
+| `GET /api/analyst-ratings` | Analyst buy/hold/sell consensus per held ticker (TradingView) |
 | `GET /api/fx-rate` | Current GBP/USD rate |
 | `GET /api/news` | General market news (CNBC RSS) |
+| `GET /api/trade-signals` | AI trade signals for held tickers (TradingView TA + AI) |
+| `POST /api/trade-signals/exclude` | Toggle ticker exclusion from trade signals |
+| `GET /api/trade-signals/excluded` | List of excluded tickers |
+| `GET /api/watchlist/tickers` | Get persisted watchlist ticker list |
+| `POST /api/watchlist/tickers` | Save watchlist ticker list |
+| `GET /api/watchlist/price` | Live price + company name for any ticker |
+| `GET /api/watchlist/signals` | TradingView targets + signal for any ticker |
+| `GET /api/watchlist/fundamentals` | Mkt cap, revenue, P/S, P/E, Forward P/E, 5yr avg P/E |
+| `GET /api/finviz/news` | Market news from Finviz |
+| `GET /api/finviz/insider` | Insider trading activity (Finviz) |
+| `GET /api/finviz/signals` | Market signals: gainers, losers, unusual volume (Finviz) |
+| `GET /api/finviz/stock/<ticker>` | Full stock detail: fundamentals, signals, analyst, insider |
+| `GET /api/market/sector-performance` | S&P 500 sector performance bars (Finviz) |
+| `GET /api/market-digest` | Daily market digest (`?provider=finviz\|claude\|gemini`) |
+| `GET /api/ai/market-digest` | Gemini-generated market digest |
+| `GET /api/ai/trade-signals` | Gemini-generated trade signals from portfolio data |
+| `POST /api/ai/chat` | Interactive Gemini chat with portfolio context |
 | `GET /health` | Health check `{"status": "ok"}` |
 | `POST /api/admin/clear-cache` | Wipes all cache entries |
 
@@ -344,10 +377,14 @@ style.css        — All styles, dark/light theme, responsive
 
 ```
 TRADING212_API_KEY_1        # Portfolio 1 API key
+TRADING212_API_KEY_1        # Portfolio 1 API key
 TRADING212_API_KEY_2        # Portfolio 2 API key (optional)
 PORTFOLIO_NAME_1            # Display name for portfolio 1 (default "Portfolio 1")
 PORTFOLIO_NAME_2            # Display name for portfolio 2 (default "Portfolio 2")
 TRADING212_BASE_URL         # https://live.trading212.com/api/v0
+FINNHUB_TOKEN               # Finnhub API key (stock metrics endpoint)
+GEMINI_API_KEY              # Google Gemini API key (also accepts GOOGLE_API_KEY)
+SHOW_AI_FEATURES            # Set to "1" to enable AI tab in UI (default "0")
 PORT                        # default 8080
 DB_PATH                     # SQLite path (default portfolio_cache.db)
 DATABASE_URL                # PostgreSQL DSN — if set, overrides SQLite
@@ -356,6 +393,7 @@ CACHE_TTL_INSTRUMENTS       # Instrument metadata TTL (default 3600s)
 CACHE_TTL_DIVIDENDS         # Dividend data TTL (default 1800s)
 CACHE_TTL_FX                # FX rate TTL (default 300s)
 CACHE_TTL_ORDERS            # Order history TTL (default 300s)
+AUTO_REFRESH_SECONDS        # Background portfolio refresh interval (default 300s)
 ```
 
 ---
@@ -369,6 +407,22 @@ CACHE_TTL_ORDERS            # Order history TTL (default 300s)
 | News | `kv_get/set` | `TTL_NEWS` | `news` |
 | Portfolio snapshots (sparklines) | `snapshot_get/add` | permanent | `{pid}` |
 | Dividend calendar | `localStorage` | 12h (client-side) | `divCal_data` + `divCal_ts` |
+| Watchlist fundamentals | `kv_get/set` | `TTL_EARNINGS` (24h) | `wl:fundamentals2:{ticker}:{country}` |
+| Trade signals | `kv_get/set` | 12h | `trade_signals:v2` |
+| AI digest | `kv_get/set` | 5 min | `ai_digest:{provider}` |
+| Risk metrics | `kv_get/set` | 1h | `risk_metrics` |
+| Monthly performance | `kv_get/set` | 15 min | `monthly_perf:{pid}` |
+
+---
+
+## Background Threads
+
+| Thread | Purpose | Interval |
+|--------|---------|---------|
+| `portfolio-refresh` | Force-refresh portfolio rows cache | `AUTO_REFRESH_SECONDS` (5 min) |
+| `div-refresh` | Refresh dividend data via Snowball Analytics | `DIV_REFRESH_INTERVAL` (6h) |
+| `market-refresh` | Pre-warm market indicators cache | 25 min |
+| `news-refresh` | Pre-warm CNBC news cache | 5 min |
 
 ---
 
@@ -378,23 +432,24 @@ CACHE_TTL_ORDERS            # Order history TTL (default 300s)
 - **Docker:** `docker build -t tracker . && docker run -p 8080:8080 --env-file .env tracker`
 - **No build step** — vanilla JS, no npm, no bundler
 - **Combined portfolio** uses pid string `"combined"` — handled specially in most endpoints
-- **Currency display:** Toggle GBP↔USD stored in `localStorage` key `currency`; all monetary values are stored in GBP, converted client-side via `currency.js`
+- **Currency display:** Toggle GBP↔USD stored in `localStorage` key `currency`; all monetary values stored in GBP, converted client-side via `currency.js`
 - **GBX stocks** (UK pence): price divided by 100 in `fx.py` → stored as GBP; currency symbol shown as `p` in heatmap
-- **Background threads:** `_background_refresh()` pre-warms portfolio cache; `_background_dividend_refresh()` refreshes dividend data
 - **Market status pills** (header): NASDAQ + LSE open/close with session schedule, updates every 60s
 - **Fear & Greed gauge:** Drawn on `<canvas id="fg-gauge">` (130×70px), semi-circle arc
+- **Yahoo Finance auth:** Uses crumb + cookie from `/v1/test/getcrumb`, cached 1h in `yf:crumb:v3`
+- **Watchlist persistence:** Ticker list stored in cache DB via `kv_get/set("watchlist_tickers")`
+- **5yr avg P/E:** Computed in `watchlist_fundamentals` from `incomeStatementHistory` + 5y monthly price history; typically 3–4 years of data available
+- **AI features gate:** `SHOW_AI_FEATURES=1` env var controls visibility of AI tab in the SPA
 
 ---
 
 ## Known Gaps / Planned Features
 
-- **Gemini AI integration** — natural language portfolio Q&A, AI-generated insights
 - **No unit tests** — no test files exist
-- **Sector map is manual** — `sectors.py` needs auto-classification
+- **Sector map is manual** — `sectors.py` needs auto-classification for new tickers
 - **SQLite ephemeral on Cloud Run** — resets on redeploy; set `DATABASE_URL` for persistent PostgreSQL
 - **No auth layer** — assumes private/internal deployment
 - **Cache doesn't auto-purge** — stale rows accumulate in SQLite over time
-- **Allocation chart** — pie/donut for sector breakdown (planned)
 - **Benchmark comparison vs FTSE100** — Portfolio vs S&P 500 is implemented; FTSE100 overlay not yet added
 - **Tax year summary** — UK Apr–Apr capital gains + dividend income report (planned)
 - **Export to CSV/PDF** — detail page has CSV export; no PDF yet

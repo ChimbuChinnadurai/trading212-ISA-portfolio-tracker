@@ -3502,7 +3502,7 @@ function _renderDividendCalendar(data) {
     el.innerHTML = `<div class="div-timeline">${items}</div>`;
 }
 
-/* ─── Upcoming Events (earnings + dividends in next 7 days) ─────────────── */
+/* ─── Upcoming Events (earnings + dividends in next 30 days) ────────────── */
 
 async function loadUpcomingEvents() {
     const el = document.getElementById('upcomingEventsList');
@@ -3511,7 +3511,7 @@ async function loadUpcomingEvents() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const cutoff = new Date(today);
-    cutoff.setDate(today.getDate() + 7);
+    cutoff.setDate(today.getDate() + 30);
 
     function toYMD(d) {
         return d.toISOString().slice(0, 10);
@@ -3565,7 +3565,7 @@ function _renderUpcomingEvents(events) {
     if (!el) return;
 
     if (!events.length) {
-        el.innerHTML = '<div class="activity-empty">No upcoming events in the next 7 days.</div>';
+        el.innerHTML = '<div class="activity-empty">No upcoming events in the next 30 days.</div>';
         return;
     }
 
@@ -4237,6 +4237,8 @@ function _renderWatchlistTable(list) {
             <td class="wl-fund-col" id="wl-rev-${ticker}">—</td>
             <td class="wl-fund-col" id="wl-ps-${ticker}">—</td>
             <td class="wl-fund-col" id="wl-pe-${ticker}">—</td>
+            <td class="wl-fund-col" id="wl-fpe-${ticker}">—</td>
+            <td class="wl-fund-col" id="wl-5pe-${ticker}">—</td>
             <td><canvas id="wl-spark-${ticker}" class="wl-spark-canvas" width="100" height="36"></canvas></td>
             <td>
               <button class="wl-remove-btn" onclick="event.stopPropagation();removeWatchlistTicker('${ticker}')" title="Remove">
@@ -4312,13 +4314,15 @@ async function _loadWatchlistRow(ticker, country) {
         }
     }
 
-    // Fundamentals: market cap, revenue LTM, P/S, P/E
+    // Fundamentals: market cap, revenue LTM, P/S, P/E, Forward P/E, 5yr P/E
     if (fundRes.status === 'fulfilled' && fundRes.value?.status === 'ok') {
         const d = fundRes.value.data;
-        const capEl = document.getElementById(`wl-mktcap-${ticker}`);
-        const revEl = document.getElementById(`wl-rev-${ticker}`);
-        const psEl = document.getElementById(`wl-ps-${ticker}`);
-        const peEl = document.getElementById(`wl-pe-${ticker}`);
+        const capEl  = document.getElementById(`wl-mktcap-${ticker}`);
+        const revEl  = document.getElementById(`wl-rev-${ticker}`);
+        const psEl   = document.getElementById(`wl-ps-${ticker}`);
+        const peEl   = document.getElementById(`wl-pe-${ticker}`);
+        const fpeEl  = document.getElementById(`wl-fpe-${ticker}`);
+        const pe5El  = document.getElementById(`wl-5pe-${ticker}`);
         if (capEl) capEl.textContent = _fmtMarketVal(d.market_cap);
         if (revEl) revEl.textContent = _fmtMarketVal(d.revenue);
         if (psEl && d.rev_multiple != null) {
@@ -4332,6 +4336,22 @@ async function _loadWatchlistRow(ticker, country) {
                 peEl.innerHTML = `<span class="wl-ps-badge ${tier}">${d.pe_ratio.toFixed(1)}x</span>`;
             } else {
                 peEl.textContent = 'N/A';
+            }
+        }
+        if (fpeEl) {
+            if (d.forward_pe != null) {
+                const tier = d.forward_pe < 15 ? 'high' : d.forward_pe < 30 ? 'mid' : 'low';
+                fpeEl.innerHTML = `<span class="wl-ps-badge ${tier}">${d.forward_pe.toFixed(1)}x</span>`;
+            } else {
+                fpeEl.textContent = 'N/A';
+            }
+        }
+        if (pe5El) {
+            if (d.pe_5yr_avg != null) {
+                const tier = d.pe_5yr_avg < 15 ? 'high' : d.pe_5yr_avg < 30 ? 'mid' : 'low';
+                pe5El.innerHTML = `<span class="wl-ps-badge ${tier}" title="Average P/E over last ~4 fiscal years">${d.pe_5yr_avg.toFixed(1)}x</span>`;
+            } else {
+                pe5El.textContent = 'N/A';
             }
         }
     }
@@ -4451,5 +4471,463 @@ async function openWatchlistStockPanel(ticker, country) {
 
     // News — always
     if (typeof window['loadStockNews'] === 'function') window['loadStockNews'](ticker);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DIVIDENDS VIEW
+═══════════════════════════════════════════════════════════════════ */
+
+async function loadDividendsView(_force = false, pid = 'combined') {
+    // Show loading state
+    ['dvPayersBody', 'dvCalendarList', 'dvHistoryList'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<tr><td colspan="5" class="dv-loading">Loading…</td></tr>';
+    });
+
+    const historyEndpoint = pid === 'combined'
+        ? '/api/pcombined/recent-dividends'
+        : `/api/p${pid}/recent-dividends`;
+
+    try {
+        const [overviewRes, upcomingRes, historyRes] = await Promise.allSettled([
+            fetch(`/api/dividends/overview?pid=${encodeURIComponent(pid)}`).then(r => r.json()),
+            fetch('/api/upcoming-dividends').then(r => r.json()),
+            fetch(historyEndpoint).then(r => r.json()),
+        ]);
+
+        if (overviewRes.status === 'fulfilled' && overviewRes.value?.status === 'ok') {
+            const d = overviewRes.value.data;
+            _dvRenderKPIs(d);
+            _dvDrawAnnualChart(d.annual || []);
+            _dvDrawMonthlyChart(d.monthly || []);
+            _dvRenderTopPayers(d.by_ticker || [], d.total_received || 0);
+        }
+
+        // Upcoming dividends: filter to only tickers held in selected portfolio
+        if (upcomingRes.status === 'fulfilled' && upcomingRes.value?.status === 'ok') {
+            let upcoming = upcomingRes.value.data || [];
+            if (pid !== 'combined') {
+                // Filter by portfolio: Snowball entries carry a pid field
+                upcoming = upcoming.filter(d => !d.pid || d.pid === pid);
+            }
+            _dvRenderCalendar(upcoming);
+        } else {
+            const el = document.getElementById('dvCalendarList');
+            if (el) el.innerHTML = '<div class="dv-empty">No upcoming dividend data available.</div>';
+        }
+
+        if (historyRes.status === 'fulfilled' && historyRes.value?.status === 'ok') {
+            _dvRenderHistory(historyRes.value.data || []);
+        }
+    } catch (err) {
+        console.error('loadDividendsView error', err);
+    }
+}
+
+function _dvFmt(v) {
+    // Format GBP value with currency helper
+    if (v == null || isNaN(v)) return '—';
+    return fmt.currency(v);
+}
+
+function _dvRenderKPIs(d) {
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+    set('dvTotalReceived', _dvFmt(d.total_received));
+    set('dvTotalSub', `${(d.annual || []).length} years of income`);
+    set('dvThisYear', _dvFmt(d.this_year));
+    set('dvProjected', _dvFmt(d.ttm));  // TTM as proxy for projected annual
+    set('dvAvgMonthly', _dvFmt(d.avg_monthly_ttm));
+
+    // YoY label
+    const yoyEl = document.getElementById('dvYoYLabel');
+    if (yoyEl && d.last_year != null && d.last_year > 0) {
+        const pct = ((d.this_year - d.last_year) / d.last_year) * 100;
+        const sign = pct >= 0 ? '+' : '';
+        const cls = pct >= 0 ? 'pos' : 'neg';
+        yoyEl.innerHTML = `<span class="${cls}">${sign}${pct.toFixed(1)}%</span> vs last year (${_dvFmt(d.last_year)})`;
+    } else {
+        set('dvYoYLabel', d.last_year > 0 ? `Last year: ${_dvFmt(d.last_year)}` : 'First year of income');
+    }
+
+    // Annual chart sub
+    const annualSub = document.getElementById('dvAnnualSub');
+    if (annualSub && d.annual?.length) {
+        const years = d.annual.map(a => a.year);
+        annualSub.textContent = `${years[0]} – ${years[years.length - 1]}`;
+    }
+}
+
+/* ── Annual Income Bar Chart ──────────────────────────────────── */
+function _dvDrawAnnualChart(annual) {
+    const canvas = document.getElementById('dvAnnualChart');
+    const emptyEl = document.getElementById('dvAnnualEmpty');
+    if (!canvas) return;
+
+    if (!annual.length) {
+        canvas.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = '';
+        return;
+    }
+    canvas.style.display = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth || 400;
+    const H = canvas.offsetHeight || 200;
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const PAD = { top: 20, right: 16, bottom: 36, left: 52 };
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+
+    const maxAmt = Math.max(...annual.map(a => a.amount));
+    const n = annual.length;
+    const barW = Math.max(16, (cW / n) * 0.6);
+    const gap  = cW / n;
+
+    const accentColor = '#10b981';  // green
+
+    // Y gridlines + labels
+    ctx.font = '9.5px "JetBrains Mono",monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.38)';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const v = (i / 4) * maxAmt;
+        const y = PAD.top + cH - (i / 4) * cH;
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+        const label = v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + v.toFixed(0);
+        ctx.fillText(label, PAD.left - 4, y + 3.5);
+    }
+
+    // Bars + x labels
+    annual.forEach((a, i) => {
+        const x   = PAD.left + i * gap + gap / 2;
+        const pct = maxAmt > 0 ? a.amount / maxAmt : 0;
+        const bH  = Math.max(2, pct * cH);
+        const bX  = x - barW / 2;
+        const bY  = PAD.top + cH - bH;
+
+        // Bar gradient
+        const grad = ctx.createLinearGradient(0, bY, 0, bY + bH);
+        grad.addColorStop(0, accentColor + 'dd');
+        grad.addColorStop(1, accentColor + '55');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(bX, bY, barW, bH, [3, 3, 0, 0]);
+        ctx.fill();
+
+        // Value label above bar
+        if (a.amount > 0) {
+            ctx.font = 'bold 9px system-ui,sans-serif';
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.textAlign = 'center';
+            const label = a.amount >= 1000 ? '£' + (a.amount / 1000).toFixed(1) + 'k' : '£' + a.amount.toFixed(0);
+            ctx.fillText(label, x, bY - 5);
+        }
+
+        // Year label
+        ctx.font = '10px system-ui,sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.textAlign = 'center';
+        ctx.fillText(a.year, x, H - 8);
+    });
+
+    // Tooltip on hover
+    canvas._dvData = annual;
+    canvas._dvPAD  = PAD;
+    canvas._dvGap  = gap;
+    canvas._dvBarW = barW;
+    canvas._dvMaxAmt = maxAmt;
+    canvas._dvCH   = cH;
+    canvas._dvH    = H;
+    canvas.onmousemove = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (canvas.width / rect.width / dpr);
+        const data = canvas._dvData;
+        const idx = Math.floor((mx - PAD.left) / canvas._dvGap);
+        if (idx >= 0 && idx < data.length) {
+            const item = data[idx];
+            showTooltip(e, `<strong>${item.year}</strong><br/>£${item.amount.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}`);
+        } else {
+            hideTooltip();
+        }
+    };
+    canvas.onmouseleave = hideTooltip;
+}
+
+/* ── Monthly Income Bar Chart ─────────────────────────────────── */
+function _dvDrawMonthlyChart(monthly) {
+    const canvas = document.getElementById('dvMonthlyChart');
+    const emptyEl = document.getElementById('dvMonthlyEmpty');
+    if (!canvas) return;
+
+    const recent = monthly.slice(-24);  // last 24 months
+    if (!recent.length) {
+        canvas.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = '';
+        return;
+    }
+    canvas.style.display = '';
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth || 400;
+    const H = canvas.offsetHeight || 200;
+    canvas.width  = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    const PAD = { top: 20, right: 16, bottom: 36, left: 52 };
+    const cW = W - PAD.left - PAD.right;
+    const cH = H - PAD.top - PAD.bottom;
+
+    const maxAmt  = Math.max(...recent.map(a => a.amount), 0.01);
+    const n       = recent.length;
+    const barW    = Math.max(4, (cW / n) * 0.65);
+    const gap     = cW / n;
+
+    // Color by year: alternate slightly different tones
+    const yearColors = { prev: '#3b82f6', curr: '#10b981' };
+    const thisYear = new Date().getFullYear().toString();
+
+    // Y gridlines
+    ctx.font = '9.5px "JetBrains Mono",monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.38)';
+    ctx.textAlign = 'right';
+    for (let i = 0; i <= 4; i++) {
+        const v = (i / 4) * maxAmt;
+        const y = PAD.top + cH - (i / 4) * cH;
+        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+        const label = v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + v.toFixed(0);
+        ctx.fillText(label, PAD.left - 4, y + 3.5);
+    }
+
+    // Bars
+    recent.forEach((a, i) => {
+        const x    = PAD.left + i * gap + gap / 2;
+        const pct  = a.amount / maxAmt;
+        const bH   = Math.max(a.amount > 0 ? 2 : 0, pct * cH);
+        const bX   = x - barW / 2;
+        const bY   = PAD.top + cH - bH;
+        const year = a.month.slice(0, 4);
+        const baseColor = year === thisYear ? yearColors.curr : yearColors.prev;
+
+        const grad = ctx.createLinearGradient(0, bY, 0, bY + bH);
+        grad.addColorStop(0, baseColor + 'ee');
+        grad.addColorStop(1, baseColor + '44');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.roundRect(bX, bY, barW, bH, [2, 2, 0, 0]);
+        ctx.fill();
+    });
+
+    // X axis: show month label every 3 months, or on year boundary
+    ctx.font = '9px system-ui,sans-serif';
+    ctx.textAlign = 'center';
+    recent.forEach((a, i) => {
+        const x = PAD.left + i * gap + gap / 2;
+        const mm = parseInt(a.month.slice(5, 7));
+        const yyyy = a.month.slice(0, 4);
+        // Show label on Jan (year boundary) or every 3 months for short series
+        const showLabel = mm === 1 || (n <= 12) || mm % 3 === 1;
+        if (!showLabel) return;
+        ctx.fillStyle = mm === 1 ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)';
+        const label = mm === 1 ? yyyy : new Date(a.month + '-01').toLocaleString('en-GB', { month: 'short' });
+        ctx.fillText(label, x, H - 8);
+    });
+
+    // Legend
+    const legendY = PAD.top - 6;
+    const legendItems = [
+        { color: yearColors.prev, label: String(parseInt(thisYear) - 1) },
+        { color: yearColors.curr, label: thisYear },
+    ];
+    let lx = W - PAD.right;
+    legendItems.reverse().forEach(({ color, label }) => {
+        ctx.font = '9px system-ui,sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        const tw = ctx.measureText(label).width;
+        ctx.fillText(label, lx, legendY + 3);
+        lx -= tw + 4;
+        ctx.fillStyle = color;
+        ctx.fillRect(lx - 8, legendY - 4, 7, 7);
+        lx -= 16;
+    });
+
+    // Hover tooltip
+    canvas._dvData = recent;
+    canvas._dvPAD  = PAD;
+    canvas._dvGap  = gap;
+    canvas.onmousemove = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (canvas.width / rect.width / dpr);
+        const idx = Math.floor((mx - PAD.left) / canvas._dvGap);
+        if (idx >= 0 && idx < recent.length) {
+            const item = recent[idx];
+            const label = new Date(item.month + '-01').toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+            showTooltip(e, `<strong>${label}</strong><br/>£${item.amount.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 })}`);
+        } else {
+            hideTooltip();
+        }
+    };
+    canvas.onmouseleave = hideTooltip;
+}
+
+/* ── Top Payers Table ─────────────────────────────────────────── */
+function _dvRenderTopPayers(byTicker, totalReceived) {
+    const tbody = document.getElementById('dvPayersBody');
+    const badge = document.getElementById('dvPayersBadge');
+    if (!tbody) return;
+    if (badge) badge.textContent = `${byTicker.length} stocks`;
+
+    if (!byTicker.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="dv-empty">No dividend data yet.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = byTicker.map(t => {
+        const pct = totalReceived > 0 ? (t.dividends / totalReceived * 100) : 0;
+        const divYield = t.div_yield > 0 ? t.div_yield.toFixed(2) + '%' : '—';
+        const yoc = t.yoc > 0 ? t.yoc.toFixed(2) + '%' : '—';
+        const logo = `<img src="https://logo.clearbit.com/${_getLogoHost(t.ticker, t.company_name)}" class="dv-stock-logo" onerror="this.style.display='none'">`;
+        return `<tr class="dv-payer-row">
+            <td>
+                <div class="dv-stock-cell">
+                    ${logo}
+                    <div>
+                        <span class="dv-stock-ticker">${esc(t.ticker)}</span>
+                        <span class="dv-stock-name">${esc(t.company_name)}</span>
+                    </div>
+                </div>
+            </td>
+            <td class="dv-col-r dv-val-green">£${t.dividends.toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 })}</td>
+            <td class="dv-col-r">${divYield}</td>
+            <td class="dv-col-r">${yoc}</td>
+            <td class="dv-col-r">
+                <div class="dv-share-cell">
+                    <div class="dv-share-bar-bg"><div class="dv-share-bar-fill" style="width:${Math.min(100,pct).toFixed(1)}%"></div></div>
+                    <span class="dv-share-pct">${pct.toFixed(1)}%</span>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+/* helper: try to get a domain for clearbit logo */
+function _getLogoHost(ticker, company) {
+    const overrides = {
+        AAPL: 'apple.com', MSFT: 'microsoft.com', GOOGL: 'google.com', AMZN: 'amazon.com',
+        TSLA: 'tesla.com', NVDA: 'nvidia.com', META: 'meta.com', NFLX: 'netflix.com',
+        LLOY: 'lloydsbankinggroup.com', BARC: 'barclays.com', HSBA: 'hsbc.com',
+        VOD: 'vodafone.com', BP: 'bp.com', SHEL: 'shell.com', GSK: 'gsk.com',
+        AZN: 'astrazeneca.com', ULVR: 'unilever.com', RIO: 'riotinto.com',
+    };
+    return overrides[ticker] || (company.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 16) + '.com');
+}
+
+/* ── Upcoming Dividend Calendar ───────────────────────────────── */
+function _dvRenderCalendar(data) {
+    const el = document.getElementById('dvCalendarList');
+    const badge = document.getElementById('dvCalBadge');
+    if (!el) return;
+
+    // Filter: upcoming only (next 90 days)
+    const today = new Date();
+    const todayStr = today.toISOString().slice(0, 10);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + 90);
+    const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+    const upcoming = data.filter(d => {
+        const pd = d.payment_date || d.ex_dividend_date || '';
+        return pd >= todayStr && pd <= cutoffStr;
+    }).slice(0, 12);
+
+    if (badge) badge.textContent = `${upcoming.length} upcoming`;
+
+    if (!upcoming.length) {
+        el.innerHTML = '<div class="dv-empty">No dividends in the next 90 days.</div>';
+        return;
+    }
+
+    el.innerHTML = upcoming.map(d => {
+        const payDate   = new Date((d.payment_date || d.ex_dividend_date) + 'T00:00:00');
+        const diff      = Math.round((payDate - today) / 86400000);
+        const relLabel  = diff === 0 ? 'TODAY' : diff === 1 ? 'TOMORROW' : `IN ${diff}d`;
+        const month     = payDate.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase();
+        const day       = payDate.getDate();
+        const payout    = d.expected_payout > 0 ? `£${d.expected_payout.toFixed(2)}` : '';
+        const perShare  = d.amount_per_share > 0 ? `${d.amount_per_share.toFixed(4)} per share` : '';
+        const exFmt     = d.ex_dividend_date ? new Date(d.ex_dividend_date + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
+        const payFmt    = d.payment_date     ? new Date(d.payment_date     + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : '—';
+
+        return `<div class="dv-cal-item">
+            <div class="dv-cal-date">
+                <span class="dv-cal-month">${month}</span>
+                <span class="dv-cal-day">${day}</span>
+                <span class="dv-cal-rel">${esc(relLabel)}</span>
+            </div>
+            <div class="dv-cal-body">
+                <div class="dv-cal-top">
+                    <span class="dv-cal-ticker">${esc(d.ticker)}</span>
+                    <span class="dv-cal-company">${esc(d.company_name || d.ticker)}</span>
+                </div>
+                <div class="dv-cal-meta">
+                    ${perShare ? `<span class="dv-cal-pershare">${esc(perShare)}</span>` : ''}
+                    <span class="dv-cal-dates">Ex: ${exFmt} · Pay: ${payFmt}</span>
+                </div>
+            </div>
+            ${payout ? `<div class="dv-cal-payout">${esc(payout)}</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+/* ── Dividend History Timeline ────────────────────────────────── */
+function _dvRenderHistory(data) {
+    const el = document.getElementById('dvHistoryList');
+    const badge = document.getElementById('dvHistoryBadge');
+    if (!el) return;
+    if (badge) badge.textContent = `${data.length} payments`;
+
+    if (!data.length) {
+        el.innerHTML = '<div class="dv-empty">No dividend history.</div>';
+        return;
+    }
+
+    el.innerHTML = `<div class="dv-history-grid">${data.map(d => {
+        const rawDate = d.paidOn || d.date || '';
+        let dayStr = '—', monthStr = '—', timeStr = '';
+        if (rawDate) {
+            const dt = new Date(rawDate + (rawDate.includes('T') ? '' : 'T00:00:00'));
+            dayStr   = dt.getDate();
+            monthStr = dt.toLocaleString('en-GB', { month: 'short' }).toUpperCase();
+            timeStr  = dt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+        const ticker  = (d.ticker || '').split('_')[0];
+        const company = d.company_name || ticker;
+        const amount  = d.amount > 0 ? `+£${Number(d.amount).toFixed(2)}` : '—';
+
+        return `<div class="dv-hist-item">
+            <div class="dv-hist-date">
+                <span class="dv-hist-month">${monthStr}</span>
+                <span class="dv-hist-day">${dayStr}</span>
+            </div>
+            <div class="dv-hist-info">
+                <span class="dv-hist-ticker">${esc(ticker)}</span>
+                <span class="dv-hist-company">${esc(company)}</span>
+                <span class="dv-hist-time">${timeStr}</span>
+            </div>
+            <span class="dv-hist-amount">${esc(amount)}</span>
+        </div>`;
+    }).join('')}</div>`;
 }
 

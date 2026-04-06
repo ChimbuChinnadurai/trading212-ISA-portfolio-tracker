@@ -222,15 +222,15 @@
         </a>
 
         <!-- Calendar -->
-        <a class="nav-item" data-route="calendar" onclick="navigate('calendar')">
+        <!-- <a class="nav-item" data-route="calendar" onclick="navigate('calendar')">
           <span class="material-symbols-outlined nav-icon">calendar_month</span>
           <span class="nav-label">Calendar</span>
-        </a>
+        </a> -->
 
-        <!-- Market -->
-        <a class="nav-item" data-route="market" onclick="navigate('market')">
-          <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
-          <span class="nav-label">Market</span>
+        <!-- Dividends -->
+        <a class="nav-item" data-route="dividends/combined" onclick="navigate('dividends/combined')">
+          <span class="material-symbols-outlined nav-icon">payments</span>
+          <span class="nav-label">Dividends</span>
         </a>
 
         <!-- Metrics -->
@@ -239,10 +239,17 @@
           <span class="nav-label">Metrics</span>
         </a>
 
+
         <!-- Watchlist -->
         <a class="nav-item" data-route="watchlist" onclick="navigate('watchlist')">
           <span class="material-symbols-outlined nav-icon">bookmark</span>
           <span class="nav-label">Watchlist</span>
+        </a>
+
+        <!-- Market -->
+        <a class="nav-item" data-route="market" onclick="navigate('market')">
+          <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
+          <span class="nav-label">Market</span>
         </a>
 
         <!-- News -->
@@ -500,33 +507,13 @@
                     <span class="fg-rating" id="fg-rating">Loading…</span>
                   </div>
                 </div>
-                <div class="fg-history" id="fg-history">
-                  <div class="skel-item" style="padding:6px 0">
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-55"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item" style="padding:6px 0">
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-50"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item" style="padding:6px 0">
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-55"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                </div>
               </div>
 
               <!-- Upcoming Events -->
               <div class="ov-card" id="ov-upcoming-events">
                 <div class="ov-header">
                   <span class="ov-label">Upcoming Events</span>
-                  <span style="font-size:0.72rem;color:var(--text-muted)">Next 7 days</span>
+                  <span style="font-size:0.72rem;color:var(--text-muted)">Next 30 days</span>
                 </div>
                 <div id="upcomingEventsList" class="upcoming-events-body">
                   <div class="skel-item">
@@ -877,19 +864,27 @@
               <div class="news-feed">
                 <!-- Square Skeletons -->
                 <div class="news-card skel-news-card" style="opacity:1;transform:none">
-                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)"></div>
+                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)">
+                  </div>
                   <div class="news-card-content">
-                    <div class="skeleton skel-line" style="width:30%;height:10px;background:rgba(255,255,255,0.2)"></div>
-                    <div class="skeleton skel-line" style="width:90%;height:18px;background:rgba(255,255,255,0.3)"></div>
-                    <div class="skeleton skel-line" style="width:70%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                    <div class="skeleton skel-line" style="width:30%;height:10px;background:rgba(255,255,255,0.2)">
+                    </div>
+                    <div class="skeleton skel-line" style="width:90%;height:18px;background:rgba(255,255,255,0.3)">
+                    </div>
+                    <div class="skeleton skel-line" style="width:70%;height:18px;background:rgba(255,255,255,0.3)">
+                    </div>
                   </div>
                 </div>
                 <div class="news-card skel-news-card" style="opacity:1;transform:none">
-                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)"></div>
+                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)">
+                  </div>
                   <div class="news-card-content">
-                    <div class="skeleton skel-line" style="width:25%;height:10px;background:rgba(255,255,255,0.2)"></div>
-                    <div class="skeleton skel-line" style="width:85%;height:18px;background:rgba(255,255,255,0.3)"></div>
-                    <div class="skeleton skel-line" style="width:60%;height:18px;background:rgba(255,255,255,0.3)"></div>
+                    <div class="skeleton skel-line" style="width:25%;height:10px;background:rgba(255,255,255,0.2)">
+                    </div>
+                    <div class="skeleton skel-line" style="width:85%;height:18px;background:rgba(255,255,255,0.3)">
+                    </div>
+                    <div class="skeleton skel-line" style="width:60%;height:18px;background:rgba(255,255,255,0.3)">
+                    </div>
                   </div>
                 </div>
               </div>
@@ -959,30 +954,30 @@
         </div><!-- /view-activity -->
 
         <!-- ═══ VIEW: CALENDAR ═══ -->
-        <div id="view-calendar" class="spa-view" style="display:none">
+        <!-- <div id="view-calendar" class="spa-view" style="display:none">
           <div class="view-main">
             <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
 
             <div class="calendar-layout">
 
-              <!-- Left: Dividend Calendar -->
-              <section class="widget-panel widget-dividends calendar-panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">Dividend Calendar</h3>
-                  <span class="panel-subtitle">Upcoming ex-div &amp; pay dates</span>
-                </div>
-                <div id="divCalendarList" class="activity-list-home">
-                  <div class="skel-card">
-                    <div class="skel-card-row">
-                      <div class="skeleton skel-line skel-w-45"></div>
-                      <div class="skeleton skel-line skel-w-45"></div>
-                    </div>
-                  </div>
-                </div>
-              </section>
+               Left: Dividend Calendar -->
+        <!-- <section class="widget-panel widget-dividends calendar-panel">
+          <div class="panel-header">
+            <h3 class="panel-title">Dividend Calendar</h3>
+            <span class="panel-subtitle">Upcoming ex-div &amp; pay dates</span>
+          </div>
+          <div id="divCalendarList" class="activity-list-home">
+            <div class="skel-card">
+              <div class="skel-card-row">
+                <div class="skeleton skel-line skel-w-45"></div>
+                <div class="skeleton skel-line skel-w-45"></div>
+              </div>
+            </div>
+          </div>
+        </section> -->
 
-              <!-- Right: Upcoming Earnings -->
-              <section class="widget-panel widget-earnings calendar-panel">
+        <!-- Right: Upcoming Earnings -->
+        <!-- <section class="widget-panel widget-earnings calendar-panel">
                 <div class="panel-header">
                   <h3 class="panel-title">Upcoming Earnings</h3>
                   <span class="panel-subtitle">Next 6 months</span>
@@ -1001,10 +996,130 @@
                 </div>
               </section>
 
-            </div><!-- /calendar-layout -->
+            </div></calendar-layout
 
-          </div><!-- /view-main -->
-        </div><!-- /view-calendar -->
+      </div>< /view-main -->
+        <!-- </div>/view-calendar -->
+
+        <!-- ═══ VIEW: Dividends & Passive Income ═══ -->
+        <div id="view-dividends" class="spa-view" style="display:none">
+          <div class="dv-body">
+
+            <!-- KPI Cards -->
+            <div class="dv-kpi-row">
+              <div class="dv-kpi-card">
+                <span class="dv-kpi-icon material-symbols-outlined">savings</span>
+                <div class="dv-kpi-content">
+                  <span class="dv-kpi-label">Total Received</span>
+                  <span class="dv-kpi-value" id="dvTotalReceived">—</span>
+                  <span class="dv-kpi-sub" id="dvTotalSub">All time · loading…</span>
+                </div>
+              </div>
+              <div class="dv-kpi-card">
+                <span class="dv-kpi-icon material-symbols-outlined">calendar_today</span>
+                <div class="dv-kpi-content">
+                  <span class="dv-kpi-label">This Year</span>
+                  <span class="dv-kpi-value" id="dvThisYear">—</span>
+                  <span class="dv-kpi-sub" id="dvYoYLabel">vs last year</span>
+                </div>
+              </div>
+              <div class="dv-kpi-card dv-kpi-card--accent">
+                <span class="dv-kpi-icon material-symbols-outlined">trending_up</span>
+                <div class="dv-kpi-content">
+                  <span class="dv-kpi-label">Projected Annual</span>
+                  <span class="dv-kpi-value" id="dvProjected">—</span>
+                  <span class="dv-kpi-sub">Based on TTM</span>
+                </div>
+              </div>
+              <div class="dv-kpi-card">
+                <span class="dv-kpi-icon material-symbols-outlined">event_repeat</span>
+                <div class="dv-kpi-content">
+                  <span class="dv-kpi-label">Avg per Month</span>
+                  <span class="dv-kpi-value" id="dvAvgMonthly">—</span>
+                  <span class="dv-kpi-sub">Trailing 12 months</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="dv-charts-row">
+              <div class="dv-chart-card">
+                <div class="dv-chart-header">
+                  <h3 class="dv-chart-title">Annual Income</h3>
+                  <span class="dv-chart-sub" id="dvAnnualSub"></span>
+                </div>
+                <div class="dv-chart-wrap">
+                  <canvas id="dvAnnualChart"></canvas>
+                  <div class="dv-chart-empty" id="dvAnnualEmpty" style="display:none">No data yet</div>
+                </div>
+              </div>
+              <div class="dv-chart-card">
+                <div class="dv-chart-header">
+                  <h3 class="dv-chart-title">Monthly Income</h3>
+                  <span class="dv-chart-sub">Last 24 months</span>
+                </div>
+                <div class="dv-chart-wrap">
+                  <canvas id="dvMonthlyChart"></canvas>
+                  <div class="dv-chart-empty" id="dvMonthlyEmpty" style="display:none">No data yet</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bottom Row -->
+            <div class="dv-bottom-row">
+
+              <!-- Top Payers -->
+              <div class="dv-payers-card">
+                <div class="dv-section-header">
+                  <h3 class="dv-section-title">Top Dividend Payers</h3>
+                  <span class="dv-section-badge" id="dvPayersBadge">—</span>
+                </div>
+                <div class="dv-payers-wrap">
+                  <table class="dv-payers-table">
+                    <thead>
+                      <tr>
+                        <th>Stock</th>
+                        <th class="dv-col-r">Received</th>
+                        <th class="dv-col-r">Yield</th>
+                        <th class="dv-col-r">YOC</th>
+                        <th class="dv-col-r">Share</th>
+                      </tr>
+                    </thead>
+                    <tbody id="dvPayersBody">
+                      <tr>
+                        <td colspan="5" class="dv-loading">Loading…</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Upcoming Calendar -->
+              <div class="dv-calendar-card">
+                <div class="dv-section-header">
+                  <h3 class="dv-section-title">Upcoming Dividends</h3>
+                  <span class="dv-section-badge" id="dvCalBadge">—</span>
+                </div>
+                <div id="dvCalendarList" class="dv-calendar-list">
+                  <div class="dv-loading">Loading…</div>
+                </div>
+              </div>
+
+            </div><!-- /dv-bottom-row -->
+
+            <!-- Dividend History -->
+            <div class="dv-history-card">
+              <div class="dv-section-header">
+                <h3 class="dv-section-title">Recent Payments</h3>
+                <span class="dv-section-badge" id="dvHistoryBadge">—</span>
+              </div>
+              <div id="dvHistoryList" class="dv-history-list">
+                <div class="dv-loading">Loading…</div>
+              </div>
+            </div>
+
+          </div><!-- /dv-body -->
+        </div><!-- /view-dividends -->
 
         <!-- ═══ VIEW: MARKET ═══ -->
         <div id="view-market" class="spa-view" style="display:none">
@@ -1343,6 +1458,8 @@
                       <th class="wl-fund-col">Revenue LTM</th>
                       <th class="wl-fund-col">P/S</th>
                       <th class="wl-fund-col">P/E</th>
+                      <th class="wl-fund-col">Fwd P/E</th>
+                      <th class="wl-fund-col">5yr P/E</th>
                       <th>48h Chart</th>
                       <th></th>
                     </tr>
@@ -1446,14 +1563,38 @@
                   id="spAvgPrice">0.00</span></div>
               <div class="sp-metric"><span class="sp-metric-label">Current Price</span><span class="sp-metric-value"
                   id="spCurrentPrice">0.00</span></div>
-              <div class="sp-metric"><span class="sp-metric-label">Category</span><span class="sp-metric-value"
-                  id="spSector">Sector</span></div>
+              <!-- <div class="sp-metric"><span class="sp-metric-label">Category</span><span class="sp-metric-value"
+                  id="spSector">Sector</span></div> -->
               <div class="sp-metric"><span class="sp-metric-label">Breakeven</span><span class="sp-metric-value"
                   id="spBreakeven">—</span></div>
               <!-- <div class="sp-metric sp-metric-wide"><span class="sp-metric-label">Held Since</span><span
                   class="sp-metric-value" id="spHeldSince">—</span></div> -->
             </div>
           </div>
+          <!-- Price Chart -->
+          <div id="spPriceChartSection" class="sp-price-chart-section">
+            <div class="sp-chart-header">
+              <h3 class="sp-section-title">Price Chart</h3>
+              <div class="sp-chart-type-toggle">
+                <button class="sp-chart-type-btn active" id="spChartTypeCandle"
+                  onclick="_spSetChartType('candle')">Candle</button>
+                <button class="sp-chart-type-btn" id="spChartTypeLine" onclick="_spSetChartType('line')">Line</button>
+              </div>
+            </div>
+            <div class="sp-range-tabs">
+              <button class="sp-range-tab" data-period="1d" onclick="_spSetPeriod('1d')">1D</button>
+              <button class="sp-range-tab active" data-period="1w" onclick="_spSetPeriod('1w')">1W</button>
+              <button class="sp-range-tab" data-period="1m" onclick="_spSetPeriod('1m')">1M</button>
+              <button class="sp-range-tab" data-period="1y" onclick="_spSetPeriod('1y')">1Y</button>
+              <button class="sp-range-tab" data-period="5y" onclick="_spSetPeriod('5y')">5Y</button>
+            </div>
+            <div class="sp-chart-wrap" id="spChartWrap">
+              <canvas id="spPriceCanvas"></canvas>
+              <div class="sp-chart-tooltip" id="spChartTooltip"></div>
+            </div>
+            <div class="sp-chart-loading" id="spChartLoading">Loading chart…</div>
+          </div>
+          <!-- <div class="sp-divider"></div> -->
           <div id="spAnalystRatingsSection" style="display:none">
             <div class="sp-analyst-header">
               <span class="sp-analyst-title">Analyst Ratings</span>
@@ -1526,6 +1667,26 @@
             </div>
           </div>
           <button class="sp-close-btn" onclick="closeFGPanel()">✕</button>
+        </div>
+        <div class="fg-history" id="fg-history">
+          <div class="skel-item" style="padding:6px 0">
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-55"></div>
+            </div>
+            <div class="skeleton skel-amount"></div>
+          </div>
+          <div class="skel-item" style="padding:6px 0">
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-50"></div>
+            </div>
+            <div class="skeleton skel-amount"></div>
+          </div>
+          <div class="skel-item" style="padding:6px 0">
+            <div class="skel-body">
+              <div class="skeleton skel-line skel-w-55"></div>
+            </div>
+            <div class="skeleton skel-amount"></div>
+          </div>
         </div>
         <div class="side-panel-content" id="fgPanelContent">
           <div class="skel-item">
