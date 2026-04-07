@@ -910,14 +910,14 @@ function renderTable(rows) {
       <td data-colid="avg_price" class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
       <td data-colid="current_price" class="td-right cell-num">${currentPxCell}</td>
       <td data-colid="breakeven" class="td-right cell-num">${beCell}</td>
-      <td data-colid="invested" class="td-right cell-num">${fmt.currency(r.invested)}</td>
-      <td data-colid="value" class="td-right cell-num">${fmt.currency(r.current_value)}</td>
+      <td data-colid="invested" data-label="Invested" class="td-right cell-num">${fmt.currency(r.invested)}</td>
+      <td data-colid="value" data-label="Value" class="td-right cell-num mob-primary">${fmt.currency(r.current_value)}</td>
       <td data-colid="weight" class="td-right">${weightCell}</td>
-      <td data-colid="pnl" class="td-right">
+      <td data-colid="pnl" data-label="P&L" class="td-right mob-secondary">
         ${_pnlCell(r.total_returns, r.returns_pct)}
       </td>
       <td data-colid="fx_impact" class="td-right cell-num">${fxCell}</td>
-      <td data-colid="returns_pct" class="td-right">
+      <td data-colid="returns_pct" data-label="Return" class="td-right mob-badge">
         <span class="pct-badge ${colorClass(r.returns_pct)}">
           ${r.returns_pct >= 0 ? '▲' : '▼'} ${Math.abs(r.returns_pct).toFixed(2)}%
         </span>

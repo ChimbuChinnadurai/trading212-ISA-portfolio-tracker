@@ -201,6 +201,19 @@ function _updateSidebarActive(route) {
     }
 }
 
+function _updateMobileNav(route) {
+    document.querySelectorAll('.mob-nav-item[data-mob-route]').forEach(el => {
+        el.classList.remove('active');
+    });
+    let mobRoute = 'home';
+    if (route === 'home') mobRoute = 'home';
+    else if (route.startsWith('portfolio/') || route.startsWith('stocks/')) mobRoute = 'portfolio';
+    else if (route === 'market') mobRoute = 'market';
+    else if (route === 'watchlist') mobRoute = 'watchlist';
+    const el = document.querySelector(`.mob-nav-item[data-mob-route="${mobRoute}"]`);
+    if (el) el.classList.add('active');
+}
+
 function _cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 /* ── Sidebar collapse ────────────────────────────────────────────────────── */
@@ -252,6 +265,7 @@ function _router() {
     // Update shared UI
     _updateBreadcrumb(hash);
     _updateSidebarActive(hash);
+    _updateMobileNav(hash);
     _updatePidSwitcher(hash);
 
     // Close mobile sidebar on navigation
