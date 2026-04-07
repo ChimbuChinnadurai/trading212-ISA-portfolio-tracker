@@ -169,6 +169,19 @@ function esc(s) {
 
 
 /* ─── Activity panels ─────────────────────────────────────────────────────── */
+let _actFilter = 'all';
+
+function _actSwitchFilter(f) {
+  _actFilter = f;
+  ['all', 'stock', 'dividend'].forEach(t => {
+    const btn = document.getElementById('actTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (btn) btn.classList.toggle('active', t === f);
+  });
+  if (_activityData || _dividendData) {
+    _renderActivity(_activityData || [], _dividendData || []);
+  }
+}
+
 async function loadDetailActivity() {
   try {
     const [actRes, divRes] = await Promise.all([
@@ -191,11 +204,15 @@ function _renderActivity(orders, dividends, warning) {
 
   const taggedOrders = orders.map(o => ({ ...o, _type: 'order' }));
   const taggedDivs = dividends.map(d => ({ ...d, _type: 'dividend' }));
-  const combined = [...taggedOrders, ...taggedDivs].sort((a, b) => {
+  const all = [...taggedOrders, ...taggedDivs].sort((a, b) => {
     const dateA = a.dateExecuted ?? a.dateCreated ?? a.paidOn ?? a.date ?? '';
     const dateB = b.dateExecuted ?? b.dateCreated ?? b.paidOn ?? b.date ?? '';
     return dateB.localeCompare(dateA);
   });
+
+  const combined = _actFilter === 'all' ? all
+    : _actFilter === 'dividend' ? all.filter(i => i._type === 'dividend')
+    : all.filter(i => i._type === 'order');
 
   if (combined.length === 0) {
     const msg = warning ? `API error: ${warning}` : 'No recent activity found.';
@@ -386,6 +403,11 @@ async function loadPortfolio(force = false) {
     }
 
     // Load portfolio bottom panels
+    _actFilter = 'all';
+    ['all', 'stock', 'dividend'].forEach(t => {
+      const btn = document.getElementById('actTab' + t.charAt(0).toUpperCase() + t.slice(1));
+      if (btn) btn.classList.toggle('active', t === 'all');
+    });
     loadDetailActivity();
     loadMonthlyDividends();
     loadDynamicsChart();

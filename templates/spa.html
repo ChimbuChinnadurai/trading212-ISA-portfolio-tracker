@@ -681,15 +681,29 @@
                     </div>
                   </div>
 
-                  <!-- Stale banner -->
-                  <!-- <div id="staleBanner" class="stale-banner" style="display:none">
-                    <span class="material-symbols-outlined"
-                      style="font-size:14px;flex-shrink:0;line-height:1;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20">schedule</span>
-                    <span id="staleBannerText">Data is over 5 minutes old.</span>
-                    <a href="#" onclick="loadPortfolio(true); return false;">Refresh now</a>
-                    <button class="stale-close" onclick="document.getElementById('staleBanner').style.display='none'"
-                      title="Dismiss">✕</button>
-                  </div> -->
+                  <!-- Dynamics of Portfolio Returns -->
+                  <div class="card dynamics-returns-card" id="dynamicsCard">
+                    <div class="dynamics-header">
+                      <div class="dynamics-title-wrap">
+                        <span class="chart-card-title">Dynamics of Portfolio Returns</span>
+                        <span class="dynamics-hint">Month-over-month portfolio value change</span>
+                      </div>
+                      <div class="dynamics-range-tabs" id="dynamicsRangeTabs">
+                        <button class="dyn-tab" data-range="all">all</button>
+                        <button class="dyn-tab active" data-range="12m">12m</button>
+                        <!-- Year tabs injected by JS -->
+                      </div>
+                    </div>
+                    <div class="dynamics-chart-wrap">
+                      <canvas id="dynamicsChart"></canvas>
+                      <div id="dynamicsTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                    </div>
+                    <div class="dynamics-legend">
+                      <span class="dyn-leg-dot"></span>
+                      <span class="dyn-leg-label">Portfolio</span>
+                    </div>
+                  </div>
+
                 </div><!-- /portfolio-left -->
 
                 <!-- Right rail: stacked panels -->
@@ -702,6 +716,17 @@
                       <h3 class="panel-title">Recent Activity</h3>
                       <div class="panel-badge" id="detailActivityBadge" style="display:none"></div>
                     </div>
+                    <div class="act-filter-tabs">
+                      <button class="act-filter-tab active" id="actTabAll" onclick="_actSwitchFilter('all')">All</button>
+                      <button class="act-filter-tab" id="actTabStock" onclick="_actSwitchFilter('stock')">
+                        <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">trending_up</span>
+                        Stocks
+                      </button>
+                      <button class="act-filter-tab" id="actTabDividend" onclick="_actSwitchFilter('dividend')">
+                        <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">payments</span>
+                        Dividends
+                      </button>
+                    </div>
                     <div class="activity-list" id="detailActivityList">
                       <div class="activity-loading">Loading…</div>
                     </div>
@@ -710,29 +735,6 @@
                 </div><!-- /portfolio-right-rail -->
 
               </div><!-- /portfolio-layout -->
-
-              <!-- Dynamics of Portfolio Returns (full-width) -->
-              <div class="card dynamics-returns-card" id="dynamicsCard">
-                <div class="dynamics-header">
-                  <div class="dynamics-title-wrap">
-                    <span class="chart-card-title">Dynamics of Portfolio Returns</span>
-                    <span class="dynamics-hint">Month-over-month portfolio value change</span>
-                  </div>
-                  <div class="dynamics-range-tabs" id="dynamicsRangeTabs">
-                    <button class="dyn-tab" data-range="all">all</button>
-                    <button class="dyn-tab active" data-range="12m">12m</button>
-                    <!-- Year tabs injected by JS -->
-                  </div>
-                </div>
-                <div class="dynamics-chart-wrap">
-                  <canvas id="dynamicsChart"></canvas>
-                  <div id="dynamicsTooltip" class="mkt-chart-tooltip" style="display:none"></div>
-                </div>
-                <div class="dynamics-legend">
-                  <span class="dyn-leg-dot"></span>
-                  <span class="dyn-leg-label">Portfolio</span>
-                </div>
-              </div>
 
             </div><!-- /dashboard -->
           </div><!-- /view-main -->
@@ -1448,8 +1450,7 @@
             <div class="watchlist-wrap">
               <!-- Tabs -->
               <div class="wl-tabs">
-                <button class="wl-tab active" id="wlTabAll" onclick="_wlSwitchTab('all')">All</button>
-                <button class="wl-tab" id="wlTabStock" onclick="_wlSwitchTab('stock')">
+                <button class="wl-tab active" id="wlTabStock" onclick="_wlSwitchTab('stock')">
                   <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-3px">trending_up</span>
                   Stocks
                   <span class="wl-tab-count" id="wlTabStockCount"></span>

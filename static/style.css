@@ -750,6 +750,21 @@ html[data-theme="dark"] .header {
   transform: translateY(-1px);
 }
 
+.s-card.s-card-blue {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(59, 130, 246, 0.06));
+}
+
+div#returnsCard {
+  border-left: 3px solid #10b981;
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(16, 185, 129, 0.06));
+}
+
+.s-card.s-card-teal {
+  border-left: 3px solid rgb(139, 92, 246);
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(139, 92, 246, 0.06));
+}
+
 /* Coloured top accent bars — dark mode only */
 html[data-theme="light"] .s-card::before {
   display: none;
@@ -1270,7 +1285,7 @@ html[data-theme="light"] .s-card::before {
 }
 
 .activity-list {
-  max-height: 480px;
+  max-height: 600px;
   /* Fixed height for consistency */
   overflow-y: auto;
   min-height: 0;
@@ -7079,7 +7094,7 @@ html[data-theme="dark"] .nav-group-header.active {
   grid-template-columns: 1fr 340px;
   gap: 16px;
   padding-top: 20px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .portfolio-left {
@@ -7093,6 +7108,7 @@ html[data-theme="dark"] .nav-group-header.active {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  height: 100%;
 }
 
 /* ── Portfolio position heatmap (treemap) ────────────────────────────────── */
@@ -7281,8 +7297,8 @@ html[data-theme="dark"] .nav-group-header.active {
   padding: 0;
   display: flex;
   flex-direction: column;
-  min-height: 200px;
-  max-height: 420px;
+  flex: 1;
+  min-height: 0;
 }
 
 .portfolio-panel .panel-header {
@@ -7624,6 +7640,16 @@ html[data-theme="dark"] .nav-group-header.active {
 
   .portfolio-layout {
     grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .portfolio-right-rail {
+    height: auto;
+  }
+
+  .portfolio-panel {
+    flex: none;
+    max-height: 420px;
   }
 
   .portfolio-heatmap-card {
@@ -9027,13 +9053,47 @@ div#sectorBarsList {
   color: #fff;
 }
 
+/* Activity filter tabs */
+.act-filter-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.act-filter-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.act-filter-tab:hover:not(.active) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.act-filter-tab.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* Tabs */
 .wl-tabs {
   display: flex;
   gap: 4px;
-  padding: 0 24px 12px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 0;
+  padding-bottom: 12px;
 }
 
 .wl-tab {
@@ -10347,7 +10407,7 @@ html[data-theme="dark"] .widget-insider {
 
 /* ── Dynamics of Portfolio Returns ──────────────────────────────────────── */
 .dynamics-returns-card {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .dynamics-header {
@@ -10400,7 +10460,7 @@ html[data-theme="dark"] .widget-insider {
 
 .dynamics-chart-wrap {
   position: relative;
-  height: 260px;
+  height: 190px;
   padding: 0 4px;
 }
 

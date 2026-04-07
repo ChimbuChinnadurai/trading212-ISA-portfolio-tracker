@@ -4157,7 +4157,7 @@ function closeDigestModal() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const _WL_STORAGE_KEY = 'wl:tickers:v1';
-let _wlActiveTab = 'all';
+let _wlActiveTab = 'stock';
 let _wlAddType = 'stock';
 
 function _wlSetAddType(type) {
@@ -4168,14 +4168,14 @@ function _wlSetAddType(type) {
 
 function _wlSwitchTab(tab) {
     _wlActiveTab = tab;
-    ['all', 'stock', 'etf'].forEach(t => {
+    ['stock', 'etf'].forEach(t => {
         const btn = document.getElementById('wlTab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (btn) btn.classList.toggle('active', t === tab);
     });
     // Show/hide rows based on type
     document.querySelectorAll('#watchlistTableBody .wl-table-row').forEach(row => {
         const rtype = row.dataset.type || 'stock';
-        row.style.display = (tab === 'all' || rtype === tab) ? '' : 'none';
+        row.style.display = rtype === tab ? '' : 'none';
     });
 }
 
@@ -4279,7 +4279,7 @@ function _renderWatchlistTable(list) {
         row.className = 'wl-table-row';
         row.dataset.type = itemType;
         // Apply active tab filter immediately
-        if (_wlActiveTab !== 'all' && itemType !== _wlActiveTab) row.style.display = 'none';
+        if (itemType !== _wlActiveTab) row.style.display = 'none';
 
         const typeBadge = itemType === 'etf'
             ? `<span class="wl-type-badge wl-type-etf">ETF</span>`
@@ -4287,7 +4287,7 @@ function _renderWatchlistTable(list) {
 
         row.innerHTML = `
             <td data-colid="wl-ticker"><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
-            <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}">${typeBadge} —</td>
+            <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}">—</td>
             <td data-colid="wl-price" class="wl-price" id="wl-price-${ticker}">—</td>
             <td data-colid="wl-change" class="wl-change" id="wl-chg-${ticker}">—</td>
             <td data-colid="wl-min" class="wl-target-col wl-target-min" id="wl-min-${ticker}">—</td>
@@ -4318,23 +4318,23 @@ function _renderWatchlistTable(list) {
 
 // ── Watchlist column picker ───────────────────────────────────────────────────
 const _WL_COL_DEFS = [
-    { id: 'wl-ticker',  label: 'Ticker',      locked: true },
-    { id: 'wl-company', label: 'Company',      locked: true },
-    { id: 'wl-price',   label: 'Price' },
-    { id: 'wl-change',  label: 'Change' },
-    { id: 'wl-min',     label: 'Min Target' },
-    { id: 'wl-avg',     label: 'Avg Target' },
-    { id: 'wl-max',     label: 'Max Target' },
-    { id: 'wl-signal',  label: 'Signal' },
-    { id: 'wl-mktcap',  label: 'Mkt Cap' },
+    { id: 'wl-ticker', label: 'Ticker', locked: true },
+    { id: 'wl-company', label: 'Company', locked: true },
+    { id: 'wl-price', label: 'Price' },
+    { id: 'wl-change', label: 'Change' },
+    { id: 'wl-min', label: 'Min Target' },
+    { id: 'wl-avg', label: 'Avg Target' },
+    { id: 'wl-max', label: 'Max Target' },
+    { id: 'wl-signal', label: 'Signal' },
+    { id: 'wl-mktcap', label: 'Mkt Cap' },
     { id: 'wl-revenue', label: 'Revenue LTM' },
-    { id: 'wl-ps',      label: 'P/S' },
-    { id: 'wl-pe',      label: 'P/E' },
-    { id: 'wl-fpe',     label: 'Fwd P/E' },
-    { id: 'wl-5pe',     label: '5yr P/E' },
-    { id: 'wl-ret6m',   label: '6M Return' },
-    { id: 'wl-ret1y',   label: '1Y Return' },
-    { id: 'wl-chart',   label: '48h Chart' },
+    { id: 'wl-ps', label: 'P/S' },
+    { id: 'wl-pe', label: 'P/E' },
+    { id: 'wl-fpe', label: 'Fwd P/E' },
+    { id: 'wl-5pe', label: '5yr P/E' },
+    { id: 'wl-ret6m', label: '6M Return' },
+    { id: 'wl-ret1y', label: '1Y Return' },
+    { id: 'wl-chart', label: '48h Chart' },
 ];
 
 function _loadWlColVis() {
