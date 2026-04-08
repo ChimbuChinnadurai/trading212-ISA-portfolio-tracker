@@ -695,6 +695,25 @@ function _onHeatmapCellClick(e) {
     });
 }
 
+/* ─── Heatmap resize observer ────────────────────────────────────────────── */
+// Re-renders the treemap whenever the container is resized (e.g. orientation
+// change, sidebar collapse, window resize). Called once from _initHomeView.
+function initHeatmapResizeObserver() {
+    const container = document.getElementById('heatmapContainer');
+    if (!container || !window.ResizeObserver) return;
+    // Guard: only attach once even if _initHomeView is called again
+    if (container._roAttached) return;
+    container._roAttached = true;
+
+    let _raf;
+    new ResizeObserver(() => {
+        cancelAnimationFrame(_raf);
+        _raf = requestAnimationFrame(() => {
+            if (_tickerData && _tickerData.length) _renderHeatmap(_tickerData);
+        });
+    }).observe(container);
+}
+
 /* ─── Sparkline charts ───────────────────────────────────────────────────── */
 const SPARK_COLORS = {
     '1': { line: '#3b82f6', fill: 'rgba(59,130,246,0.18)' },

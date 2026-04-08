@@ -51,9 +51,21 @@ const _newsTimers = {
 
 /* ── View helpers ────────────────────────────────────────────────────────── */
 function _showView(name) {
-    document.querySelectorAll('.spa-view').forEach(el => {
-        el.style.display = el.id === `view-${name}` ? '' : 'none';
-    });
+    const target = document.getElementById(`view-${name}`);
+    if (!target) return;
+
+    // Use View Transitions API where available for smooth page changes
+    if (document.startViewTransition) {
+        document.startViewTransition(() => {
+            document.querySelectorAll('.spa-view').forEach(el => {
+                el.style.display = el.id === `view-${name}` ? '' : 'none';
+            });
+        });
+    } else {
+        document.querySelectorAll('.spa-view').forEach(el => {
+            el.style.display = el.id === `view-${name}` ? '' : 'none';
+        });
+    }
 }
 
 /* ── Breadcrumb ──────────────────────────────────────────────────────────── */
@@ -426,6 +438,7 @@ function _initHomeView() {
     if (typeof loadMarketStatus === 'function') loadMarketStatus();
     if (typeof loadStockTicker === 'function') loadStockTicker();
     if (typeof loadMarketDigest === 'function') loadMarketDigest();
+    if (typeof initHeatmapResizeObserver === 'function') initHeatmapResizeObserver();
     _startHomeTimers();
 }
 

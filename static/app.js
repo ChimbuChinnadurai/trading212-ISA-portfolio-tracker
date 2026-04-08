@@ -1580,6 +1580,46 @@ function _ratingCls(consensus) {
   }[consensus] || '';
 }
 
+/* ─── Side panel swipe-to-dismiss (mobile bottom sheet) ─────────────────── */
+// Attaches once; detects a downward swipe ≥120px and closes the panel.
+let _panelSwipeInitialized = false;
+function _initPanelSwipeDismiss() {
+  if (_panelSwipeInitialized) return;
+  _panelSwipeInitialized = true;
+
+  const panel = document.getElementById('sidePanel');
+  if (!panel) return;
+
+  let startY = 0, isDragging = false;
+
+  panel.addEventListener('touchstart', e => {
+    if (window.innerWidth > 768) return;
+    // Only start drag when touching the handle area (top 56px of panel)
+    if (e.touches[0].clientY - panel.getBoundingClientRect().top > 56) return;
+    startY = e.touches[0].clientY;
+    isDragging = true;
+    panel.style.transition = 'none';
+  }, { passive: true });
+
+  panel.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    const dy = Math.max(0, e.touches[0].clientY - startY);
+    panel.style.transform = `translateY(${dy}px)`;
+  }, { passive: true });
+
+  panel.addEventListener('touchend', e => {
+    if (!isDragging) return;
+    isDragging = false;
+    panel.style.transition = '';
+    const dy = e.changedTouches[0].clientY - startY;
+    if (dy > 120) {
+      window.closeStockPanel();
+    } else {
+      panel.style.transform = '';
+    }
+  });
+}
+
 /* ─── Stock Drill-Down Side Panel ────────────────────────────────────────── */
 window.openStockPanel = function (r) {
   // Populate headers
@@ -1623,6 +1663,7 @@ window.openStockPanel = function (r) {
   if (hsEl) hsEl.textContent = '—';
 
   // Show panel
+  _initPanelSwipeDismiss();
   document.getElementById('sidePanelBackdrop').classList.add('active');
   document.getElementById('sidePanel').classList.add('open');
 
