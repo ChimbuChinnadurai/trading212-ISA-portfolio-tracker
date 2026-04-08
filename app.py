@@ -11,7 +11,7 @@ load_dotenv()
 from collections import defaultdict
 from datetime import date, timedelta
 
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
 import finviz_data as fvd
 import ai_digest as _ai_digest
 import gemini_utils as _gemini
@@ -50,6 +50,11 @@ PORTFOLIO_NAMES = {
     "1": os.environ.get("PORTFOLIO_NAME_1", "Portfolio 1"),
     "2": os.environ.get("PORTFOLIO_NAME_2", "Portfolio 2")
 }
+
+
+@app.route("/favicon.ico")
+def favicon():
+    return send_from_directory(app.static_folder, "favicon.svg", mimetype="image/svg+xml")
 
 
 @app.route("/")
