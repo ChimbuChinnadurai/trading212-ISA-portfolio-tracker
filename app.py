@@ -780,10 +780,15 @@ def stock_tickers_api():
                 price      = q.get("preMarketPrice")
                 change     = q.get("preMarketChange")
                 change_pct = q.get("preMarketChangePercent")
-            elif market_state in ("POST", "POSTPOST"):
-                price      = q.get("postMarketPrice")
-                change     = q.get("postMarketChange")
-                change_pct = q.get("postMarketChangePercent")
+            elif market_state in ("POST", "POSTPOST", "PREPRE", "CLOSED"):
+                # All post-regular-session states: use postMarketPrice (last AH trade).
+                # postMarketChangePercent is only vs today's regular close — re-compute
+                # from regularMarketPreviousClose for a true full-day change.
+                price = q.get("postMarketPrice")
+                prev = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
+                if price is not None and prev and prev != 0:
+                    change     = price - prev
+                    change_pct = (change / prev) * 100
 
             if price is None:
                 price      = q.get("regularMarketPrice")
@@ -1005,15 +1010,17 @@ def stock_chart(ticker):
     clean  = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
     symbol = f"{clean}{suffix}"
 
-    cache_key = f"stock:chart:v1:{symbol}:{period}"
+    cache_key = f"stock:chart:v2:{symbol}:{period}"
     TTL = 60 if period == "1d" else 300 if period == "1w" else 3600
+    # Include pre/post market candles for intraday periods (1d=5m, 1w=1h)
+    include_pre_post = "true" if period in ("1d", "1w") else "false"
 
     try:
         data = kv_get(cache_key, TTL)
         if data is None:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
-                params={"range": range_, "interval": interval_, "includePrePost": "false"},
+                params={"range": range_, "interval": interval_, "includePrePost": include_pre_post},
                 headers={"User-Agent": "Mozilla/5.0"},
                 timeout=10,
             )
@@ -1399,9 +1406,12 @@ def watchlist_price():
         if market_state == "PRE":
             price      = q.get("preMarketPrice")
             change_pct = q.get("preMarketChangePercent")
-        elif market_state in ("POST", "POSTPOST"):
-            price      = q.get("postMarketPrice")
-            change_pct = q.get("postMarketChangePercent")
+        elif market_state in ("POST", "POSTPOST", "PREPRE", "CLOSED"):
+            price = q.get("postMarketPrice")
+            # Recompute vs previous close for true full-day change
+            prev = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
+            if price is not None and prev and prev != 0:
+                change_pct = ((price - prev) / prev) * 100
 
         if price is None:
             price      = q.get("regularMarketPrice")
