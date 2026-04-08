@@ -4164,11 +4164,28 @@ function _wlSetAddType(type) {
     _wlAddType = type;
     document.getElementById('wlTypeStock').classList.toggle('active', type === 'stock');
     document.getElementById('wlTypeEtf').classList.toggle('active', type === 'etf');
+    document.getElementById('wlTypeCrypto').classList.toggle('active', type === 'crypto');
+    // Hide country select for crypto — Yahoo Finance uses BTC-USD format, no country needed
+    const countryEl = document.getElementById('watchlistCountrySelect');
+    if (countryEl) countryEl.style.display = type === 'crypto' ? 'none' : '';
+    const input = document.getElementById('watchlistTickerInput');
+    if (input) {
+        if (type === 'crypto') {
+            input.placeholder = 'Ticker (e.g. BTC, ETH, SOL)';
+            input.maxLength = 16;
+        } else if (type === 'etf') {
+            input.placeholder = 'Ticker (e.g. VOO, QQQ)';
+            input.maxLength = 16;
+        } else {
+            input.placeholder = 'Ticker (e.g. AAPL, NVDA)';
+            input.maxLength = 16;
+        }
+    }
 }
 
 function _wlSwitchTab(tab) {
     _wlActiveTab = tab;
-    ['stock', 'etf'].forEach(t => {
+    ['stock', 'etf', 'crypto'].forEach(t => {
         const btn = document.getElementById('wlTab' + t.charAt(0).toUpperCase() + t.slice(1));
         if (btn) btn.classList.toggle('active', t === tab);
     });
@@ -4223,9 +4240,12 @@ async function addWatchlistTicker() {
     const select = document.getElementById('watchlistCountrySelect');
     if (!input) return;
 
-    const ticker = input.value.trim().toUpperCase();
-    const country = select ? select.value : 'US';
+    let ticker = input.value.trim().toUpperCase();
+    const country = (_wlAddType === 'crypto') ? 'US' : (select ? select.value : 'US');
     if (!ticker) return;
+
+    // Normalise crypto: BTC → BTC-USD, ETH-USD stays as-is
+    if (_wlAddType === 'crypto' && !ticker.includes('-')) ticker = ticker + '-USD';
 
     const list = await _wlLoad();
     if (list.some(r => r.ticker === ticker)) {
@@ -4265,12 +4285,15 @@ function _renderWatchlistTable(list) {
     tbody.innerHTML = '';
 
     // Update tab counts
-    const stockCount = list.filter(r => (r.type || 'stock') === 'stock').length;
-    const etfCount = list.filter(r => (r.type || 'stock') === 'etf').length;
+    const stockCount  = list.filter(r => (r.type || 'stock') === 'stock').length;
+    const etfCount    = list.filter(r => (r.type || 'stock') === 'etf').length;
+    const cryptoCount = list.filter(r => (r.type || 'stock') === 'crypto').length;
     const scEl = document.getElementById('wlTabStockCount');
     const ecEl = document.getElementById('wlTabEtfCount');
-    if (scEl) scEl.textContent = stockCount || '';
-    if (ecEl) ecEl.textContent = etfCount || '';
+    const ccEl = document.getElementById('wlTabCryptoCount');
+    if (scEl) scEl.textContent = stockCount  || '';
+    if (ecEl) ecEl.textContent = etfCount    || '';
+    if (ccEl) ccEl.textContent = cryptoCount || '';
 
     list.forEach(({ ticker, country, type }) => {
         const itemType = type || 'stock';
@@ -4283,6 +4306,8 @@ function _renderWatchlistTable(list) {
 
         const typeBadge = itemType === 'etf'
             ? `<span class="wl-type-badge wl-type-etf">ETF</span>`
+            : itemType === 'crypto'
+            ? `<span class="wl-type-badge wl-type-crypto">Crypto</span>`
             : `<span class="wl-type-badge wl-type-stock">Stock</span>`;
 
         row.innerHTML = `

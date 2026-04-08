@@ -1443,7 +1443,7 @@
               </div>
               <div class="watchlist-add-bar">
                 <input id="watchlistTickerInput" class="watchlist-input" type="text"
-                  placeholder="Ticker (e.g. AAPL, NVDA)" maxlength="12"
+                  placeholder="Ticker (e.g. AAPL, NVDA)" maxlength="16"
                   onkeydown="if(event.key==='Enter') addWatchlistTicker()" />
                 <select id="watchlistCountrySelect" class="watchlist-select">
                   <option value="US">US</option>
@@ -1457,6 +1457,7 @@
                 <div class="wl-type-toggle">
                   <button class="wl-type-btn active" id="wlTypeStock" onclick="_wlSetAddType('stock')">Stock</button>
                   <button class="wl-type-btn" id="wlTypeEtf" onclick="_wlSetAddType('etf')">ETF</button>
+                  <button class="wl-type-btn" id="wlTypeCrypto" onclick="_wlSetAddType('crypto')">Crypto</button>
                 </div>
                 <div class="col-picker-wrap">
                   <button class="btn btn-col-picker" id="wlColPickerBtn" onclick="toggleWlColPicker()">
@@ -1484,6 +1485,12 @@
                     style="font-size:14px;vertical-align:-3px">account_balance</span>
                   ETFs
                   <span class="wl-tab-count" id="wlTabEtfCount"></span>
+                </button>
+                <button class="wl-tab" id="wlTabCrypto" onclick="_wlSwitchTab('crypto')">
+                  <span class="material-symbols-outlined"
+                    style="font-size:14px;vertical-align:-3px">currency_bitcoin</span>
+                  Crypto
+                  <span class="wl-tab-count" id="wlTabCryptoCount"></span>
                 </button>
               </div>
 
