@@ -280,6 +280,30 @@
     <!-- Mobile scrim -->
     <div class="sidebar-scrim" id="sidebarScrim" onclick="toggleSidebar()"></div>
 
+    <!-- Mobile bottom navigation bar -->
+    <nav class="mobile-bottom-nav" id="mobileBottomNav">
+      <a class="mob-nav-item" data-mob-route="home" onclick="navigate('home'); return false;" href="#">
+        <span class="material-symbols-outlined mob-nav-icon">home</span>
+        <span class="mob-nav-label">Home</span>
+      </a>
+      <a class="mob-nav-item" data-mob-route="portfolio" onclick="navigate('portfolio/combined'); return false;" href="#">
+        <span class="material-symbols-outlined mob-nav-icon">pie_chart</span>
+        <span class="mob-nav-label">Portfolio</span>
+      </a>
+      <a class="mob-nav-item" data-mob-route="market" onclick="navigate('market'); return false;" href="#">
+        <span class="material-symbols-outlined mob-nav-icon">candlestick_chart</span>
+        <span class="mob-nav-label">Market</span>
+      </a>
+      <a class="mob-nav-item" data-mob-route="watchlist" onclick="navigate('watchlist'); return false;" href="#">
+        <span class="material-symbols-outlined mob-nav-icon">bookmark</span>
+        <span class="mob-nav-label">Watchlist</span>
+      </a>
+      <a class="mob-nav-item" data-mob-route="more" onclick="toggleSidebar(); return false;" href="#">
+        <span class="material-symbols-outlined mob-nav-icon">more_horiz</span>
+        <span class="mob-nav-label">More</span>
+      </a>
+    </nav>
+
     <!-- ═══ MAIN ═══ -->
     <div class="app-main">
 

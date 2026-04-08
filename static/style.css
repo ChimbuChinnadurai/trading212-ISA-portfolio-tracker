@@ -164,6 +164,16 @@ html[data-theme="dark"] .ov-card-fg {
   -webkit-backdrop-filter: blur(8px);
 }
 
+@media (max-width: 960px) {
+  /* backdrop-filter creates smudge artifacts on mobile through semi-transparent cards */
+  html[data-theme="dark"] .ov-card-fg,
+  html[data-theme="dark"] .ov-card-heatmap {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--bg-card);
+  }
+}
+
 html[data-theme="dark"] .ov-card-heatmap {
   background: rgba(15, 22, 41, 0.75);
   border: 1px solid #1e2d4a;
@@ -1719,6 +1729,114 @@ html[data-theme="light"] .s-card::before {
   min-height: 0;
 }
 
+/* ── Mobile: holdings table → card rows ──────────────────────────────────── */
+@media (max-width: 640px) {
+  .table-scroll {
+    overflow-x: hidden;
+  }
+
+  .portfolio-table thead {
+    display: none;
+  }
+
+  .portfolio-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 0 0 8px;
+    padding: 10px 12px;
+    background: var(--bg-card);
+    gap: 0;
+  }
+
+  /* Hide columns we don't need in the card view */
+  .portfolio-table td[data-colid="country"],
+  .portfolio-table td[data-colid="trend"],
+  .portfolio-table td[data-colid="shares"],
+  .portfolio-table td[data-colid="avg_price"],
+  .portfolio-table td[data-colid="current_price"],
+  .portfolio-table td[data-colid="breakeven"],
+  .portfolio-table td[data-colid="invested"],
+  .portfolio-table td[data-colid="weight"],
+  .portfolio-table td[data-colid="fx_impact"],
+  .portfolio-table td[data-colid="div_yield"],
+  .portfolio-table td[data-colid="rating"] {
+    display: none !important;
+  }
+
+  /* Row 1: Ticker (left) + Return badge (right) */
+  .portfolio-table td[data-colid="ticker"] {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 0 8px 0 0;
+    border: none;
+  }
+
+  .portfolio-table td[data-colid="returns_pct"] {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    order: 2;
+  }
+
+  /* Row 1: Company name fills remaining space */
+  .portfolio-table td[data-colid="company"] {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    order: 1;
+  }
+
+  .portfolio-table td[data-colid="company"] .cell-company {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+
+  .portfolio-table td[data-colid="company"] .cell-sector {
+    display: none;
+  }
+
+  /* Row 2: Value (left) + P&L (right) */
+  .portfolio-table td[data-colid="value"],
+  .portfolio-table td[data-colid="pnl"] {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    margin-top: 6px;
+    padding: 0;
+    border: none;
+    width: 50%;
+    flex: 0 0 50%;
+    font-size: 0.82rem;
+  }
+
+  .portfolio-table td[data-colid="pnl"] {
+    justify-content: flex-end;
+  }
+
+  .portfolio-table td[data-colid="value"]::before {
+    content: attr(data-label);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-right: 4px;
+    flex-shrink: 0;
+  }
+}
+
 /* ─── Table ───────────────────────────────────────────────────────────────── */
 .portfolio-table {
   width: 100%;
@@ -2253,6 +2371,16 @@ th.sort-desc .sort-icon::before {
 
 .hm-tx {
   font-size: 7px;
+}
+
+@media (max-width: 768px) {
+  .hm-tl { font-size: 11px; }
+  .hm-tm { font-size: 9px; }
+  .hm-ts { font-size: 8px; }
+  .hm-tx { font-size: 7px; }
+  .hm-pm { font-size: 10px; }
+  .hm-ps { font-size: 8px; }
+  .hm-pricem { font-size: 9px; }
 }
 
 .hm-p {
@@ -3069,9 +3197,20 @@ th.sort-desc .sort-icon::before {
     font-size: 1rem;
   }
 
-  /* Hide market status pills — too cluttered on phone */
-  .mkt-status-wrap {
-    display: none;
+  /* Condense market pills to dots-only on phone */
+  .mkt-pill {
+    padding: 4px;
+    gap: 0;
+    font-size: 0;
+    border-radius: 50%;
+    width: 18px;
+    height: 18px;
+    justify-content: center;
+  }
+
+  .mkt-dot {
+    width: 8px;
+    height: 8px;
   }
 }
 
@@ -3094,6 +3233,26 @@ th.sort-desc .sort-icon::before {
   .dashboard {
     padding: 8px 10px;
     gap: 8px;
+  }
+}
+
+/* ─── Portfolio summary cards — mobile tightening ────────────────────────── */
+@media (max-width: 768px) {
+  .s-card {
+    padding: 14px 16px 12px;
+    gap: 7px;
+  }
+
+  .s-card-value {
+    font-size: 1.5rem;
+  }
+
+  .summary-cards {
+    gap: 10px;
+  }
+
+  .portfolio-table th {
+    font-size: 0.75rem;
   }
 }
 
@@ -3148,7 +3307,7 @@ th.sort-desc .sort-icon::before {
 
 /* ─── Footer freshness indicators ───────────────────────────────────────── */
 .freshness-info {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
 }
 
@@ -4839,8 +4998,7 @@ html[data-theme="dark"] .div-tl-status--pending {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 420px;
-  max-width: 100vw;
+  width: min(420px, 100vw - 16px);
   background: var(--bg-card);
   border-left: 1px solid var(--border);
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.4);
@@ -4849,6 +5007,7 @@ html[data-theme="dark"] .div-tl-status--pending {
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   display: flex;
   flex-direction: column;
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .side-panel.open {
@@ -6917,7 +7076,7 @@ html[data-theme="dark"] .nav-group-header.active {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, .45);
-  z-index: 199;
+  z-index: 250;
 }
 
 .sidebar-scrim.active {
@@ -6958,6 +7117,78 @@ html[data-theme="dark"] .nav-group-header.active {
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+
+/* ── Mobile bottom navigation bar ─────────────────────────────────────────── */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 56px;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+    z-index: 200;
+    padding-bottom: env(safe-area-inset-bottom);
+    box-shadow: 0 -4px 16px rgba(0,0,0,0.15);
+  }
+
+  .mob-nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 0.6rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: color 0.15s;
+    padding: 6px 4px 4px;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mob-nav-item.active {
+    color: var(--accent);
+  }
+
+  .mob-nav-item:active {
+    opacity: 0.7;
+  }
+
+  .mob-nav-icon {
+    font-size: 22px;
+    line-height: 1;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+
+  .mob-nav-item.active .mob-nav-icon {
+    font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  }
+
+  .mob-nav-label {
+    line-height: 1;
+  }
+
+  /* Pad main content so bottom nav doesn't overlap last items */
+  .app-main {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom));
+  }
+
+  /* Hide hamburger since we have bottom nav */
+  .hamburger-btn {
+    display: none !important;
+  }
+}
+
 
 .topbar-breadcrumb {
   display: flex;
@@ -7626,9 +7857,7 @@ html[data-theme="dark"] .nav-group-header.active {
     height: 6px;
   }
 
-  .hamburger-btn {
-    display: flex;
-  }
+  /* hamburger hidden — replaced by mobile bottom nav (see .mobile-bottom-nav block) */
 
   .sidebar-collapse-btn {
     display: none;
@@ -7737,8 +7966,13 @@ html[data-theme="dark"] .nav-group-header.active {
     grid-template-columns: 1fr;
   }
 
+  /* Keep digest button visible as icon-only, don't hide it */
   #digestBtn {
-    display: none;
+    display: flex;
+    width: 34px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
   }
 
   #greetingText {
@@ -7770,7 +8004,7 @@ html[data-theme="dark"] .nav-group-header.active {
   flex-direction: column;
   gap: 14px;
   min-height: 0;
-  overflow: hidden;
+  overflow: hidden; /* desktop: clips to viewport height */
 }
 
 /* Row 1: 3 portfolio cards */
@@ -8117,10 +8351,22 @@ html[data-theme="dark"] .nav-group-header.active {
 @media (max-width: 960px) {
   .home-body {
     grid-template-columns: 1fr;
+    flex: none;        /* don't try to fill viewport — let content dictate height */
+    min-height: unset;
+    align-items: start;
   }
 
+  /* Show sidebar below main content instead of hiding it */
   .home-sidebar {
-    display: none;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    overflow: visible;
+  }
+
+  /* F&G card: fixed height so gauge renders properly */
+  .home-sidebar .ov-card-fg {
+    min-height: 220px;
   }
 
   .home-cards-row {
@@ -8134,12 +8380,30 @@ html[data-theme="dark"] .nav-group-header.active {
     gap: 12px;
   }
 
+  .home-sidebar {
+    grid-template-columns: 1fr;
+    overflow: visible;
+  }
+
   .home-cards-row {
     grid-template-columns: 1fr;
   }
 
   .home-heatmap-card {
-    height: 280px;
+    height: 260px;
+    flex: none;
+    overflow: hidden;
+  }
+
+  /* Let trade signals expand naturally — remove fixed height & inner scroll */
+  .home-activity-card {
+    height: auto;
+  }
+
+  .home-activity-card .home-activity-list {
+    overflow-y: visible;
+    flex: none;
+    max-height: none;
   }
 }
 
@@ -9222,6 +9486,84 @@ div#sectorBarsList {
 
 .watchlist-table-wrap {
   overflow-x: auto;
+}
+
+/* ── Mobile: watchlist table → card rows ─────────────────────────────────── */
+@media (max-width: 640px) {
+  .watchlist-table thead {
+    display: none;
+  }
+
+  .watchlist-table tbody tr.wl-table-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin: 0 0 8px;
+    padding: 10px 12px;
+    background: var(--bg-card);
+  }
+
+  /* Hide non-essential columns */
+  .watchlist-table td[data-colid="wl-min"],
+  .watchlist-table td[data-colid="wl-avg"],
+  .watchlist-table td[data-colid="wl-max"],
+  .watchlist-table td[data-colid="wl-signal"],
+  .watchlist-table td[data-colid="wl-mktcap"],
+  .watchlist-table td[data-colid="wl-revenue"],
+  .watchlist-table td[data-colid="wl-ps"],
+  .watchlist-table td[data-colid="wl-pe"],
+  .watchlist-table td[data-colid="wl-fpe"],
+  .watchlist-table td[data-colid="wl-5pe"],
+  .watchlist-table td[data-colid="wl-ret6m"],
+  .watchlist-table td[data-colid="wl-ret1y"],
+  .watchlist-table td[data-colid="wl-chart"],
+  .watchlist-table td:last-child {
+    display: none !important;
+  }
+
+  .watchlist-table td[data-colid="wl-ticker"] {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    padding: 0 8px 0 0;
+    border: none;
+  }
+
+  .watchlist-table td[data-colid="wl-company"] {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    padding: 0;
+    border: none;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .watchlist-table td[data-colid="wl-price"] {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    margin-left: auto;
+    padding: 0;
+    border: none;
+    font-weight: 600;
+    font-size: 0.88rem;
+  }
+
+  .watchlist-table td[data-colid="wl-change"] {
+    display: flex;
+    width: 100%;
+    padding: 4px 0 0;
+    border: none;
+    font-size: 0.78rem;
+    justify-content: flex-end;
+  }
 }
 
 .watchlist-table {

@@ -910,14 +910,14 @@ function renderTable(rows) {
       <td data-colid="avg_price" class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
       <td data-colid="current_price" class="td-right cell-num">${currentPxCell}</td>
       <td data-colid="breakeven" class="td-right cell-num">${beCell}</td>
-      <td data-colid="invested" class="td-right cell-num">${fmt.currency(r.invested)}</td>
-      <td data-colid="value" class="td-right cell-num">${fmt.currency(r.current_value)}</td>
+      <td data-colid="invested" data-label="Invested" class="td-right cell-num">${fmt.currency(r.invested)}</td>
+      <td data-colid="value" data-label="Value" class="td-right cell-num mob-primary">${fmt.currency(r.current_value)}</td>
       <td data-colid="weight" class="td-right">${weightCell}</td>
-      <td data-colid="pnl" class="td-right">
+      <td data-colid="pnl" data-label="P&L" class="td-right mob-secondary">
         ${_pnlCell(r.total_returns, r.returns_pct)}
       </td>
       <td data-colid="fx_impact" class="td-right cell-num">${fxCell}</td>
-      <td data-colid="returns_pct" class="td-right">
+      <td data-colid="returns_pct" data-label="Return" class="td-right mob-badge">
         <span class="pct-badge ${colorClass(r.returns_pct)}">
           ${r.returns_pct >= 0 ? '▲' : '▼'} ${Math.abs(r.returns_pct).toFixed(2)}%
         </span>
@@ -1202,6 +1202,8 @@ function onCurrencyChange() {
   if (_activityData) _renderActivity(_activityData);
   if (_dividendData) _renderDividends(_dividendData);
   if (_monthlyData) _renderMonthly(_monthlyData);
+  // Re-render live price in stock panel if it's open
+  if (_spLivePriceData) _spRenderLivePrice();
 }
 
 /* ─── Init ────────────────────────────────────────────────────────────────── */
@@ -1596,7 +1598,9 @@ window.openStockPanel = function (r) {
 
   document.getElementById('spQuantity').textContent = fmt.number(r.quantity, 4);
   document.getElementById('spAvgPrice').textContent = fmt.currency(r.avg_price, 4);
+  // Show cached price initially, then refresh with live data
   document.getElementById('spCurrentPrice').textContent = fmt.currency((r.current_value / (r.quantity || 1)), 4);
+  _spFetchLivePrice(r.ticker, r.country || 'US');
   // document.getElementById('spSector').textContent = r.sector || 'Unknown';
 
   // Breakeven: dividend-adjusted cost per share
@@ -1656,6 +1660,55 @@ window.openStockPanel = function (r) {
 window.closeStockPanel = function () {
   document.getElementById('sidePanelBackdrop').classList.remove('active');
   document.getElementById('sidePanel').classList.remove('open');
+  _spLivePriceData = null;
+}
+
+let _spLivePriceData = null; // cached so currency switch can re-render without refetch
+
+async function _spFetchLivePrice(ticker, country) {
+  _spLivePriceData = null;
+  try {
+    const res = await fetch(`/api/watchlist/price?ticker=${encodeURIComponent(ticker)}&country=${encodeURIComponent(country)}`);
+    const json = await res.json();
+    if (json.status !== 'ok' || !json.data) return;
+    _spLivePriceData = json.data;
+    _spRenderLivePrice();
+  } catch (_) {}
+}
+
+function _spRenderLivePrice() {
+  const d = _spLivePriceData;
+  const el = document.getElementById('spCurrentPrice');
+  if (!d || !el || d.price == null) return;
+
+  // Convert native price to GBP so fmt.currency() can handle display-currency switching.
+  // fxRate = GBP/USD (≈1.27), so USD→GBP = price / fxRate.
+  // GBX/GBp are pence: divide by 100 for GBP.
+  // Other currencies (EUR, CAD…) shown native with their symbol — no cross-rate available.
+  let priceGBP = null;
+  const cur = (d.currency || '').toUpperCase();
+  if (cur === 'USD')            priceGBP = d.price / fxRate;
+  else if (cur === 'GBP')       priceGBP = d.price;
+  else if (cur === 'GBX' || cur === 'GBP' || d.currency === 'GBp') priceGBP = d.price / 100;
+
+  const pxStr = priceGBP != null
+    ? fmt.currency(priceGBP, 4)
+    : (() => {
+        const _SYM = { EUR:'€', CAD:'CA$', AUD:'A$', JPY:'¥', CHF:'Fr' };
+        const sym = _SYM[cur] || (d.currency ? d.currency + '\u00a0' : '');
+        return sym + fmt.number(d.price, 4);
+      })();
+
+  const pct = d.change_pct;
+  if (pct != null) {
+    const sign = pct >= 0 ? '+' : '';
+    const col  = pct >= 0 ? 'var(--green)' : 'var(--red)';
+    const session = d.market_state && d.market_state !== 'REGULAR'
+      ? ` <span style="font-size:0.7em;color:var(--text-muted)">${d.market_state}</span>` : '';
+    el.innerHTML = `${pxStr} <span style="font-size:0.78em;color:${col}">${sign}${pct.toFixed(2)}%</span>${session}`;
+  } else {
+    el.textContent = pxStr;
+  }
 }
 
 // ── Stock Price Chart ──────────────────────────────────────────────────────────
