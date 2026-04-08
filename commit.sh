@@ -23,11 +23,11 @@ git add -A
 
 # ── Build commit message from staged diff ─────────────────────────────────────
 # Collect changed file basenames grouped by type
-CHANGED_PY=$(git diff --cached --name-only | grep '\.py$' | xargs -I{} basename {} .py 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//')
-CHANGED_JS=$(git diff --cached --name-only | grep '\.js$' | xargs -I{} basename {} .js 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//')
-CHANGED_CSS=$(git diff --cached --name-only | grep '\.css$' | xargs -I{} basename {} .css 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//')
-CHANGED_HTML=$(git diff --cached --name-only | grep '\.html$' | xargs -I{} basename {} .html 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//')
-CHANGED_OTHER=$(git diff --cached --name-only | grep -Ev '\.(py|js|css|html)$' | xargs -I{} basename {} 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//')
+CHANGED_PY=$(git diff --cached --name-only | grep '\.py$'               | xargs -I{} basename {} .py   2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//') || true
+CHANGED_JS=$(git diff --cached --name-only | grep '\.js$'               | xargs -I{} basename {} .js   2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//') || true
+CHANGED_CSS=$(git diff --cached --name-only | grep '\.css$'             | xargs -I{} basename {} .css  2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//') || true
+CHANGED_HTML=$(git diff --cached --name-only | grep '\.html$'           | xargs -I{} basename {} .html 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//') || true
+CHANGED_OTHER=$(git diff --cached --name-only | grep -Ev '\.(py|js|css|html)$' | xargs -I{} basename {} 2>/dev/null | sort -u | tr '\n' ', ' | sed 's/,$//') || true
 
 TOTAL_FILES=$(git diff --cached --name-only | wc -l | tr -d ' ')
 TOTAL_LINES=$(git diff --cached --stat | tail -1 | grep -oE '[0-9]+ insertion|[0-9]+ deletion' | grep -oE '[0-9]+' | awk '{s+=$1}END{print s}')

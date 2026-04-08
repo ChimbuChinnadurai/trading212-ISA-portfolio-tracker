@@ -4772,6 +4772,12 @@ function _dvDrawAnnualChart(annual) {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const gridColor   = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)';
+    const labelColor  = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.38)';
+    const axisColor   = isLight ? 'rgba(0,0,0,0.4)'  : 'rgba(255,255,255,0.45)';
+    const valueColor  = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
+
     const PAD = { top: 20, right: 16, bottom: 36, left: 52 };
     const cW = W - PAD.left - PAD.right;
     const cH = H - PAD.top - PAD.bottom;
@@ -4785,12 +4791,12 @@ function _dvDrawAnnualChart(annual) {
 
     // Y gridlines + labels
     ctx.font = '9.5px "JetBrains Mono",monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.38)';
+    ctx.fillStyle = labelColor;
     ctx.textAlign = 'right';
     for (let i = 0; i <= 4; i++) {
         const v = (i / 4) * maxAmt;
         const y = PAD.top + cH - (i / 4) * cH;
-        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.strokeStyle = gridColor;
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
         const label = v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + v.toFixed(0);
@@ -4817,7 +4823,7 @@ function _dvDrawAnnualChart(annual) {
         // Value label above bar
         if (a.amount > 0) {
             ctx.font = 'bold 9px system-ui,sans-serif';
-            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.fillStyle = valueColor;
             ctx.textAlign = 'center';
             const label = a.amount >= 1000 ? '£' + (a.amount / 1000).toFixed(1) + 'k' : '£' + a.amount.toFixed(0);
             ctx.fillText(label, x, bY - 5);
@@ -4825,7 +4831,7 @@ function _dvDrawAnnualChart(annual) {
 
         // Year label
         ctx.font = '10px system-ui,sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.fillStyle = axisColor;
         ctx.textAlign = 'center';
         ctx.fillText(a.year, x, H - 8);
     });
@@ -4876,6 +4882,13 @@ function _dvDrawMonthlyChart(monthly) {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    const gridColor      = isLight ? 'rgba(0,0,0,0.07)'  : 'rgba(255,255,255,0.06)';
+    const labelColor     = isLight ? 'rgba(0,0,0,0.55)'  : 'rgba(255,255,255,0.38)';
+    const axisColor      = isLight ? 'rgba(0,0,0,0.4)'   : 'rgba(255,255,255,0.35)';
+    const axisBoldColor  = isLight ? 'rgba(0,0,0,0.65)'  : 'rgba(255,255,255,0.65)';
+    const legendColor    = isLight ? 'rgba(0,0,0,0.6)'   : 'rgba(255,255,255,0.5)';
+
     const PAD = { top: 20, right: 16, bottom: 36, left: 52 };
     const cW = W - PAD.left - PAD.right;
     const cH = H - PAD.top - PAD.bottom;
@@ -4891,12 +4904,12 @@ function _dvDrawMonthlyChart(monthly) {
 
     // Y gridlines
     ctx.font = '9.5px "JetBrains Mono",monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.38)';
+    ctx.fillStyle = labelColor;
     ctx.textAlign = 'right';
     for (let i = 0; i <= 4; i++) {
         const v = (i / 4) * maxAmt;
         const y = PAD.top + cH - (i / 4) * cH;
-        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.strokeStyle = gridColor;
         ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
         const label = v >= 1000 ? '£' + (v / 1000).toFixed(1) + 'k' : '£' + v.toFixed(0);
@@ -4932,7 +4945,7 @@ function _dvDrawMonthlyChart(monthly) {
         // Show label on Jan (year boundary) or every 3 months for short series
         const showLabel = mm === 1 || (n <= 12) || mm % 3 === 1;
         if (!showLabel) return;
-        ctx.fillStyle = mm === 1 ? 'rgba(255,255,255,0.65)' : 'rgba(255,255,255,0.35)';
+        ctx.fillStyle = mm === 1 ? axisBoldColor : axisColor;
         const label = mm === 1 ? yyyy : new Date(a.month + '-01').toLocaleString('en-GB', { month: 'short' });
         ctx.fillText(label, x, H - 8);
     });
@@ -4947,7 +4960,7 @@ function _dvDrawMonthlyChart(monthly) {
     legendItems.reverse().forEach(({ color, label }) => {
         ctx.font = '9px system-ui,sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillStyle = legendColor;
         const tw = ctx.measureText(label).width;
         ctx.fillText(label, lx, legendY + 3);
         lx -= tw + 4;

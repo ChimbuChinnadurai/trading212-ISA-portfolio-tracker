@@ -280,7 +280,7 @@ def dividends_overview():
         pid_param = "combined"
 
     try:
-        cache_key = f"dividends:overview:v2:{pid_param}"
+        cache_key = f"dividends:overview:v3:{pid_param}"
         cached = kv_get(cache_key, 900)
         if cached is not None:
             return jsonify({"status": "ok", "data": cached})
@@ -337,16 +337,24 @@ def dividends_overview():
                         "company_name":  r.get("company_name", ""),
                         "sector":        r.get("sector", ""),
                         "dividends":     div,
-                        "div_yield":     float(r.get("div_yield") or 0),
-                        "yoc":           float(r.get("yoc") or 0),
                         "quantity":      float(r.get("quantity") or 0),
                         "current_value": float(r.get("current_value") or 0),
+                        "invested":      float(r.get("invested") or 0),
                         "country":       r.get("country", "US"),
                     }
                 else:
                     ticker_map[t]["dividends"]     = round(ticker_map[t]["dividends"] + div, 4)
                     ticker_map[t]["quantity"]      += float(r.get("quantity") or 0)
                     ticker_map[t]["current_value"] += float(r.get("current_value") or 0)
+                    ticker_map[t]["invested"]      += float(r.get("invested") or 0)
+
+        # Recalculate div_yield and yoc from merged totals
+        for v in ticker_map.values():
+            cv = v["current_value"]
+            inv = v["invested"]
+            divs = v["dividends"]
+            v["div_yield"] = round((divs / cv * 100), 4) if cv > 0 else 0
+            v["yoc"]       = round((divs / inv * 100), 4) if inv > 0 else 0
 
         by_ticker = sorted(
             [v for v in ticker_map.values() if v["dividends"] > 0],
