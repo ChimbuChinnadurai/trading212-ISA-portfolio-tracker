@@ -630,9 +630,30 @@ function toggleNavGroup(groupId, event) {
     group.classList.toggle('open');
 }
 
+/* ── Mobile bottom sheet ─────────────────────────────────────────────────── */
+function openMobileSheet() {
+    const sheet = document.getElementById('mobSheet');
+    const overlay = document.getElementById('mobSheetOverlay');
+    if (!sheet || !overlay) return;
+    overlay.classList.add('active');
+    sheet.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeMobileSheet() {
+    const sheet = document.getElementById('mobSheet');
+    const overlay = document.getElementById('mobSheetOverlay');
+    if (!sheet || !overlay) return;
+    overlay.classList.remove('active');
+    sheet.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
 // Public exports
 window.navigate = navigate;
 window.toggleSidebar = toggleSidebar;
 window.toggleNavGroup = toggleNavGroup;
 window.switchPid = switchPid;
 window.toggleTheme = toggleTheme;
+window.openMobileSheet = openMobileSheet;
+window.closeMobileSheet = closeMobileSheet;

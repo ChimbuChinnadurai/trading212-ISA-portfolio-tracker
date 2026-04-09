@@ -242,13 +242,6 @@
           <span class="nav-label">Metrics</span>
         </a>
 
-
-        <!-- Watchlist -->
-        <a class="nav-item" data-route="watchlist" onclick="navigate('watchlist')">
-          <span class="material-symbols-outlined nav-icon">bookmark</span>
-          <span class="nav-label">Watchlist</span>
-        </a>
-
         <!-- Market -->
         <a class="nav-item" data-route="market" onclick="navigate('market')">
           <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
@@ -259,6 +252,12 @@
         <a class="nav-item" data-route="news" onclick="navigate('news')">
           <span class="material-symbols-outlined nav-icon">newspaper</span>
           <span class="nav-label">News</span>
+        </a>
+
+        <!-- Watchlist -->
+        <a class="nav-item" data-route="watchlist" onclick="navigate('watchlist')">
+          <span class="material-symbols-outlined nav-icon">bookmark</span>
+          <span class="nav-label">Watchlist</span>
         </a>
 
         <!-- AI Intelligence -->
@@ -289,7 +288,8 @@
         <span class="material-symbols-outlined mob-nav-icon">home</span>
         <span class="mob-nav-label">Home</span>
       </a>
-      <a class="mob-nav-item" data-mob-route="portfolio" onclick="navigate('portfolio/combined'); return false;" href="#">
+      <a class="mob-nav-item" data-mob-route="portfolio" onclick="navigate('portfolio/combined'); return false;"
+        href="#">
         <span class="material-symbols-outlined mob-nav-icon">pie_chart</span>
         <span class="mob-nav-label">Portfolio</span>
       </a>
@@ -301,11 +301,50 @@
         <span class="material-symbols-outlined mob-nav-icon">bookmark</span>
         <span class="mob-nav-label">Watchlist</span>
       </a>
-      <a class="mob-nav-item" data-mob-route="more" onclick="toggleSidebar(); return false;" href="#">
+      <a class="mob-nav-item" data-mob-route="more" onclick="openMobileSheet(); return false;" href="#">
         <span class="material-symbols-outlined mob-nav-icon">more_horiz</span>
         <span class="mob-nav-label">More</span>
       </a>
     </nav>
+
+    <!-- Mobile bottom sheet (More menu) -->
+    <div class="mob-sheet-overlay" id="mobSheetOverlay" onclick="closeMobileSheet()"></div>
+    <div class="mob-sheet" id="mobSheet">
+      <div class="mob-sheet-handle"></div>
+      <div class="mob-sheet-title">Menu</div>
+      <nav class="mob-sheet-nav">
+        <a class="mob-sheet-item" onclick="navigate('home'); closeMobileSheet();" href="#">
+          <span class="material-symbols-outlined mob-sheet-icon">home</span>
+          <span>Home</span>
+        </a>
+        <a class="mob-sheet-item" onclick="navigate('portfolio/combined'); closeMobileSheet();" href="#">
+          <span class="material-symbols-outlined mob-sheet-icon">pie_chart</span>
+          <span>Portfolio</span>
+        </a>
+        <a class="mob-sheet-item" onclick="navigate('dividends/combined'); closeMobileSheet();" href="#">
+          <span class="material-symbols-outlined mob-sheet-icon">payments</span>
+          <span>Dividends</span>
+        </a>
+        <a class="mob-sheet-item" onclick="navigate('metrics'); closeMobileSheet();" href="#">
+          <span class="material-symbols-outlined mob-sheet-icon">analytics</span>
+          <span>Metrics</span>
+        </a>
+        <a class="mob-sheet-item" onclick="navigate('news'); closeMobileSheet();" href="#">
+          <span class="material-symbols-outlined mob-sheet-icon">newspaper</span>
+          <span>News</span>
+        </a>
+        {% if show_ai %}
+        <a class="mob-sheet-item" onclick="navigate('ai-intelligence'); closeMobileSheet();" href="#">
+          <span class="material-symbols-outlined mob-sheet-icon">psychology</span>
+          <span>AI Intelligence</span>
+        </a>
+        {% endif %}
+        <a class="mob-sheet-item" href="https://app.trading212.com/" target="_blank" rel="noopener noreferrer">
+          <span class="material-symbols-outlined mob-sheet-icon">open_in_new</span>
+          <span>Open Trading212</span>
+        </a>
+      </nav>
+    </div>
 
     <!-- ═══ MAIN ═══ -->
     <div class="app-main">
@@ -744,13 +783,16 @@
                       <div class="panel-badge" id="detailActivityBadge" style="display:none"></div>
                     </div>
                     <div class="act-filter-tabs">
-                      <button class="act-filter-tab active" id="actTabAll" onclick="_actSwitchFilter('all')">All</button>
+                      <button class="act-filter-tab active" id="actTabAll"
+                        onclick="_actSwitchFilter('all')">All</button>
                       <button class="act-filter-tab" id="actTabStock" onclick="_actSwitchFilter('stock')">
-                        <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">trending_up</span>
+                        <span class="material-symbols-outlined"
+                          style="font-size:13px;vertical-align:-2px">trending_up</span>
                         Stocks
                       </button>
                       <button class="act-filter-tab" id="actTabDividend" onclick="_actSwitchFilter('dividend')">
-                        <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">payments</span>
+                        <span class="material-symbols-outlined"
+                          style="font-size:13px;vertical-align:-2px">payments</span>
                         Dividends
                       </button>
                     </div>
@@ -1461,6 +1503,7 @@
                   <button class="wl-type-btn active" id="wlTypeStock" onclick="_wlSetAddType('stock')">Stock</button>
                   <button class="wl-type-btn" id="wlTypeEtf" onclick="_wlSetAddType('etf')">ETF</button>
                   <button class="wl-type-btn" id="wlTypeCrypto" onclick="_wlSetAddType('crypto')">Crypto</button>
+                  <button class="wl-type-btn" id="wlTypeCommodity" onclick="_wlSetAddType('commodity')">Commodity</button>
                 </div>
                 <div class="col-picker-wrap">
                   <button class="btn btn-col-picker" id="wlColPickerBtn" onclick="toggleWlColPicker()">
@@ -1495,6 +1538,12 @@
                   Crypto
                   <span class="wl-tab-count" id="wlTabCryptoCount"></span>
                 </button>
+                <button class="wl-tab" id="wlTabCommodity" onclick="_wlSwitchTab('commodity')">
+                  <span class="material-symbols-outlined"
+                    style="font-size:14px;vertical-align:-3px">diamond</span>
+                  Commodities
+                  <span class="wl-tab-count" id="wlTabCommodityCount"></span>
+                </button>
               </div>
 
               <div id="watchlistEmpty" class="watchlist-empty" style="display:none">
@@ -1522,6 +1571,7 @@
                       <th data-colid="wl-5pe" class="wl-fund-col">5yr P/E</th>
                       <th data-colid="wl-ret6m" class="wl-ret-col">6M Return</th>
                       <th data-colid="wl-ret1y" class="wl-ret-col">1Y Return</th>
+                      <th data-colid="wl-ytd" class="wl-ret-col">YTD</th>
                       <th data-colid="wl-chart">48h Chart</th>
                       <th></th>
                     </tr>

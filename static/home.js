@@ -4184,28 +4184,30 @@ function _wlSetAddType(type) {
     document.getElementById('wlTypeStock').classList.toggle('active', type === 'stock');
     document.getElementById('wlTypeEtf').classList.toggle('active', type === 'etf');
     document.getElementById('wlTypeCrypto').classList.toggle('active', type === 'crypto');
-    // Hide country select for crypto — Yahoo Finance uses BTC-USD format, no country needed
+    document.getElementById('wlTypeCommodity').classList.toggle('active', type === 'commodity');
+    // Hide country select for crypto and commodity
     const countryEl = document.getElementById('watchlistCountrySelect');
-    if (countryEl) countryEl.style.display = type === 'crypto' ? 'none' : '';
+    if (countryEl) countryEl.style.display = (type === 'crypto' || type === 'commodity') ? 'none' : '';
     const input = document.getElementById('watchlistTickerInput');
     if (input) {
         if (type === 'crypto') {
             input.placeholder = 'Ticker (e.g. BTC, ETH, SOL)';
-            input.maxLength = 16;
+        } else if (type === 'commodity') {
+            input.placeholder = 'Yahoo symbol (e.g. GC=F Gold, SI=F Silver, CL=F Oil)';
         } else if (type === 'etf') {
             input.placeholder = 'Ticker (e.g. VOO, QQQ)';
-            input.maxLength = 16;
         } else {
             input.placeholder = 'Ticker (e.g. AAPL, NVDA)';
-            input.maxLength = 16;
         }
+        input.maxLength = 20;
     }
 }
 
 function _wlSwitchTab(tab) {
     _wlActiveTab = tab;
-    ['stock', 'etf', 'crypto'].forEach(t => {
-        const btn = document.getElementById('wlTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    ['stock', 'etf', 'crypto', 'commodity'].forEach(t => {
+        const key = t.charAt(0).toUpperCase() + t.slice(1);
+        const btn = document.getElementById('wlTab' + key);
         if (btn) btn.classList.toggle('active', t === tab);
     });
     // Show/hide rows based on type
@@ -4260,11 +4262,12 @@ async function addWatchlistTicker() {
     if (!input) return;
 
     let ticker = input.value.trim().toUpperCase();
-    const country = (_wlAddType === 'crypto') ? 'US' : (select ? select.value : 'US');
+    const country = (_wlAddType === 'crypto' || _wlAddType === 'commodity') ? 'US' : (select ? select.value : 'US');
     if (!ticker) return;
 
     // Normalise crypto: BTC → BTC-USD, ETH-USD stays as-is
     if (_wlAddType === 'crypto' && !ticker.includes('-')) ticker = ticker + '-USD';
+    // Commodity tickers use Yahoo Finance futures format (e.g. GC=F); keep as-is if already has =
 
     const list = await _wlLoad();
     if (list.some(r => r.ticker === ticker)) {
@@ -4304,15 +4307,18 @@ function _renderWatchlistTable(list) {
     tbody.innerHTML = '';
 
     // Update tab counts
-    const stockCount  = list.filter(r => (r.type || 'stock') === 'stock').length;
-    const etfCount    = list.filter(r => (r.type || 'stock') === 'etf').length;
-    const cryptoCount = list.filter(r => (r.type || 'stock') === 'crypto').length;
+    const stockCount     = list.filter(r => (r.type || 'stock') === 'stock').length;
+    const etfCount       = list.filter(r => (r.type || 'stock') === 'etf').length;
+    const cryptoCount    = list.filter(r => (r.type || 'stock') === 'crypto').length;
+    const commodityCount = list.filter(r => (r.type || 'stock') === 'commodity').length;
     const scEl = document.getElementById('wlTabStockCount');
     const ecEl = document.getElementById('wlTabEtfCount');
     const ccEl = document.getElementById('wlTabCryptoCount');
-    if (scEl) scEl.textContent = stockCount  || '';
-    if (ecEl) ecEl.textContent = etfCount    || '';
-    if (ccEl) ccEl.textContent = cryptoCount || '';
+    const cmEl = document.getElementById('wlTabCommodityCount');
+    if (scEl) scEl.textContent = stockCount     || '';
+    if (ecEl) ecEl.textContent = etfCount       || '';
+    if (ccEl) ccEl.textContent = cryptoCount    || '';
+    if (cmEl) cmEl.textContent = commodityCount || '';
 
     list.forEach(({ ticker, country, type }) => {
         const itemType = type || 'stock';
@@ -4327,6 +4333,8 @@ function _renderWatchlistTable(list) {
             ? `<span class="wl-type-badge wl-type-etf">ETF</span>`
             : itemType === 'crypto'
             ? `<span class="wl-type-badge wl-type-crypto">Crypto</span>`
+            : itemType === 'commodity'
+            ? `<span class="wl-type-badge wl-type-commodity">Cmdty</span>`
             : `<span class="wl-type-badge wl-type-stock">Stock</span>`;
 
         row.innerHTML = `
@@ -4346,6 +4354,7 @@ function _renderWatchlistTable(list) {
             <td data-colid="wl-5pe" class="wl-fund-col" id="wl-5pe-${ticker}">—</td>
             <td data-colid="wl-ret6m" class="wl-ret-col" id="wl-ret6m-${ticker}">—</td>
             <td data-colid="wl-ret1y" class="wl-ret-col" id="wl-ret1y-${ticker}">—</td>
+            <td data-colid="wl-ytd" class="wl-ret-col" id="wl-ytd-${ticker}">—</td>
             <td data-colid="wl-chart"><canvas id="wl-spark-${ticker}" class="wl-spark-canvas" width="100" height="36"></canvas></td>
             <td>
               <button class="wl-remove-btn" onclick="event.stopPropagation();removeWatchlistTicker('${esc(ticker)}')" title="Remove">
@@ -4378,6 +4387,7 @@ const _WL_COL_DEFS = [
     { id: 'wl-5pe', label: '5yr P/E' },
     { id: 'wl-ret6m', label: '6M Return' },
     { id: 'wl-ret1y', label: '1Y Return' },
+    { id: 'wl-ytd', label: 'YTD' },
     { id: 'wl-chart', label: '48h Chart' },
 ];
 
@@ -4556,6 +4566,7 @@ async function _loadWatchlistRow(ticker, country) {
         const pe5El = document.getElementById(`wl-5pe-${ticker}`);
         const ret6mEl = document.getElementById(`wl-ret6m-${ticker}`);
         const ret1yEl = document.getElementById(`wl-ret1y-${ticker}`);
+        const ytdEl = document.getElementById(`wl-ytd-${ticker}`);
 
         if (capEl) capEl.textContent = _fmtMarketVal(d.market_cap);
         if (revEl) revEl.textContent = _fmtMarketVal(d.revenue);
@@ -4565,6 +4576,7 @@ async function _loadWatchlistRow(ticker, country) {
         if (pe5El) pe5El.innerHTML = _peBadge(d.pe_5yr_avg, 'Average P/E over last ~4 fiscal years');
         if (ret6mEl) ret6mEl.innerHTML = _retBadge(d.return_6m);
         if (ret1yEl) ret1yEl.innerHTML = _retBadge(d.return_1y);
+        if (ytdEl) ytdEl.innerHTML = _retBadge(d.return_ytd);
     }
 }
 

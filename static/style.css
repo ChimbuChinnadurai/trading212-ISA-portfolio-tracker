@@ -7189,6 +7189,87 @@ html[data-theme="dark"] .nav-group-header.active {
   }
 }
 
+/* ── Mobile bottom sheet (More menu) ────────────────────────────────────────── */
+.mob-sheet-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 400;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.mob-sheet-overlay.active {
+  display: block;
+}
+
+.mob-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border-radius: 20px 20px 0 0;
+  z-index: 401;
+  padding: 12px 0 calc(16px + env(safe-area-inset-bottom));
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3);
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.mob-sheet.active {
+  transform: translateY(0);
+}
+
+.mob-sheet-handle {
+  width: 36px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 0 auto 12px;
+}
+
+.mob-sheet-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  padding: 0 20px 8px;
+}
+
+.mob-sheet-nav {
+  display: flex;
+  flex-direction: column;
+}
+
+.mob-sheet-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mob-sheet-item:active {
+  background: var(--bg-hover);
+}
+
+.mob-sheet-icon {
+  font-size: 22px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
 
 .topbar-breadcrumb {
   display: flex;
@@ -9427,6 +9508,12 @@ div#sectorBarsList {
   background: rgba(245, 158, 11, 0.12);
   color: #f59e0b;
   border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.wl-type-commodity {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.25);
 }
 
 .watchlist-input {

@@ -1296,7 +1296,7 @@ def watchlist_fundamentals():
     if not ticker:
         return jsonify({"status": "error", "message": "ticker required"}), 400
     try:
-        cache_key = f"wl:fundamentals3:{ticker}:{country}"
+        cache_key = f"wl:fundamentals4:{ticker}:{country}"
         cached = kv_get(cache_key, TTL_EARNINGS)
         if cached is not None:
             return jsonify({"status": "ok", "data": cached})
@@ -1351,8 +1351,8 @@ def watchlist_fundamentals():
         except Exception:
             pass
 
-        # 6-month and 1-year price returns
-        return_6m = return_1y = None
+        # 6-month, 1-year and YTD price returns
+        return_6m = return_1y = return_ytd = None
         try:
             pts = _yf_fetch_points(yf_sym, "1y", "1d")
             if pts:
@@ -1365,6 +1365,10 @@ def watchlist_fundamentals():
                     return None
                 return_6m = _ret_at(182)
                 return_1y = _ret_at(365)
+                # YTD: days elapsed since Jan 1 of current year
+                days_ytd = (date.today() - date(date.today().year, 1, 1)).days
+                if days_ytd > 0:
+                    return_ytd = _ret_at(days_ytd)
         except Exception:
             pass
 
@@ -1377,6 +1381,7 @@ def watchlist_fundamentals():
             "pe_5yr_avg":   pe_5yr_avg,
             "return_6m":    return_6m,
             "return_1y":    return_1y,
+            "return_ytd":   return_ytd,
         }
         kv_set(cache_key, data)
         return jsonify({"status": "ok", "data": data})
