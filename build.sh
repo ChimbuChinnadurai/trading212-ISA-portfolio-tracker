@@ -76,7 +76,7 @@ gcloud run deploy "$CLOUD_RUN_SERVICE" \
     --image="$FULL_IMAGE" \
     --min-instances=0 \
     --set-env-vars=PORTFOLIO_NAME_1=Chimbu,PORTFOLIO_NAME_2=Poornima \
-    --set-secrets=FINNHUB_TOKEN=finhub:latest,TRADING212_API_KEY_1=t212-chimbu:latest,TRADING212_API_KEY_2=t212-poornima:latest,MASSIVE_API_KEY=MASSIVE_API_KEY:latest,DATABASE_URL=t212-database-url:latest \
+    --set-secrets=FINNHUB_TOKEN=finhub:latest,TRADING212_API_KEY_1=t212-chimbu:latest,TRADING212_API_KEY_2=t212-poornima:latest,MASSIVE_API_KEY=MASSIVE_API_KEY:latest,DATABASE_URL=t212-database-url:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest \
     --no-cpu-boost \
     --region="$CLOUD_RUN_REGION" \
     --project="$GCP_PROJECT" \

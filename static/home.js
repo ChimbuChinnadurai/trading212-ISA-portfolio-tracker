@@ -4019,7 +4019,15 @@ function _buildTrumpCard(post, isNew = false) {
             ${reblogs  > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">repeat</span>${reblogs}</span>`         : ''}
             ${favs     > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">favorite</span>${favs}</span>`           : ''}
         </div>` : ''}
-        ${postUrl && postUrl !== '#' ? `<a href="${postUrl}" target="_blank" rel="noopener" class="trump-card-link" onclick="event.stopPropagation()">View on Truth Social ↗</a>` : ''}`;
+        ${postUrl && postUrl !== '#' ? `<a href="${postUrl}" target="_blank" rel="noopener" class="trump-card-link" onclick="event.stopPropagation()">View on Truth Social ↗</a>` : ''}
+        <div class="trump-sentiment trump-sentiment--loading">
+            <div class="trump-skel-header">
+                <div class="skeleton trump-skel-badge"></div>
+                <div class="skeleton trump-skel-tag"></div>
+                <div class="skeleton trump-skel-tag trump-skel-tag--short"></div>
+            </div>
+            <div class="skeleton trump-skel-line"></div>
+        </div>`;
     return el;
 }
 
@@ -4235,9 +4243,6 @@ function _applyTrumpSentiment(byId) {
         const card = document.getElementById(`trump-card-${id}`);
         if (!card) return;
 
-        // Remove any existing sentiment badge
-        card.querySelector('.trump-sentiment')?.remove();
-
         const impact     = (s.impact     || 'neutral').toLowerCase();
         const confidence = (s.confidence || 'low').toLowerCase();
         const sectors    = Array.isArray(s.sectors) ? s.sectors.slice(0, 3) : [];
@@ -4251,9 +4256,12 @@ function _applyTrumpSentiment(byId) {
             `<span class="trump-sector-tag">${esc(sec)}</span>`
         ).join('');
 
-        const el = document.createElement('div');
-        el.className = 'trump-sentiment';
-        el.innerHTML = `
+        // Find and replace the loading skeleton in-place
+        const existing = card.querySelector('.trump-sentiment');
+        if (!existing) return;
+
+        existing.classList.remove('trump-sentiment--loading');
+        existing.innerHTML = `
             <div class="trump-sentiment-header">
                 <span class="trump-impact-badge ${impactClass}">
                     <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">${impactIcon}</span>
@@ -4263,11 +4271,6 @@ function _applyTrumpSentiment(byId) {
                 ${sectorsHtml}
             </div>
             ${summary ? `<p class="trump-sentiment-summary">${esc(summary)}</p>` : ''}`;
-
-        // Insert before the "View on Truth Social" link, or append
-        const link = card.querySelector('.trump-card-link');
-        if (link) card.insertBefore(el, link);
-        else card.appendChild(el);
     });
 }
 
