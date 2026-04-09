@@ -3927,9 +3927,9 @@ let _trumpQueue = [];         // incoming trump queue
 
 function _socialRelTime(dt) {
     const diff = Math.floor((Date.now() - dt.getTime()) / 1000);
-    if (diff < 60)   return `${diff}s ago`;
+    if (diff < 60) return `${diff}s ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     return `${Math.floor(diff / 86400)}d ago`;
 }
 
@@ -3943,11 +3943,11 @@ function _trumpKey(p) {
 
 /* ── Build a news feed card DOM element ── */
 function _buildNewsCard(news, isNew = false) {
-    const title  = news.headline || '—';
+    const title = news.headline || '—';
     const source = news.source || '—';
-    const url    = news.url || '#';
-    const img    = news.image || '';
-    const dt     = news.datetime ? new Date(news.datetime * 1000) : null;
+    const url = news.url || '#';
+    const img = news.image || '';
+    const dt = news.datetime ? new Date(news.datetime * 1000) : null;
     const relTime = dt ? _socialRelTime(dt) : '—';
     const ageSecs = dt ? (Date.now() - dt.getTime()) / 1000 : Infinity;
 
@@ -3981,43 +3981,38 @@ function _buildNewsCard(news, isNew = false) {
 
 /* ── Build a Trump post DOM element ── */
 function _buildTrumpCard(post, isNew = false) {
-    const content  = post.content || post.text || post.status || post.body || post.post || '';
-    const rawDate  = post.created_at || post.date || post.published_at || post.datetime || '';
-    const dt       = rawDate ? new Date(rawDate) : null;
-    const relTime  = dt && !isNaN(dt) ? _socialRelTime(dt) : '—';
+    const content = post.content || post.text || post.status || post.body || post.post || '';
+    const rawDate = post.created_at || post.date || post.published_at || post.datetime || '';
+    const dt = rawDate ? new Date(rawDate) : null;
+    const relTime = dt && !isNaN(dt) ? _socialRelTime(dt) : '—';
     // Backend already strips HTML; handle legacy raw HTML just in case
     const mediaUrl = post.image || post.media_attachments?.[0]?.preview_url || post.media_attachments?.[0]?.url || '';
-    const postUrl  = post.url || post.link || '#';
+    const postUrl = post.url || post.link || '#';
 
     // Strip any residual HTML tags
     const div = document.createElement('div');
     div.innerHTML = content;
     const plainText = (div.textContent || div.innerText || content).trim();
 
-    const favs    = post.favourites ?? post.favourites_count ?? 0;
-    const reblogs = post.reblogs    ?? post.reblogs_count    ?? 0;
-    const replies = post.replies    ?? post.replies_count    ?? 0;
+    const favs = post.favourites ?? post.favourites_count ?? 0;
+    const reblogs = post.reblogs ?? post.reblogs_count ?? 0;
+    const replies = post.replies ?? post.replies_count ?? 0;
     const hasStats = favs > 0 || reblogs > 0 || replies > 0;
 
     const el = document.createElement('div');
     el.className = 'trump-card' + (isNew ? ' trump-card--new' : '');
     el.id = `trump-card-${post.id || _trumpKey(post)}`;
+    const textHtml = plainText
+        ? `<p class="trump-card-text">${esc(plainText)}</p>`
+        : (!mediaUrl ? `<p class="trump-card-text trump-card-text--placeholder">[ Image post ]</p>` : '');
     el.innerHTML = `
-        <div class="trump-card-header">
-            <div class="trump-card-avatar">T</div>
-            <div class="trump-card-meta">
-                <span class="trump-card-name">Donald J. Trump</span>
-                <span class="trump-card-handle">@realDonaldTrump</span>
-            </div>
-            <div class="trump-card-time">${esc(relTime)}</div>
-        </div>
-        <p class="trump-card-text">${esc(plainText)}</p>
+        ${textHtml}
         ${mediaUrl ? `<div class="trump-card-media"><img src="${mediaUrl}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` : ''}
         ${hasStats ? `
         <div class="trump-card-stats">
-            ${replies  > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">chat_bubble</span>${replies}</span>`  : ''}
-            ${reblogs  > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">repeat</span>${reblogs}</span>`         : ''}
-            ${favs     > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">favorite</span>${favs}</span>`           : ''}
+            ${replies > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">chat_bubble</span>${replies}</span>` : ''}
+            ${reblogs > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">repeat</span>${reblogs}</span>` : ''}
+            ${favs > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">favorite</span>${favs}</span>` : ''}
         </div>` : ''}
         ${postUrl && postUrl !== '#' ? `<a href="${postUrl}" target="_blank" rel="noopener" class="trump-card-link" onclick="event.stopPropagation()">View on Truth Social ↗</a>` : ''}
         <div class="trump-sentiment trump-sentiment--loading">
@@ -4060,7 +4055,7 @@ function _prependItems(container, elements) {
 /* ── Update the "Load N new" pill ── */
 function _updateNewsLoadPill(count) {
     const pill = document.getElementById('newsLoadNew');
-    const txt  = document.getElementById('newsLoadNewText');
+    const txt = document.getElementById('newsLoadNewText');
     if (!pill) return;
     if (count > 0) {
         if (txt) txt.textContent = `Load ${count} new article${count !== 1 ? 's' : ''}`;
@@ -4072,7 +4067,7 @@ function _updateNewsLoadPill(count) {
 
 function _updateTrumpLoadPill(count) {
     const pill = document.getElementById('trumpLoadNew');
-    const txt  = document.getElementById('trumpLoadNewText');
+    const txt = document.getElementById('trumpLoadNewText');
     if (!pill) return;
     if (count > 0) {
         if (txt) txt.textContent = `Load ${count} new post${count !== 1 ? 's' : ''}`;
@@ -4234,7 +4229,7 @@ async function _loadTrumpSentiment() {
             _trumpSentimentCache = json.data;
             _applyTrumpSentiment(json.data);
         }
-    } catch (_) {}
+    } catch (_) { }
 }
 
 function _applyTrumpSentiment(byId) {
@@ -4243,14 +4238,14 @@ function _applyTrumpSentiment(byId) {
         const card = document.getElementById(`trump-card-${id}`);
         if (!card) return;
 
-        const impact     = (s.impact     || 'neutral').toLowerCase();
+        const impact = (s.impact || 'neutral').toLowerCase();
         const confidence = (s.confidence || 'low').toLowerCase();
-        const sectors    = Array.isArray(s.sectors) ? s.sectors.slice(0, 3) : [];
-        const summary    = s.summary || '';
+        const sectors = Array.isArray(s.sectors) ? s.sectors.slice(0, 3) : [];
+        const summary = s.summary || '';
 
         const impactClass = impact === 'bullish' ? 'ts-bullish' : impact === 'bearish' ? 'ts-bearish' : 'ts-neutral';
-        const impactIcon  = impact === 'bullish' ? 'trending_up' : impact === 'bearish' ? 'trending_down' : 'trending_flat';
-        const confDots    = confidence === 'high' ? '●●●' : confidence === 'medium' ? '●●○' : '●○○';
+        const impactIcon = impact === 'bullish' ? 'trending_up' : impact === 'bearish' ? 'trending_down' : 'trending_flat';
+        const confDots = confidence === 'high' ? '●●●' : confidence === 'medium' ? '●●○' : '●○○';
 
         const sectorsHtml = sectors.map(sec =>
             `<span class="trump-sector-tag">${esc(sec)}</span>`
@@ -4282,11 +4277,11 @@ async function loadMarketNews() {
         if (json.status === 'ok') {
             resetClock('rc-news');
         }
-    } catch (_) {}
+    } catch (_) { }
 }
 
 /* eslint-disable no-unused-vars */
-window.flushNewsQueue  = flushNewsQueue;
+window.flushNewsQueue = flushNewsQueue;
 window.flushTrumpQueue = flushTrumpQueue;
 /* eslint-enable */
 
@@ -4578,17 +4573,17 @@ function _renderWatchlistTable(list) {
     tbody.innerHTML = '';
 
     // Update tab counts
-    const stockCount     = list.filter(r => (r.type || 'stock') === 'stock').length;
-    const etfCount       = list.filter(r => (r.type || 'stock') === 'etf').length;
-    const cryptoCount    = list.filter(r => (r.type || 'stock') === 'crypto').length;
+    const stockCount = list.filter(r => (r.type || 'stock') === 'stock').length;
+    const etfCount = list.filter(r => (r.type || 'stock') === 'etf').length;
+    const cryptoCount = list.filter(r => (r.type || 'stock') === 'crypto').length;
     const commodityCount = list.filter(r => (r.type || 'stock') === 'commodity').length;
     const scEl = document.getElementById('wlTabStockCount');
     const ecEl = document.getElementById('wlTabEtfCount');
     const ccEl = document.getElementById('wlTabCryptoCount');
     const cmEl = document.getElementById('wlTabCommodityCount');
-    if (scEl) scEl.textContent = stockCount     || '';
-    if (ecEl) ecEl.textContent = etfCount       || '';
-    if (ccEl) ccEl.textContent = cryptoCount    || '';
+    if (scEl) scEl.textContent = stockCount || '';
+    if (ecEl) ecEl.textContent = etfCount || '';
+    if (ccEl) ccEl.textContent = cryptoCount || '';
     if (cmEl) cmEl.textContent = commodityCount || '';
 
     list.forEach(({ ticker, country, type }) => {
@@ -4603,10 +4598,10 @@ function _renderWatchlistTable(list) {
         const typeBadge = itemType === 'etf'
             ? `<span class="wl-type-badge wl-type-etf">ETF</span>`
             : itemType === 'crypto'
-            ? `<span class="wl-type-badge wl-type-crypto">Crypto</span>`
-            : itemType === 'commodity'
-            ? `<span class="wl-type-badge wl-type-commodity">Cmdty</span>`
-            : `<span class="wl-type-badge wl-type-stock">Stock</span>`;
+                ? `<span class="wl-type-badge wl-type-crypto">Crypto</span>`
+                : itemType === 'commodity'
+                    ? `<span class="wl-type-badge wl-type-commodity">Cmdty</span>`
+                    : `<span class="wl-type-badge wl-type-stock">Stock</span>`;
 
         row.innerHTML = `
             <td data-colid="wl-ticker"><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
@@ -5075,10 +5070,10 @@ function _dvDrawAnnualChart(annual) {
     ctx.scale(dpr, dpr);
 
     const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-    const gridColor   = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)';
-    const labelColor  = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.38)';
-    const axisColor   = isLight ? 'rgba(0,0,0,0.4)'  : 'rgba(255,255,255,0.45)';
-    const valueColor  = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
+    const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)';
+    const labelColor = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.38)';
+    const axisColor = isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.45)';
+    const valueColor = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.7)';
 
     const PAD = { top: 20, right: 16, bottom: 36, left: 52 };
     const cW = W - PAD.left - PAD.right;
@@ -5185,11 +5180,11 @@ function _dvDrawMonthlyChart(monthly) {
     ctx.scale(dpr, dpr);
 
     const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-    const gridColor      = isLight ? 'rgba(0,0,0,0.07)'  : 'rgba(255,255,255,0.06)';
-    const labelColor     = isLight ? 'rgba(0,0,0,0.55)'  : 'rgba(255,255,255,0.38)';
-    const axisColor      = isLight ? 'rgba(0,0,0,0.4)'   : 'rgba(255,255,255,0.35)';
-    const axisBoldColor  = isLight ? 'rgba(0,0,0,0.65)'  : 'rgba(255,255,255,0.65)';
-    const legendColor    = isLight ? 'rgba(0,0,0,0.6)'   : 'rgba(255,255,255,0.5)';
+    const gridColor = isLight ? 'rgba(0,0,0,0.07)' : 'rgba(255,255,255,0.06)';
+    const labelColor = isLight ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.38)';
+    const axisColor = isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.35)';
+    const axisBoldColor = isLight ? 'rgba(0,0,0,0.65)' : 'rgba(255,255,255,0.65)';
+    const legendColor = isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.5)';
 
     const PAD = { top: 20, right: 16, bottom: 36, left: 52 };
     const cW = W - PAD.left - PAD.right;

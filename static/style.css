@@ -8202,6 +8202,10 @@ html[data-theme="dark"] .nav-group-header.active {
   margin: 0 0 8px;
   word-break: break-word;
 }
+.trump-card-text--placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
 
 .trump-card-media {
   border-radius: 10px;
