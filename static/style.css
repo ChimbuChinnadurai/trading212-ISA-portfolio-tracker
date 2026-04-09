@@ -7365,10 +7365,23 @@ html[data-theme="dark"] .nav-group-header.active {
 /* Override old fixed-layout overflows — view-container handles scroll now */
 #view-home,
 #view-portfolio,
-#view-stocks,
-#view-news {
+#view-stocks {
   overflow: visible;
   height: auto;
+}
+
+/* News view fills the viewport — each column has its own internal scroll */
+#view-news {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* When news is active, prevent view-container from also scrolling */
+.view-container:has(#view-news:not([style*="none"])) {
+  overflow: hidden;
 }
 
 /* ── Section header ──────────────────────────────────────────────────────── */
@@ -7829,7 +7842,498 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 
-/* Outdated news card styles removed in favour of new .news-feed design */
+/* ══════════════════════════════════════════════════════════════════════════
+   SOCIAL NEWS LAYOUT — Two-column social feed (Market News + Trump posts)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+.social-news-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px;
+  height: 100%;
+  max-height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  /* Ensure columns don't overflow on mobile when overrides apply */
+  min-height: 0;
+}
+
+/* Each column is a contained card with its own internal scroll */
+.social-feed-col {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── Column header ── */
+.social-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.social-feed-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.social-feed-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.social-feed-icon {
+  font-size: 20px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.social-feed-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.social-feed-updated {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.social-new-badge {
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* ── "Load N new posts" pill (sticky at top of scroll area) ── */
+.social-load-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 8px 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  letter-spacing: 0.02em;
+  animation: social-pill-pop 0.25s cubic-bezier(0.23,1,0.32,1);
+}
+
+.social-load-new:hover {
+  background: color-mix(in srgb, var(--accent) 80%, #000);
+}
+
+@keyframes social-pill-pop {
+  from { transform: scaleY(0); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 1; }
+}
+
+/* ── The scrollable feed area ── */
+.social-feed-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  scroll-behavior: smooth;
+}
+
+.social-feed-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.social-feed-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.social-feed-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ── Empty + skeleton states ── */
+.social-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.social-skel-wrap {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.social-skel-item {
+  height: 90px;
+  border-radius: 10px;
+  background: var(--bg-row-alt);
+  animation: skel-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes skel-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   NEWS CARD (left column — market news)
+   ════════════════════════════════════════════════════════════════ */
+.snews-card {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.snews-card:last-child {
+  border-bottom: none;
+}
+
+.snews-card:hover {
+  background: var(--bg-hover);
+}
+
+.snews-card--new {
+  border-left: 3px solid var(--accent);
+}
+
+.snews-img-wrap {
+  flex-shrink: 0;
+  width: 88px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-row-alt);
+}
+
+.snews-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.snews-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.snews-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.snews-source {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.snews-badge {
+  font-size: 0.58rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.snews-badge--breaking {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  animation: news-glow-red 2s infinite;
+}
+
+.snews-badge--update {
+  background: rgba(234, 179, 8, 0.15);
+  color: #eab308;
+}
+
+.snews-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.snews-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TRUMP CARD (right column — Truth Social posts)
+   ════════════════════════════════════════════════════════════════ */
+
+.trump-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(220,38,38,0.35);
+}
+
+.trump-handle {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+.trump-card {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.12s;
+}
+
+.trump-card:last-child {
+  border-bottom: none;
+}
+
+.trump-card:hover {
+  background: var(--bg-hover);
+}
+
+.trump-card--new {
+  border-left: 3px solid #dc2626;
+}
+
+.trump-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.trump-card-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b91c1c, #dc2626);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(220,38,38,0.3);
+}
+
+.trump-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.trump-card-name {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.trump-card-handle {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.trump-card-time {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+}
+
+.trump-card-text {
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+  margin: 0 0 8px;
+  word-break: break-word;
+}
+
+.trump-card-media {
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 8px;
+  max-height: 200px;
+}
+
+.trump-card-media img {
+  width: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.trump-card-stats {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+
+.trump-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.trump-card-link {
+  font-size: 0.7rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.trump-card-link:hover {
+  text-decoration: underline;
+}
+
+/* ── Trump Sentiment Analysis overlay ── */
+.trump-sentiment {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-row-alt);
+  border: 1px solid var(--border);
+  animation: ts-fadein 0.4s ease;
+}
+
+@keyframes ts-fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.trump-sentiment-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.trump-impact-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.ts-bullish {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.ts-bearish {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ts-neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.trump-conf {
+  font-size: 0.62rem;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.trump-sector-tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  white-space: nowrap;
+}
+
+.trump-sentiment-summary {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin: 0;
+  font-style: italic;
+}
+
+/* ── Responsive: stack on mobile ── */
+@media (max-width: 768px) {
+  .social-news-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    overflow: visible;
+    padding: 8px;
+  }
+
+  .social-feed-col {
+    max-height: 600px;
+  }
+}
 
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */

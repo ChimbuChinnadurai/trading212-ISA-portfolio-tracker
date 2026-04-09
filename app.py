@@ -4,6 +4,7 @@ import os
 import re
 import threading
 import time
+import xml.etree.ElementTree as ET
 import requests
 from dotenv import load_dotenv
 load_dotenv()
@@ -2386,6 +2387,116 @@ def trade_signals_excluded_list():
     """Return a list of all current ticker exclusions."""
     return jsonify({"status": "ok", "data": get_excluded_tickers()})
 
+
+
+@app.route("/api/trump-posts")
+def trump_posts():
+    """Fetch Trump's posts via trumpstruth.org RSS feed. Cached 5 min."""
+    cache_key = "trump:posts:rss:v4"
+    cached = kv_get(cache_key, 300)
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached, "cached": True})
+    try:
+        limit = min(int(request.args.get("per_page", 25)), 40)
+        # Try standard RSS/feed paths
+        feed_urls = [
+            "https://trumpstruth.org/feed/",
+            "https://trumpstruth.org/rss/",
+            "https://trumpstruth.org/feed.xml",
+            "https://trumpstruth.org/?feed=rss2",
+        ]
+        resp = None
+        for url in feed_urls:
+            try:
+                r = requests.get(url, headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; RSS reader)",
+                    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+                }, timeout=12)
+                snippet = r.content[:200].lstrip()
+                if r.status_code == 200 and (b'<rss' in snippet or b'<?xml' in snippet or b'<feed' in snippet):
+                    resp = r
+                    break
+                logger.info("trump_posts feed: %s → %s body[:60]=%r", url, r.status_code, r.text[:60])
+            except Exception as e_inner:
+                logger.warning("trump_posts feed %s: %s", url, e_inner)
+
+        if resp is None:
+            return jsonify({"status": "error", "message": "No RSS feed found at trumpstruth.org"}), 502
+
+        root = ET.fromstring(resp.content)
+        ns = {"media": "http://search.yahoo.com/mrss/", "content": "http://purl.org/rss/1.0/modules/content/"}
+        channel = root.find("channel")
+        items = channel.findall("item") if channel is not None else root.findall(".//item")
+
+        posts = []
+        for item in items[:limit]:
+            title    = (item.findtext("title") or "").strip()
+            desc     = (item.findtext("description") or "").strip()
+            link     = (item.findtext("link") or "").strip()
+            pub_date = (item.findtext("pubDate") or "").strip()
+            guid     = (item.findtext("guid") or link).strip()
+
+            # Full content (WP content:encoded module), fall back to description
+            full_content = item.findtext("content:encoded", namespaces=ns) or desc
+            clean = re.sub(r"<[^>]+>", " ", full_content or title)
+            clean = re.sub(r"\s+", " ", clean).strip()
+
+            # Image: media:content → enclosure → first <img> in content
+            image = None
+            mc = item.find("media:content", ns)
+            if mc is not None:
+                image = mc.get("url")
+            if not image:
+                enc = item.find("enclosure")
+                if enc is not None and (enc.get("type", "").startswith("image") or enc.get("url", "").endswith((".jpg", ".jpeg", ".png", ".webp"))):
+                    image = enc.get("url")
+            if not image and full_content:
+                m = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', full_content)
+                if m:
+                    image = m.group(1)
+
+            posts.append({
+                "id":         guid,
+                "content":    clean,
+                "created_at": pub_date,
+                "url":        link,
+                "image":      image,
+                "favourites": 0,
+                "reblogs":    0,
+                "replies":    0,
+            })
+
+        kv_set(cache_key, posts)
+        return jsonify({"status": "ok", "data": posts, "cached": False})
+    except Exception as e:
+        logger.warning("trump_posts error: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/trump-posts/sentiment")
+def trump_posts_sentiment():
+    """Batch Gemini sentiment analysis for Trump posts. Cached 30 min (posts don't change fast)."""
+    cache_key = "trump:sentiment:v1"
+    cached = kv_get(cache_key, 1800)
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached, "cached": True})
+    try:
+        # Re-use cached posts if available, otherwise fetch fresh
+        posts = kv_get("trump:posts:rss:v4", 300)
+        if not posts:
+            return jsonify({"status": "error", "message": "No posts cached yet — fetch /api/trump-posts first"}), 400
+
+        results = _gemini.analyze_trump_post_sentiments(posts)
+        if not results:
+            return jsonify({"status": "error", "message": "Gemini returned no results"}), 500
+
+        # Index by post id for easy lookup
+        by_id = {str(r.get("id", "")): r for r in results if isinstance(r, dict)}
+        kv_set(cache_key, by_id)
+        return jsonify({"status": "ok", "data": by_id, "cached": False})
+    except Exception as e:
+        logger.warning("trump_posts_sentiment error: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 @app.route("/api/finviz/news")

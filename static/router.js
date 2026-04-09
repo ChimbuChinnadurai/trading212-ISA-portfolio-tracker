@@ -340,8 +340,11 @@ function _router() {
         _updateRefreshBtn('news');
         document.title = 'Market News — Portfolio Tracker';
         if (!_newsInitialized) {
-            if (typeof loadNewsView === 'function') loadNewsView();
             _newsInitialized = true;
+            if (typeof loadNewsView === 'function') loadNewsView();
+        } else {
+            // Re-entering: silently check for new items (social refresh)
+            if (typeof loadNewsView === 'function') loadNewsView(false);
         }
         _startNewsTimers();
 

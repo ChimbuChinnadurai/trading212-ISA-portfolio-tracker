@@ -923,43 +923,71 @@
 
         <!-- ═══ VIEW: NEWS ═══ -->
         <div id="view-news" class="spa-view" style="display:none">
-          <div class="view-main">
-            <!-- <div class="section-header" style="margin-bottom:16px">
-              <h2 class="section-title">Market News</h2>
-              <span class="rc-label-wrap">
-                <span id="rc-news" class="refresh-clock" data-refresh-secs="300"></span>
-              </span>
-            </div> -->
-            <div id="newsGrid" class="news-grid">
-              <!-- skeleton -->
-              <div class="news-feed">
-                <!-- Square Skeletons -->
-                <div class="news-card skel-news-card" style="opacity:1;transform:none">
-                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)">
-                  </div>
-                  <div class="news-card-content">
-                    <div class="skeleton skel-line" style="width:30%;height:10px;background:rgba(255,255,255,0.2)">
-                    </div>
-                    <div class="skeleton skel-line" style="width:90%;height:18px;background:rgba(255,255,255,0.3)">
-                    </div>
-                    <div class="skeleton skel-line" style="width:70%;height:18px;background:rgba(255,255,255,0.3)">
-                    </div>
-                  </div>
+          <div class="social-news-layout">
+
+            <!-- ── Left: Market News Feed ─────────────────────────────────── -->
+            <div class="social-feed-col" id="newsFeedCol">
+              <div class="social-feed-header">
+                <div class="social-feed-header-left">
+                  <span class="material-symbols-outlined social-feed-icon">newspaper</span>
+                  <span class="social-feed-title">Market News</span>
                 </div>
-                <div class="news-card skel-news-card" style="opacity:1;transform:none">
-                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)">
+                <div class="social-feed-header-right">
+                  <div class="social-new-badge" id="newsNewBadge" style="display:none">
+                    <span id="newsNewCount">0</span> new
                   </div>
-                  <div class="news-card-content">
-                    <div class="skeleton skel-line" style="width:25%;height:10px;background:rgba(255,255,255,0.2)">
-                    </div>
-                    <div class="skeleton skel-line" style="width:85%;height:18px;background:rgba(255,255,255,0.3)">
-                    </div>
-                    <div class="skeleton skel-line" style="width:60%;height:18px;background:rgba(255,255,255,0.3)">
-                    </div>
-                  </div>
+                  <span class="social-feed-updated" id="newsLastUpdatedSocial"></span>
+                </div>
+              </div>
+              <!-- New-items pill that appears at top when refresh brings new articles -->
+              <div class="social-load-new" id="newsLoadNew" style="display:none" onclick="flushNewsQueue()">
+                <span class="material-symbols-outlined" style="font-size:14px">arrow_upward</span>
+                <span id="newsLoadNewText">Load new posts</span>
+              </div>
+              <div class="social-feed-scroll" id="newsFeedScroll">
+                <!-- items injected here -->
+                <div class="social-skel-wrap" id="newsSkel">
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
                 </div>
               </div>
             </div>
+
+            <!-- ── Right: Trump Truth Social Feed ────────────────────────── -->
+            <div class="social-feed-col" id="trumpFeedCol">
+              <div class="social-feed-header">
+                <div class="social-feed-header-left">
+                  <div class="trump-avatar">T</div>
+                  <div>
+                    <span class="social-feed-title">Donald J. Trump</span>
+                    <span class="trump-handle">@realDonaldTrump</span>
+                  </div>
+                </div>
+                <div class="social-feed-header-right">
+                  <div class="social-new-badge" id="trumpNewBadge" style="display:none">
+                    <span id="trumpNewCount">0</span> new
+                  </div>
+                  <span class="social-feed-updated" id="trumpLastUpdated"></span>
+                </div>
+              </div>
+              <div class="social-load-new" id="trumpLoadNew" style="display:none" onclick="flushTrumpQueue()">
+                <span class="material-symbols-outlined" style="font-size:14px">arrow_upward</span>
+                <span id="trumpLoadNewText">Load new posts</span>
+              </div>
+              <div class="social-feed-scroll" id="trumpFeedScroll">
+                <div class="social-skel-wrap" id="trumpSkel">
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
+                  <div class="social-skel-item"></div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div><!-- /view-news -->
 

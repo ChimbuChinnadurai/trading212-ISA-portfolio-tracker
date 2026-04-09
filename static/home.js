@@ -3912,112 +3912,380 @@ function initFinvizTabs() {
     _initInsiderTabs();
 }
 
-/* ─── Market News ────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   SOCIAL FEEDS — Market News + Trump Truth Social
+   Social-media style: items rendered as cards in a scrollable column.
+   On refresh, NEW items are held in a queue and smoothly prepended when
+   the user clicks "Load N new posts" (Twitter/X style).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── State ── */
+let _newsItems = [];          // currently displayed news (deduplicated by url)
+let _newsQueue = [];          // incoming new items waiting to be flushed
+let _trumpItems = [];         // currently displayed trump posts (by id)
+let _trumpQueue = [];         // incoming trump queue
+
+function _socialRelTime(dt) {
+    const diff = Math.floor((Date.now() - dt.getTime()) / 1000);
+    if (diff < 60)   return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400)return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
+}
+
+/* ── News item key for dedup ── */
+function _newsKey(item) { return item.url || item.headline || ''; }
+/* ── Trump post key for dedup ── */
+function _trumpKey(p) {
+    // Try common id fields across different API shapes
+    return String(p.id || p.ID || p.post_id || p.status_id || p.created_at || JSON.stringify(p).slice(0, 60));
+}
+
+/* ── Build a news feed card DOM element ── */
+function _buildNewsCard(news, isNew = false) {
+    const title  = news.headline || '—';
+    const source = news.source || '—';
+    const url    = news.url || '#';
+    const img    = news.image || '';
+    const dt     = news.datetime ? new Date(news.datetime * 1000) : null;
+    const relTime = dt ? _socialRelTime(dt) : '—';
+    const ageSecs = dt ? (Date.now() - dt.getTime()) / 1000 : Infinity;
+
+    let badgeClass = 'snews-badge--update', badgeText = 'Update';
+    if (ageSecs < 1200) { badgeClass = 'snews-badge--breaking'; badgeText = 'Breaking'; }
+    else if (title.toLowerCase().includes('earnings') || title.toLowerCase().includes('report')) {
+        badgeText = 'Earnings';
+    }
+
+    const el = document.createElement('a');
+    el.className = 'snews-card' + (isNew ? ' snews-card--new' : '');
+    el.href = url;
+    el.target = '_blank';
+    el.rel = 'noopener noreferrer';
+    el.innerHTML = `
+        ${img ? `<div class="snews-img-wrap"><img src="${img}" class="snews-img" alt="" loading="lazy"
+            onerror="this.parentElement.style.display='none'"></div>` : ''}
+        <div class="snews-body">
+            <div class="snews-meta">
+                <span class="snews-source">${esc(source)}</span>
+                <span class="snews-badge ${badgeClass}">${badgeText}</span>
+            </div>
+            <p class="snews-title">${esc(title)}</p>
+            <div class="snews-time">
+                <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">schedule</span>
+                ${esc(relTime)}
+            </div>
+        </div>`;
+    return el;
+}
+
+/* ── Build a Trump post DOM element ── */
+function _buildTrumpCard(post, isNew = false) {
+    const content  = post.content || post.text || post.status || post.body || post.post || '';
+    const rawDate  = post.created_at || post.date || post.published_at || post.datetime || '';
+    const dt       = rawDate ? new Date(rawDate) : null;
+    const relTime  = dt && !isNaN(dt) ? _socialRelTime(dt) : '—';
+    // Backend already strips HTML; handle legacy raw HTML just in case
+    const mediaUrl = post.image || post.media_attachments?.[0]?.preview_url || post.media_attachments?.[0]?.url || '';
+    const postUrl  = post.url || post.link || '#';
+
+    // Strip any residual HTML tags
+    const div = document.createElement('div');
+    div.innerHTML = content;
+    const plainText = (div.textContent || div.innerText || content).trim();
+
+    const favs    = post.favourites ?? post.favourites_count ?? 0;
+    const reblogs = post.reblogs    ?? post.reblogs_count    ?? 0;
+    const replies = post.replies    ?? post.replies_count    ?? 0;
+    const hasStats = favs > 0 || reblogs > 0 || replies > 0;
+
+    const el = document.createElement('div');
+    el.className = 'trump-card' + (isNew ? ' trump-card--new' : '');
+    el.id = `trump-card-${post.id || _trumpKey(post)}`;
+    el.innerHTML = `
+        <div class="trump-card-header">
+            <div class="trump-card-avatar">T</div>
+            <div class="trump-card-meta">
+                <span class="trump-card-name">Donald J. Trump</span>
+                <span class="trump-card-handle">@realDonaldTrump</span>
+            </div>
+            <div class="trump-card-time">${esc(relTime)}</div>
+        </div>
+        <p class="trump-card-text">${esc(plainText)}</p>
+        ${mediaUrl ? `<div class="trump-card-media"><img src="${mediaUrl}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'"></div>` : ''}
+        ${hasStats ? `
+        <div class="trump-card-stats">
+            ${replies  > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">chat_bubble</span>${replies}</span>`  : ''}
+            ${reblogs  > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">repeat</span>${reblogs}</span>`         : ''}
+            ${favs     > 0 ? `<span class="trump-stat"><span class="material-symbols-outlined" style="font-size:13px">favorite</span>${favs}</span>`           : ''}
+        </div>` : ''}
+        ${postUrl && postUrl !== '#' ? `<a href="${postUrl}" target="_blank" rel="noopener" class="trump-card-link" onclick="event.stopPropagation()">View on Truth Social ↗</a>` : ''}`;
+    return el;
+}
+
+/* ── Smooth prepend: slides new items into the top of the feed ── */
+function _prependItems(container, elements) {
+    // Insert in reverse order so first item ends up at top
+    const frag = document.createDocumentFragment();
+    elements.forEach(el => frag.appendChild(el));
+    // Insert before first child (or append if empty)
+    const first = container.firstChild;
+    if (first) container.insertBefore(frag, first);
+    else container.appendChild(frag);
+
+    // Animate each new item: start from above with opacity 0
+    elements.forEach((el, i) => {
+        el.style.transform = 'translateY(-24px)';
+        el.style.opacity = '0';
+        el.style.transition = 'none';
+        // Stagger slightly
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                el.style.transition = `transform 0.4s cubic-bezier(0.23,1,0.32,1) ${i * 0.05}s, opacity 0.35s ease ${i * 0.05}s`;
+                el.style.transform = 'translateY(0)';
+                el.style.opacity = '1';
+            });
+        });
+    });
+}
+
+/* ── Update the "Load N new" pill ── */
+function _updateNewsLoadPill(count) {
+    const pill = document.getElementById('newsLoadNew');
+    const txt  = document.getElementById('newsLoadNewText');
+    if (!pill) return;
+    if (count > 0) {
+        if (txt) txt.textContent = `Load ${count} new article${count !== 1 ? 's' : ''}`;
+        pill.style.display = 'flex';
+    } else {
+        pill.style.display = 'none';
+    }
+}
+
+function _updateTrumpLoadPill(count) {
+    const pill = document.getElementById('trumpLoadNew');
+    const txt  = document.getElementById('trumpLoadNewText');
+    if (!pill) return;
+    if (count > 0) {
+        if (txt) txt.textContent = `Load ${count} new post${count !== 1 ? 's' : ''}`;
+        pill.style.display = 'flex';
+    } else {
+        pill.style.display = 'none';
+    }
+}
+
+/* ── Flush queue into the feed (called on pill click or on first load) ── */
+function flushNewsQueue() {
+    if (!_newsQueue.length) return;
+    const container = document.getElementById('newsFeedScroll');
+    if (!container) return;
+
+    // Remove skeleton if still present
+    const skel = document.getElementById('newsSkel');
+    if (skel) skel.remove();
+
+    const elements = _newsQueue.map(item => _buildNewsCard(item, true));
+    _prependItems(container, elements);
+
+    // Merge into displayed set (prepend in state too)
+    _newsItems = [..._newsQueue, ..._newsItems];
+    _newsQueue = [];
+    _updateNewsLoadPill(0);
+
+    // Update timestamp
+    const updEl = document.getElementById('newsLastUpdatedSocial');
+    if (updEl) updEl.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function flushTrumpQueue() {
+    if (!_trumpQueue.length) return;
+    const container = document.getElementById('trumpFeedScroll');
+    if (!container) return;
+
+    const skel = document.getElementById('trumpSkel');
+    if (skel) skel.remove();
+
+    const elements = _trumpQueue.map(post => _buildTrumpCard(post, true));
+    _prependItems(container, elements);
+
+    _trumpItems = [..._trumpQueue, ..._trumpItems];
+    _trumpQueue = [];
+    _updateTrumpLoadPill(0);
+
+    const updEl = document.getElementById('trumpLastUpdated');
+    if (updEl) updEl.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ── Initial load: renders all items without animation ── */
+function _initNewsFeed(data) {
+    const container = document.getElementById('newsFeedScroll');
+    if (!container) return;
+
+    const skel = document.getElementById('newsSkel');
+    if (skel) skel.remove();
+
+    if (!data || !data.length) {
+        container.innerHTML = '<div class="social-empty">No news available.</div>';
+        return;
+    }
+
+    _newsItems = data;
+    _newsQueue = [];
+    container.innerHTML = '';
+    data.forEach(item => container.appendChild(_buildNewsCard(item, false)));
+
+    const updEl = document.getElementById('newsLastUpdatedSocial');
+    if (updEl) updEl.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+function _initTrumpFeed(data) {
+    const container = document.getElementById('trumpFeedScroll');
+    if (!container) return;
+
+    const skel = document.getElementById('trumpSkel');
+    if (skel) skel.remove();
+
+    if (!data || !data.length) {
+        container.innerHTML = '<div class="social-empty">No posts available.</div>';
+        return;
+    }
+
+    _trumpItems = data;
+    _trumpQueue = [];
+    container.innerHTML = '';
+    data.forEach(post => container.appendChild(_buildTrumpCard(post, false)));
+
+    const updEl = document.getElementById('trumpLastUpdated');
+    if (updEl) updEl.textContent = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ── Background refresh: diff new items into queue ── */
+function _refreshNewsFeed(data) {
+    if (!data || !data.length) return;
+    const existingKeys = new Set(_newsItems.map(_newsKey));
+    const incoming = data.filter(item => !existingKeys.has(_newsKey(item)));
+    if (!incoming.length) return;
+
+    // Add to queue and show pill
+    _newsQueue = [...incoming, ..._newsQueue];
+    _updateNewsLoadPill(_newsQueue.length);
+}
+
+function _refreshTrumpFeed(data) {
+    if (!data || !data.length) return;
+    const existingKeys = new Set(_trumpItems.map(_trumpKey));
+    const incoming = data.filter(p => !existingKeys.has(_trumpKey(p)));
+    if (!incoming.length) return;
+
+    _trumpQueue = [...incoming, ..._trumpQueue];
+    _updateTrumpLoadPill(_trumpQueue.length);
+}
+
+/* ── Public API: called by router on first view entry ── */
+async function loadNewsView(force = false) {
+    // If first load (feed is empty), fetch both feeds in parallel
+    const isFirstLoad = _newsItems.length === 0;
+    const [newsRes, trumpRes] = await Promise.allSettled([
+        fetch(force ? '/api/news?force=1' : '/api/news').then(r => r.json()),
+        fetch('/api/trump-posts?per_page=25').then(r => r.json()),
+    ]);
+
+    if (newsRes.status === 'fulfilled' && newsRes.value?.status === 'ok') {
+        if (isFirstLoad) _initNewsFeed(newsRes.value.data);
+        else _refreshNewsFeed(newsRes.value.data);
+    } else if (isFirstLoad) {
+        const c = document.getElementById('newsFeedScroll');
+        if (c) { const s = document.getElementById('newsSkel'); if (s) s.remove(); c.innerHTML = '<div class="social-empty">Could not load news.</div>'; }
+    }
+
+    if (trumpRes.status === 'fulfilled' && trumpRes.value?.status === 'ok') {
+        const posts = trumpRes.value.data;
+        if (_trumpItems.length === 0) _initTrumpFeed(posts);
+        else _refreshTrumpFeed(posts);
+        // Kick off sentiment analysis after posts are rendered (non-blocking)
+        _loadTrumpSentiment();
+    } else if (_trumpItems.length === 0) {
+        const c = document.getElementById('trumpFeedScroll');
+        if (c) { const s = document.getElementById('trumpSkel'); if (s) s.remove(); c.innerHTML = '<div class="social-empty">Could not load posts.</div>'; }
+    }
+}
+
+/* ── Trump sentiment analysis ── */
+let _trumpSentimentCache = null;
+
+async function _loadTrumpSentiment() {
+    // Don't re-fetch if we already have it
+    if (_trumpSentimentCache) {
+        _applyTrumpSentiment(_trumpSentimentCache);
+        return;
+    }
+    try {
+        const res = await fetch('/api/trump-posts/sentiment');
+        const json = await res.json();
+        if (json.status === 'ok' && json.data) {
+            _trumpSentimentCache = json.data;
+            _applyTrumpSentiment(json.data);
+        }
+    } catch (_) {}
+}
+
+function _applyTrumpSentiment(byId) {
+    // byId = { "post_id": { impact, confidence, sectors, summary }, ... }
+    Object.entries(byId).forEach(([id, s]) => {
+        const card = document.getElementById(`trump-card-${id}`);
+        if (!card) return;
+
+        // Remove any existing sentiment badge
+        card.querySelector('.trump-sentiment')?.remove();
+
+        const impact     = (s.impact     || 'neutral').toLowerCase();
+        const confidence = (s.confidence || 'low').toLowerCase();
+        const sectors    = Array.isArray(s.sectors) ? s.sectors.slice(0, 3) : [];
+        const summary    = s.summary || '';
+
+        const impactClass = impact === 'bullish' ? 'ts-bullish' : impact === 'bearish' ? 'ts-bearish' : 'ts-neutral';
+        const impactIcon  = impact === 'bullish' ? 'trending_up' : impact === 'bearish' ? 'trending_down' : 'trending_flat';
+        const confDots    = confidence === 'high' ? '●●●' : confidence === 'medium' ? '●●○' : '●○○';
+
+        const sectorsHtml = sectors.map(sec =>
+            `<span class="trump-sector-tag">${esc(sec)}</span>`
+        ).join('');
+
+        const el = document.createElement('div');
+        el.className = 'trump-sentiment';
+        el.innerHTML = `
+            <div class="trump-sentiment-header">
+                <span class="trump-impact-badge ${impactClass}">
+                    <span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px">${impactIcon}</span>
+                    ${impact.charAt(0).toUpperCase() + impact.slice(1)}
+                </span>
+                <span class="trump-conf" title="AI confidence">${confDots}</span>
+                ${sectorsHtml}
+            </div>
+            ${summary ? `<p class="trump-sentiment-summary">${esc(summary)}</p>` : ''}`;
+
+        // Insert before the "View on Truth Social" link, or append
+        const link = card.querySelector('.trump-card-link');
+        if (link) card.insertBefore(el, link);
+        else card.appendChild(el);
+    });
+}
+
+/* ── Legacy shim: loadMarketNews called from home view widgets ── */
 async function loadMarketNews() {
     try {
         const res = await fetch('/api/news');
         const json = await res.json();
         if (json.status === 'ok') {
-            _renderNewsGrid(json.data);
             resetClock('rc-news');
         }
-    } catch (err) {
-        const el = document.getElementById('newsGrid');
-        if (el) el.innerHTML = '<div class="activity-empty">Error loading news</div>';
-    }
+    } catch (_) {}
 }
 
-/** Load news for the dedicated news view (called by router) */
-async function loadNewsView(force = false) {
-    const grid = document.getElementById('newsGrid');
-    if (grid) {
-        let skeletonHtml = '';
-        for (let i = 0; i < 6; i++) {
-            skeletonHtml += `
-                <div class="news-card skel-news-card" style="opacity:1;transform:none">
-                  <div class="news-card-overlay" style="background:linear-gradient(0deg, rgba(0,0,0,0.4), transparent)"></div>
-                  <div class="news-card-content">
-                    <div class="skeleton skel-line" style="width:30%;height:10px;background:rgba(255,255,255,0.2)"></div>
-                    <div class="skeleton skel-line" style="width:90%;height:18px;background:rgba(255,255,255,0.3)"></div>
-                    <div class="skeleton skel-line" style="width:70%;height:18px;background:rgba(255,255,255,0.3)"></div>
-                  </div>
-                </div>`;
-        }
-        grid.innerHTML = `<div class="news-feed">${skeletonHtml}</div>`;
-    }
-
-    try {
-        const url = force ? '/api/news?force=1' : '/api/news';
-        const res = await fetch(url);
-        const json = await res.json();
-        if (json.status === 'ok') {
-            _renderNewsGrid(json.data);
-            resetClock('rc-news');
-            const el = document.getElementById('newsLastUpdated');
-            if (el) el.textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-        }
-    } catch (err) {
-        if (grid) grid.innerHTML = '<div class="activity-empty">Error loading news.</div>';
-    }
-}
-
-function _newsRelativeTime(dt) {
-    const now = Date.now();
-    const diff = Math.floor((now - dt.getTime()) / 1000);
-    if (diff < 60) return `${diff}s ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return `${Math.floor(diff / 86400)}d ago`;
-}
-
-function _renderNewsGrid(data) {
-    const grid = document.getElementById('newsGrid');
-    if (!grid) return;
-
-    if (!data || data.length === 0) {
-        grid.innerHTML = '<div class="activity-empty">No market news available.</div>';
-        return;
-    }
-
-    const now = Date.now();
-    const items = data.map((news, i) => {
-        const title = news.headline || '—';
-        const source = news.source || '—';
-        const url = news.url || '#';
-        const img = news.image || `https://images.unsplash.com/photo-1611974717482-98246e7f293b?auto=format&fit=crop&q=80&w=800&h=800&market=${encodeURIComponent(source)}`;
-        const dt = news.datetime ? new Date(news.datetime * 1000) : null;
-        const relTime = dt ? _newsRelativeTime(dt) : '—';
-        const ageSecs = dt ? (now - dt.getTime()) / 1000 : Infinity;
-
-        // Dynamic badges
-        let badgeClass = 'news-badge--update';
-        let badgeText = 'News Update';
-        if (ageSecs < 1200) { // < 20 min
-            badgeClass = 'news-badge--breaking';
-            badgeText = 'Breaking News';
-        } else if (title.toLowerCase().includes('earnings') || title.toLowerCase().includes('report')) {
-            badgeText = 'Earnings Report';
-        }
-
-        return `
-        <a href="${url}" target="_blank" rel="noopener" class="news-card" style="animation-delay: ${i * 0.08}s">
-            <img src="${img}" class="news-card-bg" alt="" loading="lazy" onerror="this.src='https://plus.unsplash.com/premium_photo-1681487769650-a0c3fbaed85a?q=80&w=800&h=800&auto=format&fit=crop'">
-            <div class="news-card-overlay"></div>
-            <div class="news-card-badge ${badgeClass}">${badgeText}</div>
-            <div class="news-card-footer-logo">You<b>News</b></div>
-            <div class="news-card-content">
-                <div class="news-card-source">${esc(source)}</div>
-                <h3 class="news-card-title">${esc(title)}</h3>
-                <div class="news-card-time">
-                    <span class="material-symbols-outlined" style="font-size:14px">schedule</span>
-                    ${esc(relTime)}
-                </div>
-            </div>
-        </a>`;
-    }).join('');
-
-    grid.innerHTML = `<div class="news-feed">${items}</div>`;
-}
+/* eslint-disable no-unused-vars */
+window.flushNewsQueue  = flushNewsQueue;
+window.flushTrumpQueue = flushTrumpQueue;
+/* eslint-enable */
 
 
 /* ─── AI Market Digest ───────────────────────────────────────────────────── */

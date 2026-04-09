@@ -98,6 +98,60 @@ def generate_trade_signals(portfolio_data):
         logger.error("Error generating trade signals: %s", e)
         return f"Error generating signals: {str(e)}"
 
+def analyze_trump_post_sentiments(posts):
+    """
+    Batch-analyze a list of Trump posts for market sentiment in one API call.
+    Returns a list of dicts, one per post, keyed by post id:
+      {
+        "id": str,
+        "impact": "bullish" | "bearish" | "neutral",
+        "confidence": "high" | "medium" | "low",
+        "sectors": ["Defense", "Energy", ...],   # up to 3 most relevant
+        "summary": str                            # 1-sentence market implication
+      }
+    """
+    import json as _json
+
+    if not api_key:
+        return []
+    if not posts:
+        return []
+
+    # Build a numbered list for the prompt (keep content short to save tokens)
+    lines = []
+    for i, p in enumerate(posts[:25]):
+        text = (p.get("content") or "")[:300].replace("\n", " ")
+        lines.append(f'[{i}] id={p.get("id","")} | {text}')
+
+    prompt = f"""You are a quantitative financial analyst specializing in political risk and market impact.
+Analyze the following {len(lines)} Trump posts and assess how each one is likely to affect financial markets.
+
+For each post return a JSON object with exactly these fields:
+- "id": the post id string (copy exactly from the input)
+- "impact": one of "bullish", "bearish", or "neutral"
+- "confidence": one of "high", "medium", or "low"
+- "sectors": array of up to 3 sector names most affected (e.g. "Defense", "Energy", "Tech", "Financials", "Healthcare", "Crypto", "Tariffs/Trade", "Agriculture", "Infrastructure")
+- "summary": ONE sentence describing the likely market reaction (max 15 words)
+
+Respond ONLY with a valid JSON array. No markdown, no explanation, no code fences.
+
+POSTS:
+{chr(10).join(lines)}
+
+JSON ARRAY:"""
+
+    try:
+        model = _get_model("gemini-2.5-flash")
+        response = model.generate_content(prompt)
+        text = response.text.strip()
+        # Strip any accidental markdown fences
+        text = text.lstrip("```json").lstrip("```").rstrip("```").strip()
+        return _json.loads(text)
+    except Exception as e:
+        logger.error("Error in analyze_trump_post_sentiments: %s", e)
+        return []
+
+
 def chat_with_gemini(message, history=None):
     """
     Simple chat interface with Gemini.
