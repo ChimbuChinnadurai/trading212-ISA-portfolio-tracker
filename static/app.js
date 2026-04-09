@@ -331,6 +331,7 @@ async function loadPortfolio(force = false) {
     _lastTotalDividends = json.total_dividends ?? null;
 
     renderSummary(allRows, _lastTotalDividends);
+    renderTable(allRows);
     if (_returnsMode === 'today') _loadTodayReturns();
     document.getElementById('dashboard').style.display = '';
     document.getElementById('stateError').style.display = 'none';
@@ -840,6 +841,7 @@ function renderTable(rows) {
   const sorted = sortRows([...rows]);
   const filtered = filterRows(sorted);
   const tbody = document.getElementById('tableBody');
+  if (!tbody) return;
   tbody.innerHTML = '';
 
   filtered.forEach(r => {
@@ -1218,12 +1220,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   showState('table');   // show dashboard skeleton immediately — router calls loadPortfolio()
 
-  // Auto-refresh every 5 minutes — only when a portfolio view is active
+  // Auto-refresh every 5 minutes — only when a portfolio/stocks view is active
   setInterval(() => {
     if (!PORTFOLIO_ID) return;
     const portfolioVisible = document.getElementById('view-portfolio')?.style.display !== 'none';
     const stocksVisible = document.getElementById('view-stocks')?.style.display !== 'none';
-    if (portfolioVisible || stocksVisible) loadPortfolio();
+    // Use the correct loader for each view so renderTable() is always called
+    if (stocksVisible && typeof loadStocksView === 'function') loadStocksView(false);
+    else if (portfolioVisible) loadPortfolio();
   }, 5 * 60 * 1000);
 });
 
@@ -2953,7 +2957,7 @@ async function loadStocksView(force = false) {
 
   try {
     const url = force
-      ? `/api/p${PORTFOLIO_fID}/portfolio?force=1`
+      ? `/api/p${PORTFOLIO_ID}/portfolio?force=1`
       : `/api/p${PORTFOLIO_ID}/portfolio`;
     const res = await fetch(url);
     const json = await res.json();

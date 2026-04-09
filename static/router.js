@@ -54,17 +54,19 @@ function _showView(name) {
     const target = document.getElementById(`view-${name}`);
     if (!target) return;
 
-    // Use View Transitions API where available for smooth page changes
+    // Always apply display changes synchronously so subsequent init code
+    // (loadStocksView, loadPortfolio, etc.) sees the correct visible state.
+    // startViewTransition callbacks are called asynchronously (in a new task
+    // after a screenshot is captured), which can cause data to render into a
+    // still-hidden view. By updating the DOM first and then optionally starting
+    // a transition for the cosmetic animation, we avoid that race condition.
+    document.querySelectorAll('.spa-view').forEach(el => {
+        el.style.display = el.id === `view-${name}` ? '' : 'none';
+    });
+
+    // Trigger the animation without a callback (old state already captured above)
     if (document.startViewTransition) {
-        document.startViewTransition(() => {
-            document.querySelectorAll('.spa-view').forEach(el => {
-                el.style.display = el.id === `view-${name}` ? '' : 'none';
-            });
-        });
-    } else {
-        document.querySelectorAll('.spa-view').forEach(el => {
-            el.style.display = el.id === `view-${name}` ? '' : 'none';
-        });
+        document.startViewTransition();
     }
 }
 
