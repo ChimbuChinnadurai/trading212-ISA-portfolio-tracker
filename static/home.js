@@ -270,18 +270,37 @@ function updateCard(prefix, stats) {
 
     if (pctEl) pctEl.innerText = `(${stats.returns_pct.toFixed(2)}%)`;
 
-    // Mini stats row
-    const invEl = document.getElementById(`${prefix}-invested`);
-    const posEl = document.getElementById(`${prefix}-positions`);
+    // Mini stats
+    const invEl         = document.getElementById(`${prefix}-invested`);
+    const posEl         = document.getElementById(`${prefix}-positions`);
+    const unrealizedEl  = document.getElementById(`${prefix}-unrealized`);
+    const realizedEl    = document.getElementById(`${prefix}-realized`);
+    const cashEl        = document.getElementById(`${prefix}-cash`);
 
     if (invEl && stats.invested != null)
         invEl.textContent = fmt.currency(stats.invested);
-
 
     if (posEl && stats.positions != null) {
         const sector = stats.top_sector ? ` · ${stats.top_sector}` : '';
         posEl.textContent = `${stats.positions} positions${sector}`;
     }
+
+    if (unrealizedEl && stats.unrealized_pnl != null) {
+        const v = stats.unrealized_pnl;
+        const sign = v >= 0 ? '+' : '';
+        unrealizedEl.textContent = `${sign}${fmt.currency(v)}`;
+        unrealizedEl.className = `ov-mini-val ${v >= 0 ? 'pos' : 'neg'}`;
+    }
+
+    if (realizedEl && stats.realized_pnl != null) {
+        const v = stats.realized_pnl;
+        const sign = v >= 0 ? '+' : '';
+        realizedEl.textContent = `${sign}${fmt.currency(v)}`;
+        realizedEl.className = `ov-mini-val ${v >= 0 ? 'pos' : 'neg'}`;
+    }
+
+    if (cashEl && stats.cash != null)
+        cashEl.textContent = fmt.currency(stats.cash);
 }
 
 

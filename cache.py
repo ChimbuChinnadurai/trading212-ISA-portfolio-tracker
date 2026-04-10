@@ -1,6 +1,9 @@
 import json
 import os
 import time
+import logging
+
+
 
 DB_PATH      = os.environ.get("DB_PATH", "portfolio_cache.db")
 DATABASE_URL = os.environ.get("DATABASE_URL")  # postgresql://user:pass@host:5432/db
@@ -12,6 +15,8 @@ TTL_ORDERS   = int(os.environ.get("CACHE_TTL_ORDERS",      300))   #  5 min  –
 TTL_NEWS     = int(os.environ.get("CACHE_TTL_NEWS",        300))   #  5 min  – market news
 
 _USE_PG = bool(DATABASE_URL)
+logger = logging.getLogger("cache")
+
 
 if _USE_PG:
     import psycopg2

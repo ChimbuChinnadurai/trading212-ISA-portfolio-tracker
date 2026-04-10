@@ -27,7 +27,7 @@ from fx import get_gbpusd_rate
 from portfolio import TICKER_MAPPING, build_rows
 import snowball_dividends as _sdiv
 from t212 import (
-    get_dividends, get_dividends_raw, get_instruments,
+    get_account_summary, get_dividends, get_dividends_raw, get_instruments,
     get_orders, get_portfolio, get_recent_dividends,
 )
 app = Flask(__name__)
@@ -120,28 +120,47 @@ def overview():
 
     force = request.args.get("refresh", "0") == "1"
 
-    for pid in API_KEYS:
+    total_cash = 0.0
+    total_realized = 0.0
+
+    for pid, api_key in API_KEYS.items():
         rows, _ = fetch_and_cache_portfolio(pid, force=force)
+        summary = {}
+        if api_key:
+            try:
+                summary = get_account_summary(api_key, pid)
+            except Exception:
+                pass
 
         if rows:
             p_val = sum(r["current_value"] for r in rows)
             p_inv = sum(r["invested"] for r in rows)
             total_value += p_val
             total_invested += p_inv
-            total_returns += (p_val - p_inv)
-            # Seed sparkline history on every overview fetch (first load + manual refresh)
             snapshot_add(pid, round(p_val, 2))
 
+            cash        = summary.get("cash", 0)
+            realized    = summary.get("realized_pnl", 0)
+            # Prefer T212's own unrealized figure; fall back to computed if summary unavailable
+            unrealized  = summary.get("unrealized_pnl") if summary else None
+            if unrealized is None:
+                unrealized = round(p_val - p_inv, 2)
+            total_cash      += cash
+            total_realized  += realized
+            total_returns   += unrealized
+
             res[pid] = {
-                "value":       round(p_val, 2),
-                "returns":     round(p_val - p_inv, 2),
-                "returns_pct": round(((p_val / p_inv) - 1) * 100, 2) if p_inv > 0 else 0,
-                "invested":    round(p_inv, 2),
-                "positions":   len(rows),
-                "top_sector":  _top_sector(rows),
+                "value":          round(p_val, 2),
+                "returns":        unrealized,
+                "returns_pct":    round((unrealized / p_inv) * 100, 2) if p_inv > 0 else 0,
+                "invested":       round(p_inv, 2),
+                "positions":      len(rows),
+                "top_sector":     _top_sector(rows),
+                "cash":           cash,
+                "realized_pnl":   realized,
+                "unrealized_pnl": unrealized,
             }
 
-    # Collect all rows for combined metrics
     all_combined_rows = []
     for pid in API_KEYS:
         r, _ = rows_get(pid)
@@ -149,14 +168,16 @@ def overview():
             all_combined_rows.extend(r)
 
     res["combined"] = {
-        "value":       round(total_value, 2),
-        "returns":     round(total_returns, 2),
-        "returns_pct": round(((total_value / total_invested) - 1) * 100, 2) if total_invested > 0 else 0,
-        "invested":    round(total_invested, 2),
-        "positions":   sum(p["positions"] for p in res.values() if isinstance(p, dict) and "positions" in p),
-        "top_sector":  _top_sector(all_combined_rows),
+        "value":          round(total_value, 2),
+        "returns":        round(total_returns, 2),
+        "returns_pct":    round((total_returns / total_invested) * 100, 2) if total_invested > 0 else 0,
+        "invested":       round(total_invested, 2),
+        "positions":      sum(p["positions"] for p in res.values() if isinstance(p, dict) and "positions" in p),
+        "top_sector":     _top_sector(all_combined_rows),
+        "cash":           round(total_cash, 2),
+        "realized_pnl":   round(total_realized, 2),
+        "unrealized_pnl": round(total_returns, 2),
     }
-    # Collect freshness metadata
     metadata = {
         "names": PORTFOLIO_NAMES,
         "freshness": {
@@ -1826,22 +1847,39 @@ def _home_data_inner(force):
     # ── 1. Overview ────────────────────────────────────────────────────────────
     overview_res = {}
     total_value = total_returns = total_invested = 0.0
-    for pid in API_KEYS:
+    total_cash = total_realized = 0.0
+    for pid, api_key in API_KEYS.items():
         rows, _ = fetch_and_cache_portfolio(pid, force=force)
+        summary = {}
+        if api_key:
+            try:
+                summary = get_account_summary(api_key, pid)
+            except Exception:
+                pass
         if rows:
             p_val = sum(r["current_value"] for r in rows)
             p_inv = sum(r["invested"] for r in rows)
-            total_value   += p_val
+            total_value    += p_val
             total_invested += p_inv
-            total_returns  += (p_val - p_inv)
             snapshot_add(pid, round(p_val, 2))
+            cash        = summary.get("cash", 0)
+            realized    = summary.get("realized_pnl", 0)
+            unrealized  = summary.get("unrealized_pnl") if summary else None
+            if unrealized is None:
+                unrealized = round(p_val - p_inv, 2)
+            total_cash      += cash
+            total_realized  += realized
+            total_returns   += unrealized
             overview_res[pid] = {
-                "value":       round(p_val, 2),
-                "returns":     round(p_val - p_inv, 2),
-                "returns_pct": round(((p_val / p_inv) - 1) * 100, 2) if p_inv > 0 else 0,
-                "invested":    round(p_inv, 2),
-                "positions":   len(rows),
-                "top_sector":  _top_sector(rows),
+                "value":          round(p_val, 2),
+                "returns":        unrealized,
+                "returns_pct":    round((unrealized / p_inv) * 100, 2) if p_inv > 0 else 0,
+                "invested":       round(p_inv, 2),
+                "positions":      len(rows),
+                "top_sector":     _top_sector(rows),
+                "cash":           cash,
+                "realized_pnl":   realized,
+                "unrealized_pnl": unrealized,
             }
     all_combined_rows = []
     for pid in API_KEYS:
@@ -1849,12 +1887,15 @@ def _home_data_inner(force):
         if r:
             all_combined_rows.extend(r)
     overview_res["combined"] = {
-        "value":       round(total_value, 2),
-        "returns":     round(total_returns, 2),
-        "returns_pct": round(((total_value / total_invested) - 1) * 100, 2) if total_invested > 0 else 0,
-        "invested":    round(total_invested, 2),
-        "positions":   sum(p["positions"] for p in overview_res.values() if isinstance(p, dict) and "positions" in p),
-        "top_sector":  _top_sector(all_combined_rows),
+        "value":          round(total_value, 2),
+        "returns":        round(total_returns, 2),
+        "returns_pct":    round((total_returns / total_invested) * 100, 2) if total_invested > 0 else 0,
+        "invested":       round(total_invested, 2),
+        "positions":      sum(p["positions"] for p in overview_res.values() if isinstance(p, dict) and "positions" in p),
+        "top_sector":     _top_sector(all_combined_rows),
+        "cash":           round(total_cash, 2),
+        "realized_pnl":   round(total_realized, 2),
+        "unrealized_pnl": round(total_returns, 2),
     }
     overview_metadata = {
         "names": PORTFOLIO_NAMES,

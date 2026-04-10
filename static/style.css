@@ -3759,6 +3759,8 @@ html[data-theme="dark"] .ov-card:hover {
   align-items: center;
   gap: 5px;
 }
+.ov-mini-val.pos { color: var(--green); }
+.ov-mini-val.neg { color: var(--red); }
 
 .ov-mini-badge {
   font-size: 0.62rem;

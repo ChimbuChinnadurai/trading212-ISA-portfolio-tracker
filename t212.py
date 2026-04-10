@@ -161,6 +161,30 @@ def _normalize_order(item: dict) -> dict:
     }
 
 
+def get_account_summary(api_key: str, pid: str) -> dict:
+    """Fetch account summary (cash + realized/unrealized P&L). Cached 5 min per portfolio."""
+    cached = kv_get("account_summary", 300, pid=pid)
+    if cached is not None:
+        return cached
+    headers = _get_headers(api_key)
+    resp = requests.get(
+        f"{TRADING212_BASE_URL}/api/v0/equity/account/summary",
+        headers=headers, timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    result = {
+        "cash":         round(float(data.get("cash", {}).get("availableToTrade", 0)), 2),
+        "reserved":     round(float(data.get("cash", {}).get("reservedForOrders", 0)), 2),
+        "in_pies":      round(float(data.get("cash", {}).get("inPies", 0)), 2),
+        "realized_pnl": round(float(data.get("investments", {}).get("realizedProfitLoss", 0)), 2),
+        "unrealized_pnl": round(float(data.get("investments", {}).get("unrealizedProfitLoss", 0)), 2),
+        "total_value":  round(float(data.get("totalValue", 0)), 2),
+    }
+    kv_set("account_summary", result, pid=pid)
+    return result
+
+
 def get_orders(api_key: str, pid: str, limit: int = 15) -> list:
     """
     Return recent orders across all holdings, cached for TTL_ORDERS seconds.
