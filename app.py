@@ -20,7 +20,8 @@ import gemini_utils as _gemini
 from cache import (
     TTL_DIV, TTL_NEWS, init_db, kv_age, kv_get, kv_set, kv_delete,
     rows_get, rows_set, snapshot_add, snapshot_get,
-    clear_all_cache, get_excluded_tickers, set_ticker_excluded
+    clear_all_cache, get_excluded_tickers, set_ticker_excluded,
+    trump_sentiment_get, trump_sentiment_set,
 )
 from fx import get_gbpusd_rate
 from portfolio import TICKER_MAPPING, build_rows
@@ -2474,25 +2475,28 @@ def trump_posts():
 
 @app.route("/api/trump-posts/sentiment")
 def trump_posts_sentiment():
-    """Batch Gemini sentiment analysis for Trump posts. Cached 30 min (posts don't change fast)."""
-    cache_key = "trump:sentiment:v1"
-    cached = kv_get(cache_key, 1800)
-    if cached is not None:
-        return jsonify({"status": "ok", "data": cached, "cached": True})
+    """Gemini sentiment analysis for Trump posts. Results are persisted per post ID — only new posts hit the API."""
     try:
-        # Re-use cached posts if available, otherwise fetch fresh
         posts = kv_get("trump:posts:rss:v4", 300)
         if not posts:
             return jsonify({"status": "error", "message": "No posts cached yet — fetch /api/trump-posts first"}), 400
 
-        results = _gemini.analyze_trump_post_sentiments(posts)
-        if not results:
-            return jsonify({"status": "error", "message": "Gemini returned no results"}), 500
+        all_ids = [str(p.get("id", "")) for p in posts if p.get("id")]
 
-        # Index by post id for easy lookup
-        by_id = {str(r.get("id", "")): r for r in results if isinstance(r, dict)}
-        kv_set(cache_key, by_id)
-        return jsonify({"status": "ok", "data": by_id, "cached": False})
+        # Load whatever is already stored
+        stored = trump_sentiment_get(all_ids)
+
+        # Only analyse posts not yet in the DB
+        new_posts = [p for p in posts if str(p.get("id", "")) not in stored]
+        newly_analysed = {}
+        if new_posts:
+            results = _gemini.analyze_trump_post_sentiments(new_posts)
+            newly_analysed = {str(r.get("id", "")): r for r in results if isinstance(r, dict)}
+            trump_sentiment_set(newly_analysed)
+            logger.info("trump_sentiment: analysed %d new post(s), %d already stored", len(newly_analysed), len(stored))
+
+        by_id = {**stored, **newly_analysed}
+        return jsonify({"status": "ok", "data": by_id, "new": len(newly_analysed), "cached": len(stored)})
     except Exception as e:
         logger.warning("trump_posts_sentiment error: %s", e)
         return jsonify({"status": "error", "message": str(e)}), 500

@@ -113,6 +113,13 @@ def _init_sqlite() -> None:
                 ticker TEXT PRIMARY KEY
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trump_sentiment (
+                post_id    TEXT PRIMARY KEY,
+                data       TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )
+        """)
 
 
 def _init_pg() -> None:
@@ -154,6 +161,13 @@ def _init_pg() -> None:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS excluded_tickers (
                 ticker TEXT PRIMARY KEY
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trump_sentiment (
+                post_id    TEXT PRIMARY KEY,
+                data       TEXT             NOT NULL,
+                created_at DOUBLE PRECISION NOT NULL
             )
         """)
 
@@ -275,6 +289,41 @@ def snapshot_get(pid: str, hours: int = 24) -> list:
             (pid, cutoff),
         ).fetchall()
     return [{"ts": int(r["ts"]), "value": r["value"]} for r in rows]
+
+
+# ── Trump post sentiment (permanent per-post storage) ─────────────────────────
+
+def trump_sentiment_get(post_ids: list[str]) -> dict:
+    """Return {post_id: sentiment_dict} for any of the given IDs already stored."""
+    if not post_ids:
+        return {}
+    placeholders = ",".join("?" * len(post_ids))
+    with _db() as conn:
+        rows = conn.execute(
+            f"SELECT post_id, data FROM trump_sentiment WHERE post_id IN ({placeholders})",
+            post_ids,
+        ).fetchall()
+    return {r["post_id"]: json.loads(r["data"]) for r in rows}
+
+
+def trump_sentiment_set(by_id: dict) -> None:
+    """Persist sentiment results {post_id: sentiment_dict}. Existing rows are not overwritten."""
+    if not by_id:
+        return
+    now = time.time()
+    with _db() as conn:
+        for post_id, data in by_id.items():
+            if _USE_PG:
+                conn.execute(
+                    "INSERT INTO trump_sentiment (post_id, data, created_at) VALUES (?, ?, ?)"
+                    " ON CONFLICT (post_id) DO NOTHING",
+                    (str(post_id), json.dumps(data), now),
+                )
+            else:
+                conn.execute(
+                    "INSERT OR IGNORE INTO trump_sentiment (post_id, data, created_at) VALUES (?, ?, ?)",
+                    (str(post_id), json.dumps(data), now),
+                )
 
 
 def clear_all_cache() -> None:
