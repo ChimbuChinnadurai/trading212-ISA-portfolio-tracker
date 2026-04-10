@@ -6,8 +6,7 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 import requests
-from dotenv import load_dotenv
-load_dotenv()
+import config  # noqa: F401 — must be imported before any local module reads os.environ
 
 from collections import defaultdict
 from datetime import date, timedelta

@@ -4,14 +4,11 @@ import time
 from collections import defaultdict
 
 import requests
-from dotenv import load_dotenv
 
 from cache import TTL_DIV, TTL_INSTR, TTL_ORDERS, kv_get, kv_set
 
 TTL_ORDERS_ALL = int(os.environ.get("CACHE_TTL_ORDERS_ALL", 3600))  # 1 hour
 TTL_TICKERS    = int(os.environ.get("CACHE_TTL_TICKERS",    600))   # 10 min
-
-load_dotenv()
 
 # Removed global API_KEY and HEADERS to support multiple portfolios.
 # Base URL is still shared.
