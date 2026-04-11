@@ -597,11 +597,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedTheme = localStorage.getItem('theme') || 'dark';
     document.documentElement.setAttribute('data-theme', savedTheme);
     _updateThemeIcon(savedTheme);
+    if (typeof _syncMobileTheme === 'function') _syncMobileTheme();
 
     if (typeof applyCurrency === 'function') applyCurrency();
 
     _restoreSidebar();
     _router();
+    // Seed notification badge count on load
+    setTimeout(() => { if (typeof loadNotifications === 'function') loadNotifications(); }, 500);
 });
 
 /* ── Theme & Glass Toggles ───────────────────────────────────────────────── */
@@ -612,6 +615,8 @@ function toggleTheme() {
     html.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
     _updateThemeIcon(newTheme);
+    // Sync mobile theme label
+    if (typeof _syncMobileTheme === 'function') _syncMobileTheme();
     // Redraw theme-aware canvas charts
     if (typeof _drawSectorRadialChart === 'function') _drawSectorRadialChart();
 }

@@ -22,6 +22,8 @@ from cache import (
     rows_get, rows_set, snapshot_add, snapshot_get,
     clear_all_cache, get_excluded_tickers, set_ticker_excluded,
     trump_sentiment_get, trump_sentiment_set,
+    alerts_get_all, alert_add, alert_delete, alert_mark_triggered,
+    notifications_get, notification_add, notifications_mark_all_read, notifications_unread_count,
 )
 from fx import get_gbpusd_rate
 from portfolio import TICKER_MAPPING, build_rows
@@ -1581,6 +1583,27 @@ def monthly_returns_endpoint(pid):
             pct = round((curr_v - prev_v) / prev_v * 100, 2)
             result.append({"month": months[i], "pct": pct, "value": curr_v})
 
+    # ── Attach SPY benchmark monthly returns ──────────────────────────────────
+    try:
+        spy_cache_key = "spy_monthly_returns"
+        spy_monthly = kv_get(spy_cache_key, 3600)
+        if spy_monthly is None:
+            spy_points = _yf_fetch_points("SPY", "5y", "1mo")
+            spy_monthly_vals: dict = {}
+            for i in range(1, len(spy_points)):
+                from datetime import datetime as _dt2
+                mo = _dt2.utcfromtimestamp(spy_points[i]["ts"]).strftime("%Y-%m")
+                p0 = spy_points[i - 1]["price"]
+                p1 = spy_points[i]["price"]
+                if p0 and p0 > 0:
+                    spy_monthly_vals[mo] = round((p1 - p0) / p0 * 100, 2)
+            kv_set(spy_cache_key, spy_monthly_vals)
+            spy_monthly = spy_monthly_vals
+        for item in result:
+            item["spy_pct"] = spy_monthly.get(item["month"])
+    except Exception as _spy_exc:
+        logger.warning("SPY benchmark fetch failed: %s", _spy_exc)
+
     kv_set(cache_key, result)
     return jsonify({"status": "ok", "data": result})
 
@@ -2723,8 +2746,235 @@ def market_digest():
     return jsonify({"status": "ok", "provider": provider, "digest": text, "cached": False})
 
 
+# ── Price Alerts & Notifications ──────────────────────────────────────────────
+
+@app.route("/api/alerts", methods=["GET"])
+def get_alerts():
+    return jsonify({"status": "ok", "data": alerts_get_all()})
+
+
+@app.route("/api/alerts", methods=["POST"])
+def add_alert():
+    body = request.get_json(silent=True) or {}
+    ticker = body.get("ticker", "").strip().upper()
+    condition = body.get("condition", "").lower()
+    threshold = body.get("threshold")
+    if not ticker or condition not in ("above", "below") or threshold is None:
+        return jsonify({"status": "error", "message": "ticker, condition (above|below), threshold required"}), 400
+    alert_id = alert_add(ticker, condition, float(threshold))
+    return jsonify({"status": "ok", "id": alert_id})
+
+
+@app.route("/api/alerts/<int:alert_id>", methods=["DELETE"])
+def delete_alert(alert_id):
+    alert_delete(alert_id)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/notifications", methods=["GET"])
+def get_notifications():
+    return jsonify({"status": "ok", "data": notifications_get(40), "unread": notifications_unread_count()})
+
+
+@app.route("/api/notifications/read", methods=["POST"])
+def mark_notifications_read():
+    notifications_mark_all_read()
+    return jsonify({"status": "ok"})
+
+
+# ── Return Attribution ─────────────────────────────────────────────────────────
+
+@app.route("/api/p<pid>/return-attribution")
+def return_attribution(pid):
+    """Per-sector monthly return contribution for the last 12 months."""
+    cache_key = f"return_attr:{pid}"
+    cached = kv_get(cache_key, 900)
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+
+    try:
+        from datetime import datetime as _dt
+        # 1. Get portfolio rows for weights + sectors
+        if pid == "combined":
+            all_r = []
+            for p in API_KEYS:
+                rows, _ = fetch_and_cache_portfolio(p)
+                if rows:
+                    all_r.extend(rows)
+            seen, unique = set(), []
+            for row in all_r:
+                if row["ticker"] not in seen:
+                    seen.add(row["ticker"])
+                    unique.append(row)
+        else:
+            unique, _ = fetch_and_cache_portfolio(pid)
+        if not unique:
+            return jsonify({"status": "ok", "data": {}})
+
+        total_val = sum(r["current_value"] for r in unique)
+        if total_val == 0:
+            return jsonify({"status": "ok", "data": {}})
+
+        # Weight per ticker
+        weights = {r["ticker"]: r["current_value"] / total_val for r in unique}
+        sectors = {r["ticker"]: (r.get("sector") or "Other") for r in unique}
+
+        # 2. Get monthly performance per ticker (already cached endpoint logic)
+        monthly_perf_key = f"monthly_perf:{pid}"
+        monthly_perf = kv_get(monthly_perf_key, 900)
+        if monthly_perf is None:
+            # Fetch inline (reuse same logic from /monthly-performance)
+            def _fetch_monthly_attr(row):
+                ticker = row["ticker"]
+                country = row.get("country", "US")
+                suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
+                clean = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+                yf_sym = f"{clean}{suffix}"
+                try:
+                    resp = requests.get(
+                        f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
+                        params={"range": "1y", "interval": "1mo"},
+                        headers={"User-Agent": "Mozilla/5.0"},
+                        timeout=10,
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()["chart"]["result"][0]
+                    timestamps = result.get("timestamp", [])
+                    closes = list(result["indicators"]["quote"][0].get("close", []))
+                    cur_px = result.get("meta", {}).get("regularMarketPrice")
+                    if cur_px and closes:
+                        closes[-1] = cur_px
+                    monthly = {}
+                    for i in range(1, len(timestamps)):
+                        if closes[i] is None or closes[i - 1] is None or closes[i - 1] == 0:
+                            continue
+                        dt = _dt.utcfromtimestamp(timestamps[i])
+                        mk = dt.strftime("%Y-%m")
+                        monthly[mk] = round((closes[i] - closes[i - 1]) / closes[i - 1] * 100, 2)
+                    return clean, monthly
+                except Exception:
+                    return ticker, {}
+
+            monthly_perf = {}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, max(1, len(unique)))) as ex:
+                for ticker, monthly in ex.map(_fetch_monthly_attr, unique):
+                    monthly_perf[ticker] = monthly
+
+        # 3. Compute per-sector contribution per month
+        all_months = set()
+        for monthly in monthly_perf.values():
+            all_months.update(monthly.keys())
+        sorted_months = sorted(all_months)[-12:]
+
+        # attribution[month][sector] = weighted contribution %
+        attribution = {}
+        for month in sorted_months:
+            attribution[month] = {}
+            for row in unique:
+                t = row["ticker"]
+                w = weights.get(t, 0)
+                sec = sectors.get(t, "Other")
+                pct = monthly_perf.get(t, {}).get(month, 0) or 0
+                attribution[month][sec] = round(attribution[month].get(sec, 0) + w * pct, 4)
+
+        # Gather all sectors
+        all_sectors = sorted(set(s for month_data in attribution.values() for s in month_data))
+
+        result = {
+            "months": sorted_months,
+            "sectors": all_sectors,
+            "attribution": attribution,  # {month: {sector: pct}}
+        }
+        kv_set(cache_key, result)
+        return jsonify({"status": "ok", "data": result})
+    except Exception as e:
+        logger.error("return_attribution error: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ── Daily / Weekly Returns ─────────────────────────────────────────────────────
+
+@app.route("/api/p<pid>/daily-returns")
+def daily_returns_endpoint(pid):
+    """Daily portfolio value changes for the last 30 days (or 7 days for ?range=1W).
+    Returns [{date, pct, value}] for granular chart views."""
+    range_ = request.args.get("range", "1M")  # 1W | 1M
+    cache_key = f"daily_returns:{pid}:{range_}"
+    cached = kv_get(cache_key, 300)
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+
+    hours = 7 * 24 if range_ == "1W" else 31 * 24
+
+    if pid == "combined":
+        pid_daily: dict = {}
+        for p in API_KEYS:
+            snaps = snapshot_get(p, hours=hours)
+            by_day: dict = {}
+            for s in snaps:
+                day = date.fromtimestamp(s["ts"]).isoformat()
+                if day not in by_day or s["ts"] > by_day[day][0]:
+                    by_day[day] = (s["ts"], s["value"])
+            pid_daily[p] = {d: v for d, (_, v) in by_day.items()}
+
+        all_days: set = set()
+        for d in pid_daily.values():
+            all_days.update(d.keys())
+        daily_vals: dict = {}
+        for day in sorted(all_days):
+            total = sum(pd.get(day, 0) for pd in pid_daily.values())
+            if total > 0:
+                daily_vals[day] = round(total, 2)
+    else:
+        snaps = snapshot_get(pid, hours=hours)
+        by_day = {}
+        for s in snaps:
+            d = date.fromtimestamp(s["ts"]).isoformat()
+            if d not in by_day or s["ts"] > by_day[d][0]:
+                by_day[d] = (s["ts"], s["value"])
+        daily_vals = {d: round(v, 2) for d, (_, v) in sorted(by_day.items())}
+
+    days = sorted(daily_vals.keys())
+    result = []
+    for i in range(1, len(days)):
+        prev_v = daily_vals[days[i - 1]]
+        curr_v = daily_vals[days[i]]
+        if prev_v and prev_v > 0:
+            pct = round((curr_v - prev_v) / prev_v * 100, 3)
+            result.append({"date": days[i], "pct": pct, "value": curr_v})
+
+    kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result})
+
+
 # ── Background portfolio refresh ──────────────────────────────────────────────
 _REFRESH_INTERVAL = int(os.environ.get("AUTO_REFRESH_SECONDS", 300))  # default 5 min
+
+def _check_price_alerts(rows):
+    """Check active price alerts against current portfolio prices."""
+    try:
+        active = [a for a in alerts_get_all() if a["enabled"]]
+        if not active:
+            return
+        price_map = {r["ticker"]: r.get("current_price", 0) for r in rows}
+        for alert in active:
+            ticker = alert["ticker"]
+            price = price_map.get(ticker)
+            if price is None:
+                continue
+            triggered = (alert["condition"] == "above" and price >= alert["threshold"]) or \
+                        (alert["condition"] == "below" and price <= alert["threshold"])
+            if triggered:
+                alert_mark_triggered(alert["id"])
+                direction = "above" if alert["condition"] == "above" else "below"
+                notification_add(
+                    type_="alert",
+                    title=f"Price Alert: {ticker}",
+                    message=f"{ticker} is now {direction} {alert['threshold']:.2f} (current: {price:.2f})",
+                    data={"ticker": ticker, "price": price, "threshold": alert["threshold"]},
+                )
+    except Exception as exc:
+        logging.getLogger("alerts").warning("Alert check failed: %s", exc)
 
 def _background_refresh():
     """Daemon thread: keep portfolio cache warm by force-refreshing every 5 minutes."""
@@ -2739,6 +2989,7 @@ def _background_refresh():
                 if rows:
                     total_value = sum(r.get("current_value", 0) for r in rows)
                     snapshot_add(pid, total_value)
+                    _check_price_alerts(rows)
                 _log.info("Portfolio %s refreshed (%d holdings)", pid, len(rows or []))
             except Exception as exc:
                 _log.error("Portfolio refresh failed for pid=%s: %s", pid, exc)

@@ -30,6 +30,7 @@ const _COL_DEFS = [
   { id: 'company', label: 'Company' },
   { id: 'country', label: 'Country' },
   { id: 'trend', label: '48h Trend' },
+  { id: 'spark7d', label: '7d Chart' },
   { id: 'shares', label: 'Shares' },
   { id: 'avg_price', label: 'Avg Price' },
   { id: 'current_price', label: 'Current Price' },
@@ -412,6 +413,8 @@ async function loadPortfolio(force = false) {
     loadDetailActivity();
     loadMonthlyDividends();
     loadDynamicsChart();
+    loadRiskMetricsStrip();
+    loadRealizedUnrealized();
     _loadSuccess = true;
 
   } catch (err) {
@@ -608,6 +611,7 @@ async function _loadTodayReturns() {
     }
     _todayReturns = todayTotal;
     _todayReturnsPct = todayInvested ? (todayTotal / todayInvested) * 100 : 0;
+    renderTopMovers();
   } catch (_) {
     _todayReturns = 0;
     _todayReturnsPct = 0;
@@ -922,6 +926,7 @@ function renderTable(rows) {
     }
 
     const sparkId = 'sspark-' + r.ticker.replace(/[^a-zA-Z0-9]/g, '_');
+    const spark7dId = 'spark7d-' + r.ticker.replace(/[^a-zA-Z0-9]/g, '_');
     tr.innerHTML = `
       <td data-colid="ticker"><span class="cell-ticker">${esc(r.ticker)}</span></td>
       <td data-colid="company">
@@ -934,6 +939,9 @@ function renderTable(rows) {
       <td data-colid="trend" class="td-center">
         <div class="trend-skeleton"></div>
         <canvas class="stock-spark" id="${sparkId}" width="80" height="32"></canvas>
+      </td>
+      <td data-colid="spark7d" class="td-center">
+        <canvas class="stock-spark7d" id="${spark7dId}" width="72" height="28"></canvas>
       </td>
       <td data-colid="shares" class="td-right cell-num">${fmt.number(r.quantity, 6)}</td>
       <td data-colid="avg_price" class="td-right cell-num">${fmt.currency(r.avg_price, 4)}</td>
@@ -968,6 +976,7 @@ function renderTable(rows) {
   }
 
   _loadStockSparklines(filtered);
+  _loadSparklines7d(filtered);
 }
 
 /* ─── Stock 48h Sparklines ────────────────────────────────────────────────── */
@@ -2773,6 +2782,7 @@ function drawPortfolioHeatmap(rows, totalValue) {
   container.querySelectorAll('.phm-cell').forEach(el => {
     el.onclick = () => openStockPanel(_phmRects[+el.dataset.i].item);
   });
+  _animateHeatmapCells('portfolioHeatmap');
 }
 
 function drawSectorHeatmap(rows, totalValue) {
@@ -2839,6 +2849,7 @@ function drawSectorHeatmap(rows, totalValue) {
       ${inner}
     </div>`;
   }).join('');
+  _animateHeatmapCells('sectorHeatmap');
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -3020,6 +3031,7 @@ async function loadStocksView(force = false) {
     renderTable(allRows);
     loadAnalystRatings();
     _loadStockSparklines(allRows);
+    if (Object.keys(_tickerChangeMap).length) renderTopMovers();
 
     showStocksState('table');
   } catch (err) {
@@ -3292,6 +3304,33 @@ function _drawDynamicsChart() {
   });
 
   canvas._dynMeta = { data, xOf, yOf, y0, barW, barStep, PAD, W, H };
+
+  // ── SPY benchmark overlay line ────────────────────────────────────────────
+  const spyData = data.filter(d => d.spy_pct != null);
+  if (spyData.length >= 2) {
+    const spyCol = 'rgba(251,191,36,0.85)';
+    ctx.save();
+    ctx.strokeStyle = spyCol;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([5, 3]);
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    let started = false;
+    data.forEach((d, i) => {
+      if (d.spy_pct == null) return;
+      const x = xOf(i);
+      const y = yOf(d.spy_pct);
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    // Show SPY legend
+    const spyLeg = document.getElementById('dynLegSpy');
+    const spyLbl = document.getElementById('dynLegSpyLabel');
+    if (spyLeg) spyLeg.style.display = '';
+    if (spyLbl) spyLbl.style.display = '';
+  }
 }
 
 function _initDynamicsRangeTabs() {
@@ -3317,8 +3356,15 @@ function _initDynamicsRangeTabs() {
     if (!btn) return;
     tabBar.querySelectorAll('.dyn-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    _dynamicsRange = btn.dataset.range;
-    _drawDynamicsChart();
+    const range = btn.dataset.range;
+    if (range === '1W' || range === '1M') {
+      _loadDailyReturns(range);
+    } else {
+      _dynamicsRange = range;
+      _dynamicsView = _dynamicsView || 'returns';
+      if (_dynamicsView === 'attribution') _drawAttributionChart();
+      else _drawDynamicsChart();
+    }
   });
 
   // Hover: column highlight + tooltip
@@ -3366,4 +3412,630 @@ function _initDynamicsRangeTabs() {
     const tooltip = document.getElementById('dynamicsTooltip');
     if (tooltip) tooltip.style.display = 'none';
   });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RISK METRICS STRIP  (portfolio view — compact row below summary cards)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+async function loadRiskMetricsStrip() {
+  try {
+    const res = await fetch('/api/pcombined/risk-metrics');
+    const json = await res.json();
+    if (json.status !== 'ok') return;
+    const d = json.data;
+    if (d.insufficient_data) {
+      const strip = document.getElementById('riskStrip');
+      if (strip) strip.style.display = 'none';
+      return;
+    }
+
+    // Remove skeleton classes
+    ['rs-volatility','rs-sharpe','rs-beta','rs-twr','rs-maxdd'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('skeleton');
+    });
+
+    _setRsValue('rsVolatility', d.volatility != null ? d.volatility.toFixed(1) + '%' : '—');
+    _setRsValue('rsSharpe', d.sharpe != null ? d.sharpe.toFixed(2) : '—', d.sharpe);
+    _setRsValue('rsBeta', d.beta != null ? d.beta.toFixed(2) : '—');
+
+    // TWR vs SPY: show portfolio TWR and diff
+    if (d.twr != null && d.spy_twr != null) {
+      const diff = d.twr_vs_spy;
+      const sign = diff >= 0 ? '+' : '';
+      const el = document.getElementById('rsTwr');
+      if (el) {
+        el.textContent = d.twr.toFixed(1) + '%';
+        el.className = 'rs-value ' + (diff >= 0 ? 'pos' : 'neg');
+      }
+      const sub = document.querySelector('#rs-twr .rs-sub');
+      if (sub) sub.textContent = `SPY: ${d.spy_twr.toFixed(1)}% (${sign}${diff.toFixed(1)}%)`;
+    } else {
+      _setRsValue('rsTwr', d.twr != null ? d.twr.toFixed(1) + '%' : '—');
+    }
+
+    // Max drawdown: compute from snapshot data (reuse drawdown if already computed)
+    if (typeof _ddMaxDD !== 'undefined' && _ddMaxDD != null) {
+      const el = document.getElementById('rsMaxDD');
+      if (el) el.textContent = _ddMaxDD.toFixed(1) + '%';
+    } else {
+      _setRsValue('rsMaxDD', '—');
+      _loadMaxDrawdownForStrip();
+    }
+  } catch (_) {}
+}
+
+function _setRsValue(id, text, numForColor) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  if (numForColor != null) {
+    el.className = 'rs-value ' + (numForColor >= 0 ? 'pos' : 'neg');
+  }
+}
+
+async function _loadMaxDrawdownForStrip() {
+  try {
+    const res = await fetch(`/api/pcombined/daily-history`);
+    const json = await res.json();
+    if (json.status !== 'ok' || !json.data.length) return;
+    const vals = json.data.map(d => d.value);
+    let peak = vals[0], maxDD = 0;
+    for (const v of vals) {
+      if (v > peak) peak = v;
+      const dd = peak > 0 ? (v - peak) / peak * 100 : 0;
+      if (dd < maxDD) maxDD = dd;
+    }
+    const el = document.getElementById('rsMaxDD');
+    if (el) el.textContent = maxDD.toFixed(1) + '%';
+  } catch (_) {}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REALIZED vs UNREALIZED P&L  (fetched once on portfolio load)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+async function loadRealizedUnrealized() {
+  try {
+    const res = await fetch('/api/overview');
+    const json = await res.json();
+    if (json.status !== 'ok') return;
+    const pid = typeof PORTFOLIO_ID !== 'undefined' ? PORTFOLIO_ID : 'combined';
+    const d = json.data[pid] || json.data['combined'];
+    if (!d) return;
+    const unrealized = d.unrealized_pnl;
+    const realized = d.realized_pnl;
+    const rvEl = document.getElementById('realizedValue');
+    const uvEl = document.getElementById('unrealizedValue');
+    if (uvEl && unrealized != null) {
+      const sign = unrealized >= 0 ? '+' : '';
+      uvEl.textContent = sign + fmt.currency(unrealized);
+      uvEl.className = 'pnl-split-val ' + colorClass(unrealized);
+    }
+    if (rvEl && realized != null) {
+      const sign = realized >= 0 ? '+' : '';
+      rvEl.textContent = sign + fmt.currency(realized);
+      rvEl.className = 'pnl-split-val ' + colorClass(realized);
+    }
+    const splitRow = document.getElementById('pnlSplitRow');
+    if (splitRow) splitRow.style.display = '';
+  } catch (_) {}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RETURN ATTRIBUTION  (sector contribution stacked bar)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+let _attributionData = null;
+let _dynamicsView = 'returns'; // 'returns' | 'attribution'
+
+function _setDynamicsView(view) {
+  _dynamicsView = view;
+  const btnR = document.getElementById('dynViewReturns');
+  const btnA = document.getElementById('dynViewAttrib');
+  if (btnR) btnR.classList.toggle('active', view === 'returns');
+  if (btnA) btnA.classList.toggle('active', view === 'attribution');
+  const hintEl = document.getElementById('dynamicsHint');
+  if (view === 'attribution') {
+    if (hintEl) hintEl.textContent = 'Monthly sector contribution to returns';
+    if (_attributionData) _drawAttributionChart();
+    else _loadAttribution();
+  } else {
+    if (hintEl) hintEl.textContent = 'Month-over-month portfolio value change';
+    if (_dynamicsData) _drawDynamicsChart();
+    else loadDynamicsChart();
+  }
+}
+
+async function _loadAttribution() {
+  try {
+    const res = await fetch(`/api/p${PORTFOLIO_ID}/return-attribution`);
+    const json = await res.json();
+    if (json.status === 'ok') {
+      _attributionData = json.data;
+      _drawAttributionChart();
+    }
+  } catch (_) {}
+}
+
+const _SECTOR_COLORS = [
+  '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
+  '#ec4899','#14b8a6','#f97316','#06b6d4','#22c55e',
+  '#a78bfa','#fb923c','#e879f9','#4ade80','#60a5fa',
+];
+
+function _drawAttributionChart() {
+  const canvas = document.getElementById('dynamicsChart');
+  if (!canvas) return;
+  if (!canvas.offsetWidth) { requestAnimationFrame(_drawAttributionChart); return; }
+
+  const d = _attributionData;
+  if (!d || !d.months || !d.months.length) {
+    _showChartEmpty(canvas, 'Not enough data yet');
+    return;
+  }
+  _hideChartEmpty(canvas);
+
+  // Filter months based on _dynamicsRange
+  let months = d.months;
+  if (_dynamicsRange === '12m') months = months.slice(-12);
+  else if (_dynamicsRange !== 'all' && _dynamicsRange.length === 4) {
+    months = months.filter(m => m.startsWith(_dynamicsRange));
+  }
+
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const textCol = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+  const gridCol = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+
+  const PAD = { top: 32, right: 12, bottom: 44, left: 44 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  const sectors = d.sectors;
+  const colorMap = {};
+  sectors.forEach((s, i) => { colorMap[s] = _SECTOR_COLORS[i % _SECTOR_COLORS.length]; });
+
+  // Compute total range
+  const totals = months.map(m => {
+    const mv = d.attribution[m] || {};
+    return sectors.reduce((s, sec) => s + (mv[sec] || 0), 0);
+  });
+  const maxVal = Math.max(...totals, 1);
+  const minVal = Math.min(...totals, -1);
+  const yMax = Math.ceil(maxVal * 1.25 / 5) * 5;
+  const yMin = Math.floor(minVal * 1.25 / 5) * 5;
+  const yRng = yMax - yMin;
+  const yOf = v => PAD.top + (1 - (v - yMin) / yRng) * cH;
+  const y0 = yOf(0);
+  const barStep = cW / months.length;
+  const barW = Math.max(6, Math.min(44, barStep * 0.62));
+  const xOf = i => PAD.left + (i + 0.5) * barStep;
+
+  // Y gridlines
+  const yStep = yRng <= 15 ? 5 : yRng <= 40 ? 10 : 20;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let v = yMin; v <= yMax + 0.01; v += yStep) {
+    const y = yOf(v);
+    ctx.strokeStyle = v === 0 ? (isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)') : gridCol;
+    ctx.lineWidth = v === 0 ? 1.2 : 0.5;
+    ctx.setLineDash(v === 0 ? [] : [4, 4]);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = textCol;
+    ctx.fillText(v + '%', PAD.left - 6, y);
+  }
+
+  // Stacked bars
+  months.forEach((m, i) => {
+    const mv = d.attribution[m] || {};
+    const x = xOf(i);
+    let posY = y0, negY = y0;
+    sectors.forEach(sec => {
+      const v = mv[sec] || 0;
+      if (v === 0) return;
+      const bH = Math.abs(yOf(v) - y0);
+      if (v >= 0) {
+        ctx.fillStyle = colorMap[sec];
+        ctx.fillRect(x - barW / 2, posY - bH, barW, bH);
+        posY -= bH;
+      } else {
+        ctx.fillStyle = colorMap[sec];
+        ctx.fillRect(x - barW / 2, negY, barW, bH);
+        negY += bH;
+      }
+    });
+  });
+
+  // X labels
+  ctx.fillStyle = textCol;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const labelEvery = Math.max(1, Math.ceil(months.length / 18));
+  months.forEach((m, i) => {
+    if (i % labelEvery !== 0 && i !== months.length - 1) return;
+    const [yr, mo] = m.split('-');
+    const lbl = new Date(+yr, +mo - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+    ctx.fillText(lbl, xOf(i), H - PAD.bottom + 6);
+  });
+
+  // Legend
+  const legEl = document.getElementById('dynamicsLegend');
+  if (legEl) {
+    legEl.innerHTML = sectors.map(s =>
+      `<span class="dyn-leg-dot" style="background:${colorMap[s]};border:none"></span><span class="dyn-leg-label">${esc(s)}</span>`
+    ).join('');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DAILY / WEEKLY CHART GRANULARITY
+   ══════════════════════════════════════════════════════════════════════════ */
+
+let _dailyReturnsData = null;
+let _dailyRange = null;
+
+async function _loadDailyReturns(range) {
+  _dailyRange = range;
+  const canvas = document.getElementById('dynamicsChart');
+  if (canvas) _showChartEmpty(canvas, 'Loading…');
+  try {
+    const res = await fetch(`/api/p${PORTFOLIO_ID}/daily-returns?range=${range}`);
+    const json = await res.json();
+    if (json.status !== 'ok') throw new Error(json.message);
+    _dailyReturnsData = json.data || [];
+    _drawDailyChart(_dailyReturnsData, range);
+    const hintEl = document.getElementById('dynamicsHint');
+    if (hintEl) hintEl.textContent = range === '1W' ? 'Daily returns — last 7 days' : 'Daily returns — last 30 days';
+  } catch (err) {
+    const canvas2 = document.getElementById('dynamicsChart');
+    if (canvas2) _showChartEmpty(canvas2, 'No daily data yet');
+  }
+}
+
+function _drawDailyChart(data, range) {
+  const canvas = document.getElementById('dynamicsChart');
+  if (!canvas || !canvas.offsetWidth) { requestAnimationFrame(() => _drawDailyChart(data, range)); return; }
+  _hideChartEmpty(canvas);
+
+  if (!data.length) { _showChartEmpty(canvas, 'No data yet'); return; }
+
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const textCol = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.45)';
+  const gridCol = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)';
+  const zeroCol = isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)';
+  const posCol = '#4ade80', negCol = '#f87171';
+
+  const PAD = { top: 32, right: 12, bottom: 44, left: 44 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  const vals = data.map(d => d.pct);
+  const maxVal = Math.max(...vals, 0.1);
+  const minVal = Math.min(...vals, -0.1);
+  const yMax = Math.ceil(maxVal * 1.3 / 0.5) * 0.5;
+  const yMin = Math.floor(minVal * 1.3 / 0.5) * 0.5;
+  const yRng = yMax - yMin;
+  const yOf = v => PAD.top + (1 - (v - yMin) / yRng) * cH;
+  const y0 = yOf(0);
+  const barStep = cW / data.length;
+  const barW = Math.max(4, Math.min(28, barStep * 0.7));
+  const xOf = i => PAD.left + (i + 0.5) * barStep;
+
+  // Grid + labels
+  const yStep = yRng <= 2 ? 0.5 : yRng <= 5 ? 1 : 2;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let v = yMin; v <= yMax + 0.001; v = Math.round((v + yStep) * 100) / 100) {
+    const y = yOf(v);
+    ctx.strokeStyle = v === 0 ? zeroCol : gridCol;
+    ctx.lineWidth = v === 0 ? 1.2 : 0.5;
+    ctx.setLineDash(v === 0 ? [] : [4, 4]);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = textCol;
+    ctx.fillText(v.toFixed(1) + '%', PAD.left - 6, y);
+  }
+
+  // Bars
+  data.forEach((d, i) => {
+    const x = xOf(i), pos = d.pct >= 0;
+    const bTop = pos ? yOf(d.pct) : y0;
+    const bH = Math.max(1, Math.abs(yOf(d.pct) - y0));
+    ctx.fillStyle = pos ? posCol : negCol;
+    ctx.fillRect(x - barW / 2, bTop, barW, bH);
+  });
+
+  // X labels
+  ctx.fillStyle = textCol;
+  ctx.font = '10px system-ui,sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  const labelEvery = Math.max(1, Math.ceil(data.length / 14));
+  data.forEach((d, i) => {
+    if (i % labelEvery !== 0 && i !== data.length - 1) return;
+    const dt = new Date(d.date);
+    const lbl = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    ctx.fillText(lbl, xOf(i), H - PAD.bottom + 6);
+  });
+
+  // Reset legend when in daily view
+  const legEl = document.getElementById('dynamicsLegend');
+  if (legEl) legEl.innerHTML = `<span class="dyn-leg-dot"></span><span class="dyn-leg-label">Portfolio (daily)</span>`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   7-DAY SPARKLINES FOR HOLDINGS TABLE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+async function _loadSparklines7d(rows) {
+  if (!rows || !rows.length) return;
+  const tickers = rows.map(r => r.ticker).join(',');
+  const countries = rows.map(r => r.country).join(',');
+  try {
+    // Reuse stock-sparklines endpoint but request 5d/1d data
+    const res = await fetch(`/api/stock-sparklines?tickers=${encodeURIComponent(tickers)}&countries=${encodeURIComponent(countries)}&range=5d`);
+    const json = await res.json();
+    if (json.status !== 'ok') return;
+    for (const [ticker, points] of Object.entries(json.data)) {
+      if (!points.length) continue;
+      const safeId = ticker.replace(/[^a-zA-Z0-9]/g, '_');
+      const canvas = document.getElementById('spark7d-' + safeId);
+      if (canvas) _drawStockSparkline7d(canvas, points);
+    }
+  } catch (_) {}
+}
+
+function _drawStockSparkline7d(canvas, points) {
+  const W = 72, H = 28;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const prices = points.map(p => p.price);
+  const minP = Math.min(...prices), maxP = Math.max(...prices);
+  const range = (maxP - minP) || 1;
+  const isUp = prices[prices.length - 1] >= prices[0];
+  const lineCol = isUp ? '#10b981' : '#ef4444';
+  const pad = { t: 2, b: 2, l: 1, r: 1 };
+  const cW = W - pad.l - pad.r, cH = H - pad.t - pad.b;
+  const xOf = i => pad.l + (i / (prices.length - 1)) * cW;
+  const yOf = v => pad.t + (1 - (v - minP) / range) * cH;
+  ctx.beginPath();
+  prices.forEach((p, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(p)) : ctx.lineTo(xOf(i), yOf(p)));
+  ctx.strokeStyle = lineCol;
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TOP MOVERS STRIP  (above holdings table)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function renderTopMovers() {
+  if (!Object.keys(_tickerChangeMap).length) return;
+  const strip = document.getElementById('topMoversStrip');
+  const container = document.getElementById('moversItems');
+  if (!strip || !container) return;
+
+  const entries = Object.entries(_tickerChangeMap)
+    .filter(([, v]) => v != null)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .slice(0, 8);
+
+  if (!entries.length) return;
+
+  container.innerHTML = entries.map(([ticker, pct]) => {
+    const sign = pct >= 0 ? '+' : '';
+    const cls = pct >= 0 ? 'mover-pos' : 'mover-neg';
+    return `<span class="mover-chip ${cls}" onclick="openStockPanelByTicker('${esc(ticker)}')">
+      <span class="mover-ticker">${esc(ticker)}</span>
+      <span class="mover-pct">${sign}${pct.toFixed(2)}%</span>
+    </span>`;
+  }).join('');
+  strip.style.display = '';
+}
+
+function openStockPanelByTicker(ticker) {
+  const row = allRows.find(r => r.ticker === ticker);
+  if (row) openStockPanel(row);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ANIMATED SECTOR HEATMAP
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function _animateHeatmapCells(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const cells = container.querySelectorAll('.phm-cell');
+  cells.forEach((cell, i) => {
+    cell.style.opacity = '0';
+    cell.style.transform = 'scale(0.88)';
+    cell.style.transition = 'none';
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        cell.style.transition = `opacity 0.25s ease ${i * 18}ms, transform 0.25s ease ${i * 18}ms`;
+        cell.style.opacity = '1';
+        cell.style.transform = 'scale(1)';
+      }, 10);
+    });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NOTIFICATIONS PANEL
+   ══════════════════════════════════════════════════════════════════════════ */
+
+let _notifPanelOpen = false;
+
+function toggleNotifPanel() {
+  const panel = document.getElementById('notifPanel');
+  if (!panel) return;
+  _notifPanelOpen = !_notifPanelOpen;
+  panel.style.display = _notifPanelOpen ? '' : 'none';
+  if (_notifPanelOpen) {
+    loadNotifications();
+    loadAlertsList();
+  }
+}
+
+document.addEventListener('click', e => {
+  if (_notifPanelOpen && !e.target.closest('#notifWrap')) {
+    _notifPanelOpen = false;
+    const panel = document.getElementById('notifPanel');
+    if (panel) panel.style.display = 'none';
+  }
+});
+
+async function loadNotifications() {
+  try {
+    const res = await fetch('/api/notifications');
+    const json = await res.json();
+    if (json.status !== 'ok') return;
+    const badge = document.getElementById('notifBadge');
+    if (badge) {
+      if (json.unread > 0) { badge.textContent = json.unread; badge.style.display = ''; }
+      else badge.style.display = 'none';
+    }
+    const list = document.getElementById('notifList');
+    if (!list) return;
+    if (!json.data.length) {
+      list.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+      return;
+    }
+    list.innerHTML = json.data.map(n => {
+      const dt = new Date(n.created_at * 1000).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const unreadCls = n.is_read ? '' : ' notif-unread';
+      const iconMap = { alert: 'add_alert', price: 'trending_up', system: 'info' };
+      const icon = iconMap[n.type] || 'notifications';
+      return `<div class="notif-item${unreadCls}">
+        <span class="material-symbols-outlined notif-icon">${icon}</span>
+        <div class="notif-content">
+          <div class="notif-title">${esc(n.title)}</div>
+          <div class="notif-msg">${esc(n.message)}</div>
+          <div class="notif-time">${dt}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (_) {}
+}
+
+async function markNotificationsRead() {
+  try {
+    await fetch('/api/notifications/read', { method: 'POST' });
+    const badge = document.getElementById('notifBadge');
+    if (badge) badge.style.display = 'none';
+    document.querySelectorAll('.notif-unread').forEach(el => el.classList.remove('notif-unread'));
+  } catch (_) {}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PRICE ALERTS  (modal + list)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function openAlertsModal() {
+  const overlay = document.getElementById('alertModalOverlay');
+  if (overlay) overlay.style.display = 'flex';
+  toggleNotifPanel(); // close notification panel
+}
+
+function closeAlertsModal() {
+  const overlay = document.getElementById('alertModalOverlay');
+  if (overlay) overlay.style.display = 'none';
+}
+
+async function saveAlert() {
+  const ticker = (document.getElementById('alertTicker')?.value || '').trim().toUpperCase();
+  const condition = document.getElementById('alertCondition')?.value || 'above';
+  const threshold = parseFloat(document.getElementById('alertThreshold')?.value || '0');
+  if (!ticker || isNaN(threshold) || threshold <= 0) {
+    alert('Please enter a valid ticker and threshold.');
+    return;
+  }
+  try {
+    const res = await fetch('/api/alerts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, condition, threshold }),
+    });
+    const json = await res.json();
+    if (json.status === 'ok') {
+      closeAlertsModal();
+      document.getElementById('alertTicker').value = '';
+      document.getElementById('alertThreshold').value = '';
+      // Re-open notifications panel to see the new alert
+      _notifPanelOpen = false;
+      toggleNotifPanel();
+    }
+  } catch (_) {}
+}
+
+async function loadAlertsList() {
+  try {
+    const res = await fetch('/api/alerts');
+    const json = await res.json();
+    if (json.status !== 'ok') return;
+    const container = document.getElementById('alertsList');
+    if (!container) return;
+    if (!json.data.length) {
+      container.innerHTML = '<div class="notif-empty" style="font-size:0.75rem">No alerts set</div>';
+      return;
+    }
+    container.innerHTML = json.data.map(a => {
+      const triggered = a.triggered_at ? ' alert-triggered' : '';
+      const status = a.triggered_at ? '✓ Triggered' : (a.enabled ? 'Active' : 'Disabled');
+      return `<div class="alert-item${triggered}">
+        <div class="alert-item-info">
+          <span class="alert-ticker">${esc(a.ticker)}</span>
+          <span class="alert-cond">${a.condition} ${fmt.currency(a.threshold)}</span>
+          <span class="alert-status">${status}</span>
+        </div>
+        <button class="alert-delete-btn" onclick="deleteAlert(${a.id})">✕</button>
+      </div>`;
+    }).join('');
+  } catch (_) {}
+}
+
+async function deleteAlert(id) {
+  try {
+    await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
+    loadAlertsList();
+  } catch (_) {}
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE THEME LABEL SYNC
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function _syncMobileTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+  const mobIcon = document.getElementById('mobThemeIcon');
+  const mobLabel = document.getElementById('mobThemeLabel');
+  const mobBadge = document.getElementById('mobThemeBadge');
+  if (mobIcon) mobIcon.textContent = isDark ? 'dark_mode' : 'light_mode';
+  if (mobLabel) mobLabel.textContent = isDark ? 'Dark Mode' : 'Light Mode';
+  if (mobBadge) mobBadge.textContent = isDark ? 'ON' : 'OFF';
 }

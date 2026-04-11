@@ -125,6 +125,28 @@ def _init_sqlite() -> None:
                 created_at REAL NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS price_alerts (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker      TEXT    NOT NULL,
+                condition   TEXT    NOT NULL,
+                threshold   REAL    NOT NULL,
+                enabled     INTEGER NOT NULL DEFAULT 1,
+                created_at  REAL    NOT NULL,
+                triggered_at REAL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                type        TEXT    NOT NULL,
+                title       TEXT    NOT NULL,
+                message     TEXT    NOT NULL,
+                data        TEXT,
+                created_at  REAL    NOT NULL,
+                is_read     INTEGER NOT NULL DEFAULT 0
+            )
+        """)
 
 
 def _init_pg() -> None:
@@ -173,6 +195,28 @@ def _init_pg() -> None:
                 post_id    TEXT PRIMARY KEY,
                 data       TEXT             NOT NULL,
                 created_at DOUBLE PRECISION NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS price_alerts (
+                id           SERIAL PRIMARY KEY,
+                ticker       TEXT             NOT NULL,
+                condition    TEXT             NOT NULL,
+                threshold    DOUBLE PRECISION NOT NULL,
+                enabled      INTEGER          NOT NULL DEFAULT 1,
+                created_at   DOUBLE PRECISION NOT NULL,
+                triggered_at DOUBLE PRECISION
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id         SERIAL PRIMARY KEY,
+                type       TEXT             NOT NULL,
+                title      TEXT             NOT NULL,
+                message    TEXT             NOT NULL,
+                data       TEXT,
+                created_at DOUBLE PRECISION NOT NULL,
+                is_read    INTEGER          NOT NULL DEFAULT 0
             )
         """)
 
@@ -341,3 +385,74 @@ def clear_all_cache() -> None:
             conn.execute("DELETE FROM kv_cache")
             conn.execute("DELETE FROM portfolio_history")
             conn.execute("DELETE FROM portfolio_snapshots")
+
+
+# ── Price Alerts ──────────────────────────────────────────────────────────────
+
+def alerts_get_all() -> list:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT id, ticker, condition, threshold, enabled, created_at, triggered_at FROM price_alerts ORDER BY created_at DESC"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def alert_add(ticker: str, condition: str, threshold: float) -> int:
+    with _db() as conn:
+        cur = conn.execute(
+            "INSERT INTO price_alerts (ticker, condition, threshold, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
+            (ticker.upper(), condition, threshold, time.time()),
+        )
+        return cur.lastrowid
+
+
+def alert_delete(alert_id: int) -> None:
+    with _db() as conn:
+        conn.execute("DELETE FROM price_alerts WHERE id = ?", (alert_id,))
+
+
+def alert_mark_triggered(alert_id: int) -> None:
+    with _db() as conn:
+        conn.execute(
+            "UPDATE price_alerts SET triggered_at = ?, enabled = 0 WHERE id = ?",
+            (time.time(), alert_id),
+        )
+
+
+# ── Notifications ─────────────────────────────────────────────────────────────
+
+def notifications_get(limit: int = 30) -> list:
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT id, type, title, message, data, created_at, is_read FROM notifications ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    result = []
+    for r in rows:
+        d = dict(r)
+        if d.get("data"):
+            try:
+                d["data"] = json.loads(d["data"])
+            except Exception:
+                pass
+        result.append(d)
+    return result
+
+
+def notification_add(type_: str, title: str, message: str, data=None) -> None:
+    with _db() as conn:
+        conn.execute(
+            "INSERT INTO notifications (type, title, message, data, created_at, is_read) VALUES (?, ?, ?, ?, ?, 0)",
+            (type_, title, message, json.dumps(data) if data else None, time.time()),
+        )
+
+
+def notifications_mark_all_read() -> None:
+    with _db() as conn:
+        conn.execute("UPDATE notifications SET is_read = 1")
+
+
+def notifications_unread_count() -> int:
+    with _db() as conn:
+        row = conn.execute("SELECT COUNT(*) AS cnt FROM notifications WHERE is_read = 0").fetchone()
+    return row["cnt"] if row else 0
