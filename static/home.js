@@ -75,6 +75,57 @@ let _signalsData = {};        // cache per signal type
 let _insiderData = {};
 let _tradeSignalsData = null;
 
+/* ─── Overview card skeleton + count-up helpers ─────────────────────────── */
+function _homeShowSkeletons() {
+    const ids = [
+        'p1-value', 'p1-returns', 'p1-pct',
+        'p2-value', 'p2-returns', 'p2-pct',
+        'c-value',  'c-returns',  'c-pct',
+    ];
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('skeleton', 'skeleton-text');
+        el.dataset.rawValue = '';
+        el.textContent = '';
+    });
+}
+
+function _homeHideSkeleton(el) {
+    if (!el) return;
+    el.classList.remove('skeleton', 'skeleton-text');
+}
+
+/**
+ * Animate a numeric currency value from its previous value to `toValue`.
+ * Uses ease-out-cubic over `duration` ms. On first call (no stored raw)
+ * it counts up from 0, giving the "number ticker" effect on load.
+ */
+function _animateValue(el, toValue, formatter, duration = 700) {
+    if (!el) return;
+    _homeHideSkeleton(el);
+    const raw = parseFloat(el.dataset.rawValue);
+    const fromValue = isNaN(raw) ? 0 : raw;
+    el.dataset.rawValue = toValue;
+
+    if (Math.abs(toValue - fromValue) < 0.005) {
+        el.textContent = formatter(toValue);
+        return;
+    }
+
+    const start = performance.now();
+    const delta = toValue - fromValue;
+
+    function tick(now) {
+        const t = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+        el.textContent = formatter(fromValue + delta * eased);
+        if (t < 1) requestAnimationFrame(tick);
+        else el.textContent = formatter(toValue); // exact final value
+    }
+    requestAnimationFrame(tick);
+}
+
 async function loadOverview(refresh = false) {
     try {
         const url = refresh ? '/api/overview?refresh=1' : '/api/overview';
@@ -121,6 +172,7 @@ async function loadOverview(refresh = false) {
 
 /* ─── Combined home-data loader (1 request instead of 5 on page load) ──────── */
 async function loadHomeData(refresh = false) {
+    if (!refresh) _homeShowSkeletons();
     try {
         const url = refresh ? '/api/home-data?refresh=1' : '/api/home-data';
         const resp = await fetch(url);
@@ -260,22 +312,27 @@ function updateCard(prefix, stats) {
     const retEl = document.getElementById(`${prefix}-returns`);
     const pctEl = document.getElementById(`${prefix}-pct`);
 
-    if (valEl) valEl.innerText = fmt.currency(stats.value);
+    // Main value — count-up animation (from 0 on first load, from prev on refresh)
+    _animateValue(valEl, stats.value, v => fmt.currency(v));
 
     if (retEl) {
-        const sign = stats.returns >= 0 ? '+' : '';
-        retEl.innerText = `${sign}${fmt.currency(stats.returns)}`;
-        retEl.className = `ov-returns ${stats.returns >= 0 ? 'pos' : 'neg'}`;
+        const isPos = stats.returns >= 0;
+        retEl.className = `ov-returns ${isPos ? 'pos' : 'neg'}`;
+        _animateValue(retEl, stats.returns, v => (v >= 0 ? '+' : '') + fmt.currency(v));
     }
 
-    if (pctEl) pctEl.innerText = `(${stats.returns_pct.toFixed(2)}%)`;
+    if (pctEl) {
+        _homeHideSkeleton(pctEl);
+        pctEl.textContent = `(${stats.returns_pct.toFixed(2)}%)`;
+        pctEl.dataset.rawValue = stats.returns_pct;
+    }
 
-    // Mini stats
-    const invEl         = document.getElementById(`${prefix}-invested`);
-    const posEl         = document.getElementById(`${prefix}-positions`);
-    const unrealizedEl  = document.getElementById(`${prefix}-unrealized`);
-    const realizedEl    = document.getElementById(`${prefix}-realized`);
-    const cashEl        = document.getElementById(`${prefix}-cash`);
+    // Mini stats — no animation, just direct set
+    const invEl        = document.getElementById(`${prefix}-invested`);
+    const posEl        = document.getElementById(`${prefix}-positions`);
+    const unrealizedEl = document.getElementById(`${prefix}-unrealized`);
+    const realizedEl   = document.getElementById(`${prefix}-realized`);
+    const cashEl       = document.getElementById(`${prefix}-cash`);
 
     if (invEl && stats.invested != null)
         invEl.textContent = fmt.currency(stats.invested);
@@ -287,15 +344,13 @@ function updateCard(prefix, stats) {
 
     if (unrealizedEl && stats.unrealized_pnl != null) {
         const v = stats.unrealized_pnl;
-        const sign = v >= 0 ? '+' : '';
-        unrealizedEl.textContent = `${sign}${fmt.currency(v)}`;
+        unrealizedEl.textContent = `${v >= 0 ? '+' : ''}${fmt.currency(v)}`;
         unrealizedEl.className = `ov-mini-val ${v >= 0 ? 'pos' : 'neg'}`;
     }
 
     if (realizedEl && stats.realized_pnl != null) {
         const v = stats.realized_pnl;
-        const sign = v >= 0 ? '+' : '';
-        realizedEl.textContent = `${sign}${fmt.currency(v)}`;
+        realizedEl.textContent = `${v >= 0 ? '+' : ''}${fmt.currency(v)}`;
         realizedEl.className = `ov-mini-val ${v >= 0 ? 'pos' : 'neg'}`;
     }
 
@@ -4622,24 +4677,25 @@ function _renderWatchlistTable(list) {
                     ? `<span class="wl-type-badge wl-type-commodity">Cmdty</span>`
                     : `<span class="wl-type-badge wl-type-stock">Stock</span>`;
 
+        const _s = 'skeleton skeleton-text wl-cell-skel';
         row.innerHTML = `
             <td data-colid="wl-ticker"><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
-            <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}">—</td>
-            <td data-colid="wl-price" class="wl-price" id="wl-price-${ticker}">—</td>
-            <td data-colid="wl-change" class="wl-change" id="wl-chg-${ticker}">—</td>
-            <td data-colid="wl-min" class="wl-target-col wl-target-min" id="wl-min-${ticker}">—</td>
-            <td data-colid="wl-avg" class="wl-target-col wl-target-avg" id="wl-avg-${ticker}">—</td>
-            <td data-colid="wl-max" class="wl-target-col wl-target-max" id="wl-max-${ticker}">—</td>
-            <td data-colid="wl-signal" id="wl-sig-${ticker}">—</td>
-            <td data-colid="wl-mktcap" class="wl-fund-col" id="wl-mktcap-${ticker}">—</td>
-            <td data-colid="wl-revenue" class="wl-fund-col" id="wl-rev-${ticker}">—</td>
-            <td data-colid="wl-ps" class="wl-fund-col" id="wl-ps-${ticker}">—</td>
-            <td data-colid="wl-pe" class="wl-fund-col" id="wl-pe-${ticker}">—</td>
-            <td data-colid="wl-fpe" class="wl-fund-col" id="wl-fpe-${ticker}">—</td>
-            <td data-colid="wl-5pe" class="wl-fund-col" id="wl-5pe-${ticker}">—</td>
-            <td data-colid="wl-ret6m" class="wl-ret-col" id="wl-ret6m-${ticker}">—</td>
-            <td data-colid="wl-ret1y" class="wl-ret-col" id="wl-ret1y-${ticker}">—</td>
-            <td data-colid="wl-ytd" class="wl-ret-col" id="wl-ytd-${ticker}">—</td>
+            <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-price" class="wl-price" id="wl-price-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-change" class="wl-change" id="wl-chg-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-min" class="wl-target-col wl-target-min" id="wl-min-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-avg" class="wl-target-col wl-target-avg" id="wl-avg-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-max" class="wl-target-col wl-target-max" id="wl-max-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-signal" id="wl-sig-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-mktcap" class="wl-fund-col" id="wl-mktcap-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-revenue" class="wl-fund-col" id="wl-rev-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-ps" class="wl-fund-col" id="wl-ps-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-pe" class="wl-fund-col" id="wl-pe-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-fpe" class="wl-fund-col" id="wl-fpe-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-5pe" class="wl-fund-col" id="wl-5pe-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-ret6m" class="wl-ret-col" id="wl-ret6m-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-ret1y" class="wl-ret-col" id="wl-ret1y-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-ytd" class="wl-ret-col" id="wl-ytd-${ticker}"><span class="${_s}"></span></td>
             <td data-colid="wl-chart"><canvas id="wl-spark-${ticker}" class="wl-spark-canvas" width="100" height="36"></canvas></td>
             <td>
               <button class="wl-remove-btn" onclick="event.stopPropagation();removeWatchlistTicker('${esc(ticker)}')" title="Remove">
@@ -4758,6 +4814,15 @@ function _fmtMarketVal(v) {
     return '$' + v.toLocaleString();
 }
 
+function _wlClearSkel(...ids) {
+    ids.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const skel = el.querySelector('.wl-cell-skel');
+        if (skel) skel.remove();
+    });
+}
+
 async function _loadWatchlistRow(ticker, country) {
     // Fetch price + sparkline + signals + fundamentals in parallel
     const [priceRes, sparkRes, sigRes, fundRes] = await Promise.allSettled([
@@ -4768,6 +4833,7 @@ async function _loadWatchlistRow(ticker, country) {
     ]);
 
     // Price + company
+    _wlClearSkel(`wl-co-${ticker}`, `wl-price-${ticker}`, `wl-chg-${ticker}`);
     if (priceRes.status === 'fulfilled' && priceRes.value?.status === 'ok') {
         const d = priceRes.value.data;
         const coEl = document.getElementById(`wl-co-${ticker}`);
@@ -4804,6 +4870,7 @@ async function _loadWatchlistRow(ticker, country) {
     }
 
     // Signals
+    _wlClearSkel(`wl-min-${ticker}`, `wl-avg-${ticker}`, `wl-max-${ticker}`, `wl-sig-${ticker}`);
     if (sigRes.status === 'fulfilled' && sigRes.value?.status === 'ok') {
         const d = sigRes.value.data;
         const fmt2 = v => v != null ? v.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—';
@@ -4823,6 +4890,11 @@ async function _loadWatchlistRow(ticker, country) {
     }
 
     // Fundamentals + returns
+    _wlClearSkel(
+        `wl-mktcap-${ticker}`, `wl-rev-${ticker}`, `wl-ps-${ticker}`,
+        `wl-pe-${ticker}`, `wl-fpe-${ticker}`, `wl-5pe-${ticker}`,
+        `wl-ret6m-${ticker}`, `wl-ret1y-${ticker}`, `wl-ytd-${ticker}`
+    );
     if (fundRes.status === 'fulfilled' && fundRes.value?.status === 'ok') {
         const d = fundRes.value.data;
 

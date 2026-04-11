@@ -451,6 +451,33 @@ function hideSkeletons() {
   });
 }
 
+/* ─── Count-up animation for summary card values ─────────────────────────── */
+function _animateCardValue(el, toValue, formatter, duration = 700) {
+    if (!el) return;
+    // Remove any skeleton state so value is visible immediately
+    el.classList.remove('skeleton', 'skeleton-text');
+    const raw = parseFloat(el.dataset.rawValue);
+    const fromValue = isNaN(raw) ? 0 : raw;
+    el.dataset.rawValue = toValue;
+
+    if (Math.abs(toValue - fromValue) < 0.005) {
+        el.textContent = formatter(toValue);
+        return;
+    }
+
+    const start = performance.now();
+    const delta = toValue - fromValue;
+
+    function tick(now) {
+        const t = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3);
+        el.textContent = formatter(fromValue + delta * eased);
+        if (t < 1) requestAnimationFrame(tick);
+        else el.textContent = formatter(toValue);
+    }
+    requestAnimationFrame(tick);
+}
+
 /* ─── Summary cards ───────────────────────────────────────────────────────── */
 function renderSummary(rows, allTimeDividends = null) {
   const totalValue = rows.reduce((s, r) => s + r.current_value, 0);
@@ -469,12 +496,12 @@ function renderSummary(rows, allTimeDividends = null) {
   const topDiv = rows.reduce((t, r) => r.dividends > (t?.dividends ?? -Infinity) ? r : t, null);
 
   // Card 1: Portfolio Value
-  set('totalValue', fmt.currency(totalValue));
+  _animateCardValue(document.getElementById('totalValue'), totalValue, v => fmt.currency(v));
   set('totalInvested', 'Invested: ' + fmt.currency(invested));
   set('totalHoldings', rows.length + ' holdings');
 
   // Card 2: Dividends
-  set('totalDividends', fmt.currency(totalDividends));
+  _animateCardValue(document.getElementById('totalDividends'), totalDividends, v => fmt.currency(v));
 
   const topDivEl = document.getElementById('topDivStock');
   if (topDiv && topDiv.dividends > 0) {
@@ -541,8 +568,8 @@ function _renderReturnsValues() {
     pEl.textContent = 'Loading…';
     pEl.className = 's-card-pct';
   } else if (val != null) {
-    rEl.textContent = (val >= 0 ? '+' : '') + fmt.currency(val);
     rEl.className = 's-card-value ' + colorClass(val);
+    _animateCardValue(rEl, val, v => (v >= 0 ? '+' : '') + fmt.currency(v));
     pEl.textContent = fmt.pct(pct);
     pEl.className = 's-card-pct ' + colorClass(pct);
   }
@@ -1543,8 +1570,13 @@ function drawAnalystGauge(canvasId, score, consensus) {
   const lineH = fontSize + 2;
   for (const ldef of labelDefs) {
     const angle = Math.PI + (ldef.pos / 100) * Math.PI;
-    const lx = cx + Math.cos(angle) * labelR;
+    let lx = cx + Math.cos(angle) * labelR;
     const ly = cy + Math.sin(angle) * labelR;
+    // Clamp label anchor so text doesn't overflow canvas edges
+    const longestLine = ldef.lines.reduce((a, b) => a.length > b.length ? a : b, '');
+    const tw = ctx.measureText(longestLine).width;
+    if (ldef.align === 'right') lx = Math.max(lx, tw + 2);
+    if (ldef.align === 'left')  lx = Math.min(lx, W - tw - 2);
     ctx.fillStyle = ldef.active ? activeColor : mutedColor;
     ctx.textAlign = ldef.align;
     ctx.textBaseline = 'middle';

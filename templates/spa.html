@@ -313,28 +313,28 @@
       <div class="mob-sheet-handle"></div>
       <div class="mob-sheet-title">Menu</div>
       <nav class="mob-sheet-nav">
-        <a class="mob-sheet-item" onclick="navigate('home'); closeMobileSheet();" href="#">
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#home">
           <span class="material-symbols-outlined mob-sheet-icon">home</span>
           <span>Home</span>
         </a>
-        <a class="mob-sheet-item" onclick="navigate('portfolio/combined'); closeMobileSheet();" href="#">
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#portfolio/combined">
           <span class="material-symbols-outlined mob-sheet-icon">pie_chart</span>
           <span>Portfolio</span>
         </a>
-        <a class="mob-sheet-item" onclick="navigate('dividends/combined'); closeMobileSheet();" href="#">
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#dividends/combined">
           <span class="material-symbols-outlined mob-sheet-icon">payments</span>
           <span>Dividends</span>
         </a>
-        <a class="mob-sheet-item" onclick="navigate('metrics'); closeMobileSheet();" href="#">
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#metrics">
           <span class="material-symbols-outlined mob-sheet-icon">analytics</span>
           <span>Metrics</span>
         </a>
-        <a class="mob-sheet-item" onclick="navigate('news'); closeMobileSheet();" href="#">
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#news">
           <span class="material-symbols-outlined mob-sheet-icon">newspaper</span>
           <span>News</span>
         </a>
         {% if show_ai %}
-        <a class="mob-sheet-item" onclick="navigate('ai-intelligence'); closeMobileSheet();" href="#">
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#ai-intelligence">
           <span class="material-symbols-outlined mob-sheet-icon">psychology</span>
           <span>AI Intelligence</span>
         </a>
@@ -414,10 +414,10 @@
                   </div>
                   <div class="ov-body">
                     <div class="ov-stats">
-                      <div class="ov-main-val" id="p1-value">£0.00</div>
+                      <div class="ov-main-val skeleton skeleton-text" id="p1-value"></div>
                       <div class="ov-subline">
-                        <span class="ov-returns" id="p1-returns">+£0.00</span>
-                        <span class="ov-pct" id="p1-pct">(0.00%)</span>
+                        <span class="ov-returns skeleton skeleton-text" id="p1-returns"></span>
+                        <span class="ov-pct skeleton skeleton-text" id="p1-pct"></span>
                       </div>
                       <div class="ov-24h" id="p1-24h" style="display:none"></div>
                     </div>
@@ -451,10 +451,10 @@
                   </div>
                   <div class="ov-body" id="p2-body" style="filter: grayscale(1); opacity: 0.6;">
                     <div class="ov-stats">
-                      <div class="ov-main-val" id="p2-value">£0.00</div>
+                      <div class="ov-main-val skeleton skeleton-text" id="p2-value"></div>
                       <div class="ov-subline">
-                        <span class="ov-returns" id="p2-returns">+£0.00</span>
-                        <span class="ov-pct" id="p2-pct">(0.00%)</span>
+                        <span class="ov-returns skeleton skeleton-text" id="p2-returns"></span>
+                        <span class="ov-pct skeleton skeleton-text" id="p2-pct"></span>
                       </div>
                       <div class="ov-24h" id="p2-24h" style="display:none"></div>
                     </div>
@@ -488,10 +488,10 @@
                   </div>
                   <div class="ov-body">
                     <div class="ov-stats">
-                      <div class="ov-main-val" id="c-value">£0.00</div>
+                      <div class="ov-main-val skeleton skeleton-text" id="c-value"></div>
                       <div class="ov-subline">
-                        <span class="ov-returns" id="c-returns">+£0.00</span>
-                        <span class="ov-pct" id="c-pct">(0.00%)</span>
+                        <span class="ov-returns skeleton skeleton-text" id="c-returns"></span>
+                        <span class="ov-pct skeleton skeleton-text" id="c-pct"></span>
                       </div>
                       <div class="ov-24h" id="c-24h" style="display:none"></div>
                     </div>
