@@ -255,6 +255,10 @@ function _renderHomeTopUnder(top, under) {
     const all = [...top, ...under];
     if (!all.length) { el.innerHTML = '<div class="activity-empty">No data.</div>'; return; }
 
+    // Re-split by actual sign so mis-bucketed rows (e.g. small positive in under-performers) appear correctly
+    const positives = all.filter(r => (r.total_returns ?? 0) >= 0).sort((a, b) => (b.total_returns ?? 0) - (a.total_returns ?? 0));
+    const negatives = all.filter(r => (r.total_returns ?? 0) < 0).sort((a, b) => (a.total_returns ?? 0) - (b.total_returns ?? 0));
+
     const maxAbs = Math.max(...all.map(r => Math.abs(r.total_returns ?? 0)), 1);
 
     function renderRow(r) {
@@ -266,11 +270,10 @@ function _renderHomeTopUnder(top, under) {
         const barPct = Math.round(Math.abs(abs) / maxAbs * 100);
         const ticker = esc((r.ticker || '—').slice(0, 7));
         const absVal = fmt.currency(Math.abs(abs));
-        const valStr = `${absVal}`;
         const pctStr = `${sign}${pct.toFixed(1)}%`;
 
         const infoHtml = `<span class="cdiv-ticker">${ticker}</span>`
-            + `<span class="cdiv-val ${cls}">${valStr}</span>`
+            + `<span class="cdiv-val ${cls}">${absVal}</span>`
             + `<span class="cdiv-pct">(${pctStr})</span>`;
         const barHtml = `<div class="cdiv-fill ${cls}" style="width:${barPct}%"></div>`;
 
@@ -287,7 +290,7 @@ function _renderHomeTopUnder(top, under) {
         }
     }
 
-    el.innerHTML = top.map(renderRow).join('') + under.map(renderRow).join('');
+    el.innerHTML = positives.map(renderRow).join('') + negatives.map(renderRow).join('');
 }
 
 function renderOverview(data) {
