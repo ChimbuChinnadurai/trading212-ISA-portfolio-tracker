@@ -78,7 +78,7 @@ gcloud beta run deploy "$CLOUD_RUN_SERVICE" \
     --set-secrets=/tmp/config.json=t212:latest \
     --no-cpu-boost \
     --region="$CLOUD_RUN_REGION" \
-    --project="$GCP_PROJECT"
+    --project="$GCP_PROJECT" \
     || die "gcloud run deploy failed"
 step_end
 

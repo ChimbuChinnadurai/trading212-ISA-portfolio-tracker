@@ -2759,9 +2759,10 @@ def add_alert():
     ticker = body.get("ticker", "").strip().upper()
     condition = body.get("condition", "").lower()
     threshold = body.get("threshold")
+    currency = body.get("currency", "GBP").upper()
     if not ticker or condition not in ("above", "below") or threshold is None:
         return jsonify({"status": "error", "message": "ticker, condition (above|below), threshold required"}), 400
-    alert_id = alert_add(ticker, condition, float(threshold))
+    alert_id = alert_add(ticker, condition, float(threshold), currency)
     return jsonify({"status": "ok", "id": alert_id})
 
 
@@ -2956,22 +2957,45 @@ def _check_price_alerts(rows):
         active = [a for a in alerts_get_all() if a["enabled"]]
         if not active:
             return
-        price_map = {r["ticker"]: r.get("current_price", 0) for r in rows}
+        
+        # Build maps for current prices in GBP and native
+        price_gbp = {r["ticker"]: r.get("current_price", 0) for r in rows}
+        price_native = {r["ticker"]: r.get("native_price", 0) for r in rows}
+
         for alert in active:
             ticker = alert["ticker"]
-            price = price_map.get(ticker)
+            alert_currency = alert.get("currency", "GBP").upper()
+
+            # Use native price if alert is in native currency, otherwise GBP
+            if alert_currency == "GBP":
+                price = price_gbp.get(ticker)
+            else:
+                price = price_native.get(ticker)
+
+            if price is None:
+                # Fallback: try matching ticker without suffix (e.g. CRWV_US_EQ -> CRWV)
+                # find first key that starts with ticker
+                for t in price_native.keys():
+                    if t.startswith(ticker):
+                        price = price_gbp.get(t) if alert_currency == "GBP" else price_native.get(t)
+                        break
+                
             if price is None:
                 continue
+
             triggered = (alert["condition"] == "above" and price >= alert["threshold"]) or \
                         (alert["condition"] == "below" and price <= alert["threshold"])
+            
+            logging.getLogger("alerts").debug(f"Checking {ticker}: {price} {alert_currency} vs {alert['threshold']} {alert['condition']} -> {triggered}")
+
             if triggered:
                 alert_mark_triggered(alert["id"])
                 direction = "above" if alert["condition"] == "above" else "below"
                 notification_add(
                     type_="alert",
                     title=f"Price Alert: {ticker}",
-                    message=f"{ticker} is now {direction} {alert['threshold']:.2f} (current: {price:.2f})",
-                    data={"ticker": ticker, "price": price, "threshold": alert["threshold"]},
+                    message=f"{ticker} is now {direction} {alert['threshold']:.2f} {alert_currency} (current: {price:.2f})",
+                    data={"ticker": ticker, "price": price, "threshold": alert["threshold"], "currency": alert_currency},
                 )
     except Exception as exc:
         logging.getLogger("alerts").warning("Alert check failed: %s", exc)
@@ -3103,6 +3127,75 @@ def ai_chat():
     except Exception as e:
         logger.error("AI Chat failed: %s", e)
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def _migrate_price_alerts():
+    """One-time migration: Convert GBP alerts for non-UK stocks to their native currency."""
+    try:
+        from fx import get_gbpusd_rate
+        
+        # Check if migration already run
+        if kv_get("migration_alerts_native_v1", 9999999):
+            return
+
+        alerts = alerts_get_all()
+        if not alerts:
+            return
+
+        # Get portfolio data to know the native currency of stocks
+        all_rows = []
+        for pid in API_KEYS:
+            rows, _ = rows_get(pid)
+            if rows:
+                all_rows.extend(rows)
+        
+        if not all_rows:
+            return
+
+        # Map ticker -> native_currency
+        ticker_map = {r["ticker"]: r for r in all_rows}
+        gbpusd = get_gbpusd_rate()
+
+        from cache import _db
+        with _db() as conn:
+            for alert in alerts:
+                ticker = alert["ticker"]
+                current_currency = alert.get("currency", "GBP")
+                if current_currency != "GBP":
+                    continue # Already migrated or set manually
+                
+                stock = ticker_map.get(ticker)
+                if not stock:
+                    continue # Can't migrate if not in portfolio
+                
+                native_currency = stock.get("native_currency", "GBP")
+                if native_currency == "GBP" or native_currency == "GBX":
+                    # For UK stocks, native is GBP/GBX, already handled correctly by current_price
+                    continue
+                
+                # For non-UK stocks (e.g. US), convert threshold from GBP to native
+                threshold_gbp = alert["threshold"]
+                if native_currency == "USD":
+                    new_threshold = round(threshold_gbp * gbpusd, 2)
+                    new_currency = "USD"
+                else:
+                    # For other currencies (EUR, etc.), we don't have rates in fx.py easily accessible
+                    # but we can try to find them if needed. For now US is the main one.
+                    continue
+                
+                conn.execute(
+                    "UPDATE price_alerts SET threshold = ?, currency = ? WHERE id = ?",
+                    (new_threshold, new_currency, alert["id"])
+                )
+                logger.info("Migrated alert %d for %s: %.2f GBP -> %.2f %s", 
+                            alert["id"], ticker, threshold_gbp, new_threshold, new_currency)
+
+        kv_set("migration_alerts_native_v1", True)
+    except Exception as e:
+        logger.error("Alert migration failed: %s", e)
+
+# Run migration on startup
+_migrate_price_alerts()
 
 
 if __name__ == "__main__":

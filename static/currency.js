@@ -70,6 +70,16 @@ const fmt = {
       minimumFractionDigits: decimals, maximumFractionDigits: decimals
     });
   },
+  currencyNative: (n, currencyCode, decimals = 2) => {
+    if (n == null) return '—';
+    const symMap = { 'GBP': '£', 'USD': '$', 'EUR': '€', 'GBX': 'p' };
+    const code = (currencyCode || 'GBP').toUpperCase();
+    const sym = symMap[code] || code;
+    const formatted = Number(n).toLocaleString('en-GB', {
+      minimumFractionDigits: decimals, maximumFractionDigits: decimals
+    });
+    return code === 'GBX' ? (formatted + 'p') : (sym + formatted);
+  },
   number: (n, decimals = 4) =>
     n == null ? '—' : Number(n).toLocaleString('en-GB', {
       minimumFractionDigits: 0, maximumFractionDigits: decimals

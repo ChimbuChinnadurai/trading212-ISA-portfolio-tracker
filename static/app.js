@@ -1264,7 +1264,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Use the correct loader for each view so renderTable() is always called
     if (stocksVisible && typeof loadStocksView === 'function') loadStocksView(false);
     else if (portfolioVisible) loadPortfolio();
-  }, 5 * 60 * 1000);
+  }, 30 * 1000);
 });
 
 /* ─── Analyst Ratings panel renderer ─────────────────────────────────────── */
@@ -3970,6 +3970,7 @@ function closeAlertsModal() {
 async function saveAlert() {
   const ticker = (document.getElementById('alertTicker')?.value || '').trim().toUpperCase();
   const condition = document.getElementById('alertCondition')?.value || 'above';
+  const currency = document.getElementById('alertCurrency')?.value || 'GBP';
   const threshold = parseFloat(document.getElementById('alertThreshold')?.value || '0');
   if (!ticker || isNaN(threshold) || threshold <= 0) {
     alert('Please enter a valid ticker and threshold.');
@@ -3979,7 +3980,7 @@ async function saveAlert() {
     const res = await fetch('/api/alerts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ticker, condition, threshold }),
+      body: JSON.stringify({ ticker, condition, threshold, currency }),
     });
     const json = await res.json();
     if (json.status === 'ok') {
@@ -4010,7 +4011,7 @@ async function loadAlertsList() {
       return `<div class="alert-item${triggered}">
         <div class="alert-item-info">
           <span class="alert-ticker">${esc(a.ticker)}</span>
-          <span class="alert-cond">${a.condition} ${fmt.currency(a.threshold)}</span>
+          <span class="alert-cond">${a.condition} ${fmt.currencyNative(a.threshold, a.currency)}</span>
           <span class="alert-status">${status}</span>
         </div>
         <button class="alert-delete-btn" onclick="deleteAlert(${a.id})">✕</button>
@@ -4025,6 +4026,25 @@ async function deleteAlert(id) {
     loadAlertsList();
   } catch (_) {}
 }
+
+// Auto-detect currency when typing ticker
+document.getElementById('alertTicker')?.addEventListener('input', (e) => {
+  const ticker = (e.target.value || '').trim().toUpperCase();
+  const row = allRows.find(r => r.ticker === ticker);
+  const currencyEl = document.getElementById('alertCurrency');
+  const labelEl = document.getElementById('alertThresholdLabel');
+  if (row && currencyEl) {
+    let native = row.native_currency || 'GBP';
+    if (native === 'GBX') native = 'GBP'; // User enters in GBP for UK stocks
+    currencyEl.value = native;
+    if (labelEl) labelEl.textContent = `Threshold (${native})`;
+  }
+});
+
+document.getElementById('alertCurrency')?.addEventListener('change', (e) => {
+  const labelEl = document.getElementById('alertThresholdLabel');
+  if (labelEl) labelEl.textContent = `Threshold (${e.target.value})`;
+});
 
 /* ══════════════════════════════════════════════════════════════════════════
    MOBILE THEME LABEL SYNC

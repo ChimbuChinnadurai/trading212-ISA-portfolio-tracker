@@ -131,11 +131,16 @@ def _init_sqlite() -> None:
                 ticker      TEXT    NOT NULL,
                 condition   TEXT    NOT NULL,
                 threshold   REAL    NOT NULL,
+                currency    TEXT    NOT NULL DEFAULT 'GBP',
                 enabled     INTEGER NOT NULL DEFAULT 1,
                 created_at  REAL    NOT NULL,
                 triggered_at REAL
             )
         """)
+        try:
+            conn.execute("ALTER TABLE price_alerts ADD COLUMN currency TEXT NOT NULL DEFAULT 'GBP'")
+        except Exception:
+            pass # column likely exists
         conn.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -203,11 +208,16 @@ def _init_pg() -> None:
                 ticker       TEXT             NOT NULL,
                 condition    TEXT             NOT NULL,
                 threshold    DOUBLE PRECISION NOT NULL,
+                currency     TEXT             NOT NULL DEFAULT 'GBP',
                 enabled      INTEGER          NOT NULL DEFAULT 1,
                 created_at   DOUBLE PRECISION NOT NULL,
                 triggered_at DOUBLE PRECISION
             )
         """)
+        try:
+            conn.execute("ALTER TABLE price_alerts ADD COLUMN currency TEXT NOT NULL DEFAULT 'GBP'")
+        except Exception:
+            pass # column likely exists
         conn.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id         SERIAL PRIMARY KEY,
@@ -392,16 +402,16 @@ def clear_all_cache() -> None:
 def alerts_get_all() -> list:
     with _db() as conn:
         rows = conn.execute(
-            "SELECT id, ticker, condition, threshold, enabled, created_at, triggered_at FROM price_alerts ORDER BY created_at DESC"
+            "SELECT id, ticker, condition, threshold, currency, enabled, created_at, triggered_at FROM price_alerts ORDER BY created_at DESC"
         ).fetchall()
     return [dict(r) for r in rows]
 
 
-def alert_add(ticker: str, condition: str, threshold: float) -> int:
+def alert_add(ticker: str, condition: str, threshold: float, currency: str = 'GBP') -> int:
     with _db() as conn:
         cur = conn.execute(
-            "INSERT INTO price_alerts (ticker, condition, threshold, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
-            (ticker.upper(), condition, threshold, time.time()),
+            "INSERT INTO price_alerts (ticker, condition, threshold, currency, enabled, created_at) VALUES (?, ?, ?, ?, 1, ?)",
+            (ticker.upper(), condition, threshold, currency.upper(), time.time()),
         )
         return cur.lastrowid
 
