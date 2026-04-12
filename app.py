@@ -1591,8 +1591,8 @@ def monthly_returns_endpoint(pid):
             spy_points = _yf_fetch_points("SPY", "5y", "1mo")
             spy_monthly_vals: dict = {}
             for i in range(1, len(spy_points)):
-                from datetime import datetime as _dt2
-                mo = _dt2.utcfromtimestamp(spy_points[i]["ts"]).strftime("%Y-%m")
+                from datetime import datetime as _dt2, timezone as _tz2
+                mo = _dt2.fromtimestamp(spy_points[i]["ts"], _tz2.utc).strftime("%Y-%m")
                 p0 = spy_points[i - 1]["price"]
                 p1 = spy_points[i]["price"]
                 if p0 and p0 > 0:
@@ -1784,7 +1784,7 @@ def risk_metrics_endpoint():
 @app.route("/api/p<pid>/monthly-performance")
 def monthly_performance(pid):
     """Monthly % returns for all tickers in the portfolio for the last 12 months."""
-    from datetime import datetime as _dt
+    from datetime import datetime as _dt, timezone as _tz
 
     cache_key = f"monthly_perf:{pid}"
     cached = kv_get(cache_key, 900)  # 15-min TTL — current month needs fresh price
@@ -1837,7 +1837,7 @@ def monthly_performance(pid):
             for i in range(1, len(timestamps)):
                 if closes[i] is None or closes[i - 1] is None or closes[i - 1] == 0:
                     continue
-                dt = _dt.utcfromtimestamp(timestamps[i])
+                dt = _dt.fromtimestamp(timestamps[i], _tz.utc)
                 month_key = dt.strftime("%Y-%m")
                 pct = (closes[i] - closes[i - 1]) / closes[i - 1] * 100
                 monthly[month_key] = round(pct, 2)
@@ -2794,7 +2794,7 @@ def return_attribution(pid):
         return jsonify({"status": "ok", "data": cached})
 
     try:
-        from datetime import datetime as _dt
+        from datetime import datetime as _dt, timezone as _tz
         # 1. Get portfolio rows for weights + sectors
         if pid == "combined":
             all_r = []
@@ -2849,7 +2849,7 @@ def return_attribution(pid):
                     for i in range(1, len(timestamps)):
                         if closes[i] is None or closes[i - 1] is None or closes[i - 1] == 0:
                             continue
-                        dt = _dt.utcfromtimestamp(timestamps[i])
+                        dt = _dt.fromtimestamp(timestamps[i], _tz.utc)
                         mk = dt.strftime("%Y-%m")
                         monthly[mk] = round((closes[i] - closes[i - 1]) / closes[i - 1] * 100, 2)
                     return clean, monthly
@@ -3077,6 +3077,8 @@ _news_refresh_thread.start()
 
 
 # ── Gemini AI Endpoints ───────────────────────────────────────────────────────
+
+
 
 @app.route("/api/ai/market-digest")
 def ai_market_digest():

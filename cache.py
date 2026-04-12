@@ -438,7 +438,7 @@ def alert_mark_triggered(alert_id: int) -> None:
 def notifications_get(limit: int = 30) -> list:
     with _db() as conn:
         rows = conn.execute(
-            "SELECT id, type, title, message, data, created_at, is_read FROM notifications ORDER BY created_at DESC LIMIT ?",
+            "SELECT id, type, title, message, data, created_at, is_read FROM notifications WHERE is_read = 0 ORDER BY created_at DESC LIMIT ?",
             (limit,),
         ).fetchall()
     result = []

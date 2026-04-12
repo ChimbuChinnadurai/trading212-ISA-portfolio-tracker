@@ -28,6 +28,7 @@ let _aiInitialized = false;
 let _dividendsInitialized = false;
 
 
+
 /* ── Auto-refresh timer handles ─────────────────────────────────────────── */
 const _homeTimers = {
     heatmap: null,
@@ -413,16 +414,6 @@ function _router() {
             window._dividendsActivePid = dvPid;
             _dividendsInitialized = true;
             if (typeof loadDividendsView === 'function') loadDividendsView(false, dvPid);
-        }
-
-        /* ── AI Intelligence ── */
-    } else if (hash === 'ai-intelligence') {
-        _showView('ai-intelligence');
-        _updateRefreshBtn('ai-intelligence');
-        document.title = 'AI Intelligence — Portfolio Tracker';
-        if (!_aiInitialized) {
-            if (typeof initAiView === 'function') initAiView();
-            _aiInitialized = true;
         }
     }
 }

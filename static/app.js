@@ -213,7 +213,7 @@ function _renderActivity(orders, dividends, warning) {
 
   const combined = _actFilter === 'all' ? all
     : _actFilter === 'dividend' ? all.filter(i => i._type === 'dividend')
-    : all.filter(i => i._type === 'order');
+      : all.filter(i => i._type === 'order');
 
   if (combined.length === 0) {
     const msg = warning ? `API error: ${warning}` : 'No recent activity found.';
@@ -456,29 +456,29 @@ function hideSkeletons() {
 
 /* ─── Count-up animation for summary card values ─────────────────────────── */
 function _animateCardValue(el, toValue, formatter, duration = 700) {
-    if (!el) return;
-    // Remove any skeleton state so value is visible immediately
-    el.classList.remove('skeleton', 'skeleton-text');
-    const raw = parseFloat(el.dataset.rawValue);
-    const fromValue = isNaN(raw) ? 0 : raw;
-    el.dataset.rawValue = toValue;
+  if (!el) return;
+  // Remove any skeleton state so value is visible immediately
+  el.classList.remove('skeleton', 'skeleton-text');
+  const raw = parseFloat(el.dataset.rawValue);
+  const fromValue = isNaN(raw) ? 0 : raw;
+  el.dataset.rawValue = toValue;
 
-    if (Math.abs(toValue - fromValue) < 0.005) {
-        el.textContent = formatter(toValue);
-        return;
-    }
+  if (Math.abs(toValue - fromValue) < 0.005) {
+    el.textContent = formatter(toValue);
+    return;
+  }
 
-    const start = performance.now();
-    const delta = toValue - fromValue;
+  const start = performance.now();
+  const delta = toValue - fromValue;
 
-    function tick(now) {
-        const t = Math.min((now - start) / duration, 1);
-        const eased = 1 - Math.pow(1 - t, 3);
-        el.textContent = formatter(fromValue + delta * eased);
-        if (t < 1) requestAnimationFrame(tick);
-        else el.textContent = formatter(toValue);
-    }
-    requestAnimationFrame(tick);
+  function tick(now) {
+    const t = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = formatter(fromValue + delta * eased);
+    if (t < 1) requestAnimationFrame(tick);
+    else el.textContent = formatter(toValue);
+  }
+  requestAnimationFrame(tick);
 }
 
 /* ─── Summary cards ───────────────────────────────────────────────────────── */
@@ -1585,7 +1585,7 @@ function drawAnalystGauge(canvasId, score, consensus) {
     const longestLine = ldef.lines.reduce((a, b) => a.length > b.length ? a : b, '');
     const tw = ctx.measureText(longestLine).width;
     if (ldef.align === 'right') lx = Math.max(lx, tw + 2);
-    if (ldef.align === 'left')  lx = Math.min(lx, W - tw - 2);
+    if (ldef.align === 'left') lx = Math.min(lx, W - tw - 2);
     ctx.fillStyle = ldef.active ? activeColor : mutedColor;
     ctx.textAlign = ldef.align;
     ctx.textBaseline = 'middle';
@@ -1759,7 +1759,7 @@ async function _spFetchLivePrice(ticker, country) {
     if (json.status !== 'ok' || !json.data) return;
     _spLivePriceData = json.data;
     _spRenderLivePrice();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function _spRenderLivePrice() {
@@ -1773,22 +1773,22 @@ function _spRenderLivePrice() {
   // Other currencies (EUR, CAD…) shown native with their symbol — no cross-rate available.
   let priceGBP = null;
   const cur = (d.currency || '').toUpperCase();
-  if (cur === 'USD')            priceGBP = d.price / fxRate;
-  else if (cur === 'GBP')       priceGBP = d.price;
+  if (cur === 'USD') priceGBP = d.price / fxRate;
+  else if (cur === 'GBP') priceGBP = d.price;
   else if (cur === 'GBX' || cur === 'GBP' || d.currency === 'GBp') priceGBP = d.price / 100;
 
   const pxStr = priceGBP != null
     ? fmt.currency(priceGBP, 4)
     : (() => {
-        const _SYM = { EUR:'€', CAD:'CA$', AUD:'A$', JPY:'¥', CHF:'Fr' };
-        const sym = _SYM[cur] || (d.currency ? d.currency + '\u00a0' : '');
-        return sym + fmt.number(d.price, 4);
-      })();
+      const _SYM = { EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥', CHF: 'Fr' };
+      const sym = _SYM[cur] || (d.currency ? d.currency + '\u00a0' : '');
+      return sym + fmt.number(d.price, 4);
+    })();
 
   const pct = d.change_pct;
   if (pct != null) {
     const sign = pct >= 0 ? '+' : '';
-    const col  = pct >= 0 ? 'var(--green)' : 'var(--red)';
+    const col = pct >= 0 ? 'var(--green)' : 'var(--red)';
     const session = d.market_state && d.market_state !== 'REGULAR'
       ? ` <span style="font-size:0.7em;color:var(--text-muted)">${d.market_state}</span>` : '';
     el.innerHTML = `${pxStr} <span style="font-size:0.78em;color:${col}">${sign}${pct.toFixed(2)}%</span>${session}`;
@@ -3431,7 +3431,7 @@ async function loadRiskMetricsStrip() {
     }
 
     // Remove skeleton classes
-    ['rs-volatility','rs-sharpe','rs-beta','rs-twr','rs-maxdd'].forEach(id => {
+    ['rs-volatility', 'rs-sharpe', 'rs-beta', 'rs-twr', 'rs-maxdd'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('skeleton');
     });
@@ -3463,7 +3463,7 @@ async function loadRiskMetricsStrip() {
       _setRsValue('rsMaxDD', '—');
       _loadMaxDrawdownForStrip();
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function _setRsValue(id, text, numForColor) {
@@ -3489,7 +3489,7 @@ async function _loadMaxDrawdownForStrip() {
     }
     const el = document.getElementById('rsMaxDD');
     if (el) el.textContent = maxDD.toFixed(1) + '%';
-  } catch (_) {}
+  } catch (_) { }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3518,9 +3518,9 @@ async function loadRealizedUnrealized() {
       rvEl.textContent = sign + fmt.currency(realized);
       rvEl.className = 'pnl-split-val ' + colorClass(realized);
     }
-    const splitRow = document.getElementById('pnlSplitRow');
-    if (splitRow) splitRow.style.display = '';
-  } catch (_) {}
+    // const splitRow = document.getElementById('pnlSplitRow');
+    // if (splitRow) splitRow.style.display = '';
+  } catch (_) { }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3556,13 +3556,13 @@ async function _loadAttribution() {
       _attributionData = json.data;
       _drawAttributionChart();
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 const _SECTOR_COLORS = [
-  '#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6',
-  '#ec4899','#14b8a6','#f97316','#06b6d4','#22c55e',
-  '#a78bfa','#fb923c','#e879f9','#4ade80','#60a5fa',
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#22c55e',
+  '#a78bfa', '#fb923c', '#e879f9', '#4ade80', '#60a5fa',
 ];
 
 function _drawAttributionChart() {
@@ -3803,7 +3803,7 @@ async function _loadSparklines7d(rows) {
       const canvas = document.getElementById('spark7d-' + safeId);
       if (canvas) _drawStockSparkline7d(canvas, points);
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 function _drawStockSparkline7d(canvas, points) {
@@ -3940,7 +3940,7 @@ async function loadNotifications() {
         </div>
       </div>`;
     }).join('');
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function markNotificationsRead() {
@@ -3948,8 +3948,9 @@ async function markNotificationsRead() {
     await fetch('/api/notifications/read', { method: 'POST' });
     const badge = document.getElementById('notifBadge');
     if (badge) badge.style.display = 'none';
-    document.querySelectorAll('.notif-unread').forEach(el => el.classList.remove('notif-unread'));
-  } catch (_) {}
+    const list = document.getElementById('notifList');
+    if (list) list.innerHTML = '<div class="notif-empty">No notifications yet</div>';
+  } catch (_) { }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3991,7 +3992,7 @@ async function saveAlert() {
       _notifPanelOpen = false;
       toggleNotifPanel();
     }
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function loadAlertsList() {
@@ -4017,14 +4018,14 @@ async function loadAlertsList() {
         <button class="alert-delete-btn" onclick="deleteAlert(${a.id})">✕</button>
       </div>`;
     }).join('');
-  } catch (_) {}
+  } catch (_) { }
 }
 
 async function deleteAlert(id) {
   try {
     await fetch(`/api/alerts/${id}`, { method: 'DELETE' });
     loadAlertsList();
-  } catch (_) {}
+  } catch (_) { }
 }
 
 // Auto-detect currency when typing ticker
