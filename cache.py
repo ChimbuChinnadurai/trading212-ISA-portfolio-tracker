@@ -140,7 +140,7 @@ def _init_sqlite() -> None:
         try:
             conn.execute("ALTER TABLE price_alerts ADD COLUMN currency TEXT NOT NULL DEFAULT 'GBP'")
         except Exception:
-            pass # column likely exists
+            pass # column already exists
         conn.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -214,10 +214,14 @@ def _init_pg() -> None:
                 triggered_at DOUBLE PRECISION
             )
         """)
-        try:
-            conn.execute("ALTER TABLE price_alerts ADD COLUMN currency TEXT NOT NULL DEFAULT 'GBP'")
-        except Exception:
-            pass # column likely exists
+        conn.execute("""
+            DO $$ 
+            BEGIN 
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='price_alerts' AND column_name='currency') THEN
+                    ALTER TABLE price_alerts ADD COLUMN currency TEXT NOT NULL DEFAULT 'GBP';
+                END IF;
+            END $$;
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS notifications (
                 id         SERIAL PRIMARY KEY,
