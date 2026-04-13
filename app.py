@@ -644,7 +644,7 @@ def _fetch_market_symbol(config):
     key = symbol.replace("^", "")
     try:
         resp = requests.get(
-            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+            f"{symbol}",
             params={"range": "2y", "interval": "1d"},
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=10,
@@ -739,7 +739,7 @@ def _yf_fetch_points(symbol, range_, interval_):
     resp = requests.get(
         f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
         params={"range": range_, "interval": interval_, "includePrePost": "true"},
-        headers={"User-Agent": "Mozilla/5.0"},
+        headers={"User-Agent": _YF_UA},
         timeout=8,
     )
     resp.raise_for_status()
@@ -791,19 +791,25 @@ def stock_tickers_api():
             clean   = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
             sym_to_row[f"{clean}{suffix}"] = (ticker, clean, row)
 
-        try:
-            crumb, cookies = _yf_crumb()
-            resp = requests.get(
-                "https://query1.finance.yahoo.com/v7/finance/quote",
-                params={"symbols": ",".join(sym_to_row.keys()), "crumb": crumb},
-                headers={"User-Agent": _YF_UA, "Cookie": cookies},
-                timeout=12,
-            )
-            resp.raise_for_status()
-            quotes = resp.json().get("quoteResponse", {}).get("result", [])
-        except Exception as exc:
-            logger.warning("stock_tickers batch quote failed: %s", exc)
-            quotes = []
+        quotes = []
+        for attempt in range(2):
+            try:
+                crumb, cookies = _yf_crumb()
+                resp = requests.get(
+                    "https://query1.finance.yahoo.com/v7/finance/quote",
+                    params={"symbols": ",".join(sym_to_row.keys()), "crumb": crumb},
+                    headers={"User-Agent": _YF_UA, "Cookie": cookies},
+                    timeout=12,
+                )
+                if resp.status_code == 401 and attempt == 0:
+                    kv_set("yf:crumb:v3", None)
+                    continue
+                resp.raise_for_status()
+                quotes = resp.json().get("quoteResponse", {}).get("result", [])
+                break
+            except Exception as exc:
+                logger.warning("stock_tickers batch quote failed: %s", exc)
+                break
 
         for q in quotes:
             yf_sym = q.get("symbol", "")
@@ -1058,11 +1064,12 @@ def stock_chart(ticker):
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
                 params={"range": range_, "interval": interval_, "includePrePost": include_pre_post},
-                headers={"User-Agent": "Mozilla/5.0"},
+                headers={"User-Agent": _YF_UA},
                 timeout=10,
             )
             resp.raise_for_status()
             result = resp.json()["chart"]["result"][0]
+            meta    = result.get("meta", {})
             ts_list = result.get("timestamp", [])
             q       = result["indicators"]["quote"][0]
             opens   = q.get("open",   [])
@@ -1087,8 +1094,20 @@ def stock_chart(ticker):
                     "c": round(float(c), 4),
                     "v": int(v) if v else 0,
                 })
-            currency = result.get("meta", {}).get("currency", "")
-            data = {"candles": candles, "currency": currency}
+            currency     = meta.get("currency", "")
+            market_state = meta.get("marketState", "REGULAR")
+            # Capture extended-hours live price so the chart can draw a current-price line
+            ext_price = None
+            if market_state == "PRE":
+                ext_price = meta.get("preMarketPrice")
+            elif market_state in ("POST", "POSTPOST", "PREPRE", "CLOSED"):
+                ext_price = meta.get("postMarketPrice")
+            data = {
+                "candles":      candles,
+                "currency":     currency,
+                "market_state": market_state,
+                "ext_price":    round(ext_price, 4) if ext_price is not None else None,
+            }
             if candles:
                 kv_set(cache_key, data)
         return jsonify({"status": "ok", "data": data})
@@ -1264,7 +1283,7 @@ def watchlist_signals():
 
 _YF_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
 )
 
 
@@ -1431,15 +1450,21 @@ def watchlist_price():
         clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
         yf_sym       = f"{clean_ticker}{suffix}"
 
-        crumb, cookies = _yf_crumb()
-        resp = requests.get(
-            "https://query1.finance.yahoo.com/v7/finance/quote",
-            params={"symbols": yf_sym, "crumb": crumb},
-            headers={"User-Agent": _YF_UA, "Cookie": cookies},
-            timeout=8,
-        )
-        resp.raise_for_status()
-        quotes = resp.json().get("quoteResponse", {}).get("result", [])
+        quotes = []
+        for attempt in range(2):
+            crumb, cookies = _yf_crumb()
+            resp = requests.get(
+                "https://query1.finance.yahoo.com/v7/finance/quote",
+                params={"symbols": yf_sym, "crumb": crumb},
+                headers={"User-Agent": _YF_UA, "Cookie": cookies},
+                timeout=8,
+            )
+            if resp.status_code == 401 and attempt == 0:
+                kv_set("yf:crumb:v3", None)
+                continue
+            resp.raise_for_status()
+            quotes = resp.json().get("quoteResponse", {}).get("result", [])
+            break
         q = quotes[0] if quotes else {}
 
         market_state = q.get("marketState", "REGULAR")
@@ -2656,10 +2681,12 @@ def market_sector_performance():
             if market_state == "PRE":
                 price      = meta.get("preMarketPrice")
                 change_pct = meta.get("preMarketChangePercent")
-            elif market_state in ("POST", "POSTPOST"):
-                price      = meta.get("postMarketPrice")
-                change_pct = meta.get("postMarketChangePercent")
-                
+            elif market_state in ("POST", "POSTPOST", "PREPRE", "CLOSED"):
+                price = meta.get("postMarketPrice")
+                prev  = meta.get("chartPreviousClose") or meta.get("previousClose")
+                if price is not None and prev and prev != 0:
+                    change_pct = (price - prev) / prev * 100
+
             if price is None:
                 price      = meta.get("regularMarketPrice")
                 change_pct = meta.get("regularMarketChangePercent")

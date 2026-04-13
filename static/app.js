@@ -1841,11 +1841,11 @@ async function _spLoadChart() {
 }
 
 function _spDrawChart(data) {
-  if (_spChartType === 'candle') _spDrawCandle(data.candles);
-  else _spDrawLine(data.candles);
+  if (_spChartType === 'candle') _spDrawCandle(data.candles, data.ext_price, data.market_state);
+  else _spDrawLine(data.candles, data.ext_price, data.market_state);
 }
 
-function _spDrawCandle(candles) {
+function _spDrawCandle(candles, extPrice, marketState) {
   const canvas = document.getElementById('spPriceCanvas');
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
@@ -1863,8 +1863,10 @@ function _spDrawCandle(candles) {
 
   const highs = candles.map(c => c.h);
   const lows = candles.map(c => c.l);
-  const minP = Math.min(...lows);
-  const maxP = Math.max(...highs);
+  // Expand Y range to include ext_price so the AH line is always visible
+  const allVals = extPrice != null ? [...highs, ...lows, extPrice] : [...highs, ...lows];
+  const minP = Math.min(...allVals);
+  const maxP = Math.max(...allVals);
   const range = (maxP - minP) || 1;
 
   const yOf = v => pad.top + ch - ((v - minP) / range) * ch;
@@ -1922,11 +1924,27 @@ function _spDrawCandle(candles) {
     ctx.fillRect(x - candleW / 2, bodyY, candleW, bodyH);
   });
 
+  // Extended-hours price line (AH / Pre-market)
+  if (extPrice != null && (marketState === 'PRE' || marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'PREPRE' || marketState === 'CLOSED')) {
+    const y = yOf(extPrice);
+    const label = marketState === 'PRE' ? 'PRE' : 'AH';
+    ctx.save();
+    ctx.strokeStyle = 'rgba(250,204,21,0.75)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(250,204,21,0.9)';
+    ctx.font = 'bold 9px system-ui,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${label} ${extPrice.toFixed(extPrice >= 100 ? 2 : 4)}`, pad.left + 2, y - 3);
+  }
+
   // Hover tooltip
   _spAttachHover(canvas, candles, pad, cw, ch, yOf, 'candle');
 }
 
-function _spDrawLine(candles) {
+function _spDrawLine(candles, extPrice, marketState) {
   const canvas = document.getElementById('spPriceCanvas');
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
@@ -1942,8 +1960,10 @@ function _spDrawLine(candles) {
   const cw = W - pad.left - pad.right;
   const ch = H - pad.top - pad.bottom;
   const vals = candles.map(c => c.c);
-  const minP = Math.min(...vals);
-  const maxP = Math.max(...vals);
+  // Expand Y range to include ext_price so the AH line is always visible
+  const allVals = extPrice != null ? [...vals, extPrice] : vals;
+  const minP = Math.min(...allVals);
+  const maxP = Math.max(...allVals);
   const range = (maxP - minP) || 1;
   const yOf = v => pad.top + ch - ((v - minP) / range) * ch;
   const n = candles.length;
@@ -2003,6 +2023,22 @@ function _spDrawLine(candles) {
   ctx.strokeStyle = lineCol;
   ctx.lineWidth = 1.5;
   ctx.stroke();
+
+  // Extended-hours price line (AH / Pre-market)
+  if (extPrice != null && (marketState === 'PRE' || marketState === 'POST' || marketState === 'POSTPOST' || marketState === 'PREPRE' || marketState === 'CLOSED')) {
+    const y = yOf(extPrice);
+    const label = marketState === 'PRE' ? 'PRE' : 'AH';
+    ctx.save();
+    ctx.strokeStyle = 'rgba(250,204,21,0.75)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(250,204,21,0.9)';
+    ctx.font = 'bold 9px system-ui,sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${label} ${extPrice.toFixed(extPrice >= 100 ? 2 : 4)}`, pad.left + 2, y - 3);
+  }
 
   _spAttachHover(canvas, candles, pad, cw, ch, yOf, 'line');
 }
