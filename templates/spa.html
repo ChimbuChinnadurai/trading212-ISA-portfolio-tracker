@@ -294,13 +294,13 @@
         <span class="material-symbols-outlined mob-nav-icon">pie_chart</span>
         <span class="mob-nav-label">Portfolio</span>
       </a>
-      <a class="mob-nav-item" data-mob-route="market" onclick="navigate('market'); return false;" href="#">
-        <span class="material-symbols-outlined mob-nav-icon">candlestick_chart</span>
-        <span class="mob-nav-label">Market</span>
-      </a>
       <a class="mob-nav-item" data-mob-route="watchlist" onclick="navigate('watchlist'); return false;" href="#">
         <span class="material-symbols-outlined mob-nav-icon">bookmark</span>
         <span class="mob-nav-label">Watchlist</span>
+      </a>
+      <a class="mob-nav-item" data-mob-route="news" onclick="navigate('news'); return false;" href="#">
+        <span class="material-symbols-outlined mob-nav-icon">newspaper</span>
+        <span class="mob-nav-label">News</span>
       </a>
       <a class="mob-nav-item" data-mob-route="more" onclick="openMobileSheet(); return false;" href="#">
         <span class="material-symbols-outlined mob-nav-icon">more_horiz</span>
@@ -318,9 +318,9 @@
           <span class="material-symbols-outlined mob-sheet-icon">home</span>
           <span>Home</span>
         </a>
-        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#portfolio/combined">
-          <span class="material-symbols-outlined mob-sheet-icon">pie_chart</span>
-          <span>Portfolio</span>
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#stocks/combined">
+          <span class="material-symbols-outlined mob-sheet-icon">candlestick_chart</span>
+          <span>Holdings</span>
         </a>
         <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#dividends/combined">
           <span class="material-symbols-outlined mob-sheet-icon">payments</span>
@@ -330,9 +330,9 @@
           <span class="material-symbols-outlined mob-sheet-icon">analytics</span>
           <span>Metrics</span>
         </a>
-        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#news">
-          <span class="material-symbols-outlined mob-sheet-icon">newspaper</span>
-          <span>News</span>
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#market">
+          <span class="material-symbols-outlined mob-sheet-icon">candlestick_chart</span>
+          <span>Market</span>
         </a>
         {% if show_ai %}
         <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#ai-intelligence">
