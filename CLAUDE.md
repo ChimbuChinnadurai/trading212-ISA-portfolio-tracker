@@ -4,6 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## Project Overview
+
+This is a Python/Flask + HTML/CSS/JavaScript portfolio tracker app. The backend is app.py (Flask with Yahoo Finance API calls), frontend is HTML templates with vanilla JS and CSS. Always consider both backend and frontend implications of any change.
+
+## Code Changes
+
+When removing a feature or function, always search the entire codebase for ALL callers/references before confirming the removal is complete. Use Grep to find every import, function call, and template reference.
+
+## Interaction Style
+
+When asked to explore the codebase or generate suggestions, provide an initial concise answer FIRST, then offer to dive deeper. Do not spend extended time reading files before giving any response.
+
 ## Commands
 
 ```bash
@@ -100,6 +112,8 @@ All charts are drawn manually on `<canvas>` — no chart library. The pattern is
 ### Currency formatting
 Always use `fmt.currency(value)` for monetary display — never `toFixed(2)` directly. This respects the active currency and rate stored in `currency.js`.
 
+After implementing CSS changes, especially involving flex layouts, overflow, sticky positioning, or height calculations, verify that existing components still render correctly. Test by checking that container heights are not collapsed to 0px.
+
 ---
 
 ## Data model — enriched portfolio row
@@ -166,3 +180,9 @@ AUTO_REFRESH_SECONDS   # background refresh interval (default 300)
 - SQLite resets on Cloud Run redeploy — use `DATABASE_URL` for persistence
 - Cache does not auto-purge stale rows
 - Drawdown chart does not auto-redraw on theme toggle (redraws on next range-tab click)
+- For UK stocks (LSE-listed), logos and data sources often differ from US stocks. Always test with UK ticker symbols (e.g., BARC.L, VWRL.L) and implement fallback sources when primary sources fail for non-US equities.
+
+
+## API & Data Fetching
+
+Yahoo Finance API is rate-limited and unreliable. When implementing data fetching: (1) always use bulk downloads over individual requests where possible, (2) implement progressive/streaming responses (SSE) for long-running fetches, (3) handle stale/incomplete data gracefully with fallbacks.
