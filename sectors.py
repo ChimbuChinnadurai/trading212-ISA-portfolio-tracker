@@ -18,6 +18,7 @@ SECTORS = {
     "PLTR":  "Information Technology",
     "ATO":  "Information Technology",
     "KULR":  "Industrials",
+    "APLD":  "Information Technology",
 
     # Major Tech
     "AAPL":  "Information Technology",

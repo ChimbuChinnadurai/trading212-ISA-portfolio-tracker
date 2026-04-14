@@ -644,8 +644,8 @@ def _fetch_market_symbol(config):
     key = symbol.replace("^", "")
     try:
         resp = requests.get(
-            f"{symbol}",
-            params={"range": "2y", "interval": "1d"},
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+            params={"range": "5y", "interval": "1d"},
             headers={"User-Agent": "Mozilla/5.0"},
             timeout=10,
         )
@@ -667,7 +667,7 @@ def _fetch_market_symbol(config):
             for i in range(len(c_list))
         ]
 
-        n = 252  # display last 252 trading days (~1 year)
+        n = 1300  # display last ~5 years of trading days
         c_out  = [round(v, 2) for v in c_list[-n:]]
         ma_out = [round(m, 2) if m is not None else None for m in ma_list[-n:]]
         current    = c_out[-1]

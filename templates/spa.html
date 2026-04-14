@@ -1390,96 +1390,81 @@
                 </div>
               </section>
 
-              <!-- Row 1, Col 2: Market Signals -->
-              <section class="widget-panel widget-signals">
+              <!-- Row 1, Col 2: S&P 500 Chart -->
+              <section class="widget-panel widget-index-chart">
                 <div class="panel-header">
-                  <h3 class="panel-title">Market Signals</h3>
-                  <div class="signal-tabs" id="signalTabs">
-                    <button class="signal-tab active" data-signal="gainers">Gainers</button>
-                    <button class="signal-tab" data-signal="losers">Losers</button>
-                    <button class="signal-tab" data-signal="volume">Volume</button>
-                    <button class="signal-tab" data-signal="newhighs">New Highs</button>
-                    <button class="signal-tab" data-signal="oversold">Oversold</button>
+                  <div class="mkt-chart-title-group">
+                    <h3 class="panel-title">S&amp;P 500</h3>
+                    <span id="mktSpPrice" class="mkt-sp-price">—</span>
+                    <span id="mktSpChange" class="mkt-sp-change">—</span>
+                  </div>
+                  <div id="mktRangeTabs" class="mkt-range-tabs">
+                    <button class="mkt-range-tab" data-range="1D">1D</button>
+                    <button class="mkt-range-tab" data-range="1W">1W</button>
+                    <button class="mkt-range-tab" data-range="1M">1M</button>
+                    <button class="mkt-range-tab active" data-range="6M">6M</button>
+                    <button class="mkt-range-tab" data-range="1Y">1Y</button>
+                    <button class="mkt-range-tab" data-range="5Y">5Y</button>
                   </div>
                 </div>
-                <div id="signalsList" class="signals-list">
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-60"></div>
-                      <div class="skeleton skel-line skel-w-40"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-50"></div>
-                      <div class="skeleton skel-line skel-w-35"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-60"></div>
-                      <div class="skeleton skel-line skel-w-45"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-55"></div>
-                      <div class="skeleton skel-line skel-w-30"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
+                <div class="mkt-chart-wrap">
+                  <canvas id="mktChart"></canvas>
+                  <div id="mktChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="mkt-chart-footer mkt-chart-footer-sm">
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Range</span>
+                    <span id="mktRangePct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">vs MA</span>
+                    <span id="mktVsMa" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">VIX</span>
+                    <span id="mktVix" class="mkt-footer-val">—</span>
+                  </span>
                 </div>
               </section>
 
-              <!-- Row 1, Col 3: Insider Trading -->
-              <section class="widget-panel widget-insider">
+              <!-- Row 1, Col 3: VIX Chart -->
+              <section class="widget-panel widget-index-chart">
                 <div class="panel-header">
-                  <h3 class="panel-title">Insider Trading</h3>
-                  <div class="signal-tabs" id="insiderTabs">
-                    <button class="signal-tab active" data-period="latest">Latest</button>
-                    <button class="signal-tab" data-period="top week">Top Week</button>
+                  <div class="mkt-chart-title-group">
+                    <h3 class="panel-title">VIX</h3>
+                    <span id="vixCurrentPrice" class="mkt-sp-price">—</span>
+                    <span id="vixCurrentChange" class="mkt-sp-change">—</span>
+                  </div>
+                  <div id="vixRangeTabs" class="mkt-range-tabs">
+                    <button class="mkt-range-tab" data-range="1D">1D</button>
+                    <button class="mkt-range-tab" data-range="1W">1W</button>
+                    <button class="mkt-range-tab" data-range="1M">1M</button>
+                    <button class="mkt-range-tab active" data-range="6M">6M</button>
+                    <button class="mkt-range-tab" data-range="1Y">1Y</button>
+                    <button class="mkt-range-tab" data-range="5Y">5Y</button>
                   </div>
                 </div>
-                <div id="insiderList" class="insider-list">
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-60"></div>
-                      <div class="skeleton skel-line skel-w-40"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-50"></div>
-                      <div class="skeleton skel-line skel-w-35"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-60"></div>
-                      <div class="skeleton skel-line skel-w-45"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-55"></div>
-                      <div class="skeleton skel-line skel-w-30"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
+                <div class="mkt-chart-wrap">
+                  <canvas id="vixChart"></canvas>
+                  <div id="vixChartTooltip" class="mkt-chart-tooltip" style="display:none"></div>
+                </div>
+                <div class="mkt-chart-footer mkt-chart-footer-sm">
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Range</span>
+                    <span id="vixRangePct" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">vs 50MA</span>
+                    <span id="vixVsMa" class="mkt-footer-val">—</span>
+                  </span>
+                  <span class="mkt-footer-divider"></span>
+                  <span class="mkt-footer-stat">
+                    <span class="mkt-footer-label">Signal</span>
+                    <span id="vixSignal" class="mkt-footer-val">—</span>
+                  </span>
                 </div>
               </section>
 

@@ -9,8 +9,9 @@ let _homeActivityData = null;
 let _homeDividendData = null;
 let _sp500Data = [];          // S&P 500 heatmap full dataset
 let _mktChartData = null;  // market-indicators API data
-let _mktActiveRange = '3M'; // 1W | 1M | 3M | 1Y
-let _nasdaqActiveRange = '3M';
+let _mktActiveRange = '6M';
+let _nasdaqActiveRange = '6M';
+let _vixActiveRange = '6M';
 let _portfolioVsData = null; // [{date, ts, value}] from /api/pcombined/daily-history
 let _pvsActiveRange = '1Y';  // 1M | 3M | 6M | 1Y | ALL
 let _ddActiveRange = '1Y';   // drawdown chart range
@@ -1593,7 +1594,7 @@ function _drawSectorRadialChart() {
 
 /* ─── S&P 500 Chart ──────────────────────────────────────────────────────── */
 
-const _MKT_RANGE_DAYS = { '1W': 5, '1M': 22, '3M': 66, '1Y': 252 };
+const _MKT_RANGE_DAYS = { '1D': 2, '1W': 5, '1M': 22, '3M': 66, '6M': 126, '1Y': 252, '5Y': 1300 };
 
 function _mktDataValid(d) {
     // A market-indicators payload is valid only if at least one symbol has values
@@ -1601,11 +1602,15 @@ function _mktDataValid(d) {
 }
 
 async function loadMarketChart() {
+    _initChartRangeTabs();
+    _initVixRangeTabs();
     if (_mktDataValid(_mktChartData)) {
         _drawMarketChart();
         _drawNasdaqChart();
+        _drawVixChart();
         _updateMarketStats();
         _updateNasdaqStats();
+        _updateVixStats();
         // redraw portfolio vs S&P if data already loaded
         if (_portfolioVsData) _drawPortfolioVsChart();
         return;
@@ -1620,8 +1625,10 @@ async function loadMarketChart() {
             if (!_marketIndData) _marketIndData = json.data;
             _drawMarketChart();
             _drawNasdaqChart();
+            _drawVixChart();
             _updateMarketStats();
             _updateNasdaqStats();
+            _updateVixStats();
             if (_portfolioVsData) _drawPortfolioVsChart();
         }
     } catch (err) { console.warn('[marketChart]', err); }
@@ -1699,6 +1706,45 @@ function _updateNasdaqStats() {
     }
 }
 
+function _updateVixStats() {
+    const vix = _mktChartData?.VIX;
+    if (!vix?.values?.length) return;
+    const n = _MKT_RANGE_DAYS[_vixActiveRange] || 5;
+    const vals = vix.values.slice(-n);
+    const current = vals[vals.length - 1];
+    const prev = vix.values[vix.values.length - 2];
+
+    const priceEl = document.getElementById('vixCurrentPrice');
+    const changeEl = document.getElementById('vixCurrentChange');
+    if (priceEl) priceEl.textContent = current != null ? current.toFixed(2) : '—';
+    if (changeEl && current != null && prev != null) {
+        const d = ((current / prev) - 1) * 100;
+        changeEl.textContent = (d >= 0 ? '+' : '') + d.toFixed(2) + '%';
+        changeEl.className = 'mkt-sp-change ' + (d >= 0 ? 'pos' : 'neg');
+    }
+
+    const rangePctEl = document.getElementById('vixRangePct');
+    if (rangePctEl && current != null && vals[0] != null) {
+        const p = ((current / vals[0]) - 1) * 100;
+        rangePctEl.textContent = (p >= 0 ? '+' : '') + p.toFixed(1) + '%';
+        rangePctEl.className = 'mkt-footer-val ' + (p >= 0 ? 'pos' : 'neg');
+    }
+
+    const vsMaEl = document.getElementById('vixVsMa');
+    if (vsMaEl && vix.pct_vs_ma != null) {
+        vsMaEl.textContent = (vix.pct_vs_ma >= 0 ? '+' : '') + vix.pct_vs_ma.toFixed(1) + '%';
+        vsMaEl.className = 'mkt-footer-val ' + (vix.pct_vs_ma >= 0 ? 'pos' : 'neg');
+    }
+
+    const signalEl = document.getElementById('vixSignal');
+    if (signalEl && current != null) {
+        const label = current > 30 ? 'Fear' : current > 20 ? 'Caution' : 'Calm';
+        const cls = current > 30 ? 'neg' : current > 20 ? '' : 'pos';
+        signalEl.textContent = label;
+        signalEl.className = 'mkt-footer-val ' + cls;
+    }
+}
+
 // ── Generic index chart drawing (S&P 500 + NASDAQ) ──────────────────────────
 
 function _drawMarketChart() {
@@ -1709,12 +1755,16 @@ function _drawNasdaqChart() {
     _drawIndexChart('nasdaqChart', _mktChartData?.IXIC, _nasdaqActiveRange, 'nasdaqChartTooltip');
 }
 
+function _drawVixChart() {
+    _drawIndexChart('vixChart', _mktChartData?.VIX, _vixActiveRange, 'vixChartTooltip');
+}
+
 function _drawIndexChart(canvasId, sp, activeRange, tooltipId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas || !sp?.values?.length) return;
     if (!canvas.offsetWidth) { requestAnimationFrame(() => _drawIndexChart(canvasId, sp, activeRange, tooltipId)); return; }
 
-    const n = _MKT_RANGE_DAYS[activeRange] || 66;
+    const n = _MKT_RANGE_DAYS[activeRange] || 126;
     const values = sp.values.slice(-n);
     const maAll = sp.ma.slice(-n);
     const tsAll = sp.timestamps.slice(-n);
@@ -1728,54 +1778,67 @@ function _drawIndexChart(canvasId, sp, activeRange, tooltipId) {
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
 
-    const PAD = { top: 12, right: 10, bottom: 26, left: 52 };
+    const isSmall = values[values.length - 1] < 100; // VIX-style values need decimals
+    const PAD = { top: 16, right: 14, bottom: 28, left: isSmall ? 40 : 54 };
     const cW = W - PAD.left - PAD.right;
     const cH = H - PAD.top - PAD.bottom;
-    const minV = Math.min(...values) * 0.9985;
-    const maxV = Math.max(...values) * 1.0015;
+    const minV = Math.min(...values) * (isSmall ? 0.97 : 0.9985);
+    const maxV = Math.max(...values) * (isSmall ? 1.03 : 1.0015);
     const vRng = maxV - minV || 1;
 
-    const xOf = i => PAD.left + (i / (values.length - 1)) * cW;
+    const xOf = i => PAD.left + (i / Math.max(values.length - 1, 1)) * cW;
     const yOf = v => PAD.top + (1 - (v - minV) / vRng) * cH;
 
     const isUp = values[values.length - 1] >= values[0];
-    const lineColor = isUp ? '#22c55e' : '#ef4444';
-    const fillA = isUp ? 'rgba(34,197,94,0.18)' : 'rgba(239,68,68,0.18)';
-    const fillB = isUp ? 'rgba(34,197,94,0.02)' : 'rgba(239,68,68,0.02)';
+    const lineColor   = isUp ? '#4ade80' : '#f87171';
+    const glowColor   = isUp ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)';
+    const fillTop     = isUp ? 'rgba(74,222,128,0.22)' : 'rgba(248,113,113,0.22)';
+    const fillMid     = isUp ? 'rgba(74,222,128,0.06)' : 'rgba(248,113,113,0.06)';
+    const fillBottom  = 'rgba(0,0,0,0)';
 
-    // Y gridlines + labels
-    for (let i = 0; i <= 4; i++) {
+    // ── Subtle horizontal grid lines (3 lines) ──────────────────────────────
+    ctx.setLineDash([2, 4]);
+    for (let i = 1; i <= 3; i++) {
         const v = minV + (i / 4) * (maxV - minV);
         const y = yOf(v);
-        ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+        ctx.strokeStyle = 'rgba(255,255,255,0.07)';
         ctx.lineWidth = 1;
-        ctx.setLineDash([]);
         ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.28)';
-        ctx.font = '10px "JetBrains Mono",monospace';
-        ctx.textAlign = 'right';
-        ctx.fillText(Math.round(v).toLocaleString('en-US'), PAD.left - 4, y + 3);
     }
+    ctx.setLineDash([]);
 
-    // X labels
-    const xCount = activeRange === '1W' ? 5 : 6;
+    // ── Y-axis labels (top, mid, bottom) ───────────────────────────────────
+    ctx.fillStyle = 'rgba(255,255,255,0.32)';
+    ctx.font = '9px "JetBrains Mono",monospace';
+    ctx.textAlign = 'right';
+    [0, 2, 4].forEach(i => {
+        const v = minV + (i / 4) * (maxV - minV);
+        const y = yOf(v);
+        const lbl = isSmall ? v.toFixed(1) : Math.round(v).toLocaleString('en-US');
+        ctx.fillText(lbl, PAD.left - 5, y + 3.5);
+    });
+
+    // ── X-axis labels ────────────────────────────────────────────────────────
+    const xCount = (activeRange === '1D' || activeRange === '1W') ? Math.min(values.length, 5) : 5;
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,0.28)';
-    ctx.font = '10px system-ui,sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.30)';
+    ctx.font = '9px system-ui,sans-serif';
     for (let i = 0; i < xCount; i++) {
         const idx = Math.round(i / (xCount - 1) * (values.length - 1));
         const d = new Date(tsAll[idx] * 1000);
-        const lbl = activeRange === '1W'
+        const lbl = (activeRange === '1D' || activeRange === '1W')
             ? d.toLocaleDateString('en-GB', { weekday: 'short' })
-            : activeRange === '1Y'
-                ? d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })
-                : d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
-        ctx.fillText(lbl, xOf(idx), H - 6);
+            : (activeRange === '1M')
+                ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                : d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+        ctx.fillText(lbl, xOf(idx), H - 7);
     }
 
-    // Gradient fill
+    // ── Gradient area fill ───────────────────────────────────────────────────
     const grad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
-    grad.addColorStop(0, fillA); grad.addColorStop(1, fillB);
+    grad.addColorStop(0, fillTop);
+    grad.addColorStop(0.5, fillMid);
+    grad.addColorStop(1, fillBottom);
     ctx.beginPath();
     ctx.moveTo(xOf(0), yOf(values[0]));
     for (let i = 1; i < values.length; i++) ctx.lineTo(xOf(i), yOf(values[i]));
@@ -1785,7 +1848,7 @@ function _drawIndexChart(canvasId, sp, activeRange, tooltipId) {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // MA line
+    // ── MA line (solid, subtle amber) ────────────────────────────────────────
     if (maAll.some(v => v != null)) {
         ctx.beginPath();
         let started = false;
@@ -1794,36 +1857,47 @@ function _drawIndexChart(canvasId, sp, activeRange, tooltipId) {
             if (!started) { ctx.moveTo(xOf(i), yOf(maAll[i])); started = true; }
             else ctx.lineTo(xOf(i), yOf(maAll[i]));
         }
-        ctx.strokeStyle = 'rgba(251,191,36,0.55)';
+        ctx.strokeStyle = 'rgba(251,191,36,0.5)';
         ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 3]);
-        ctx.stroke();
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
         ctx.setLineDash([]);
+        ctx.stroke();
     }
 
-    // Price line
+    // ── Price line ───────────────────────────────────────────────────────────
     ctx.beginPath();
     ctx.moveTo(xOf(0), yOf(values[0]));
     for (let i = 1; i < values.length; i++) ctx.lineTo(xOf(i), yOf(values[i]));
     ctx.strokeStyle = lineColor;
     ctx.lineWidth = 2;
     ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.stroke();
 
-    // Data dots (visible at shorter ranges)
-    if (values.length <= 66) {
-        const dotR = values.length <= 5 ? 3.5 : values.length <= 22 ? 2.5 : 1.5;
-        ctx.fillStyle = lineColor;
-        for (let i = 0; i < values.length; i++) {
-            ctx.beginPath();
-            ctx.arc(xOf(i), yOf(values[i]), dotR, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
+    // ── Current-price dashed horizontal rule ─────────────────────────────────
+    const lastY = yOf(values[values.length - 1]);
+    ctx.setLineDash([3, 5]);
+    ctx.strokeStyle = lineColor + '55';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.left, lastY); ctx.lineTo(W - PAD.right, lastY); ctx.stroke();
+    ctx.setLineDash([]);
 
-    // Store for hover
-    canvas._mkt = { values, tsAll, PAD, cW, cH, minV, vRng, lineColor, W, H };
-    canvas._mktRedraw = canvasId === 'mktChart' ? _drawMarketChart : _drawNasdaqChart;
+    // ── Glowing endpoint dot ─────────────────────────────────────────────────
+    const lastX = xOf(values.length - 1);
+    ctx.beginPath(); ctx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = glowColor; ctx.fill();
+    ctx.beginPath(); ctx.arc(lastX, lastY, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = lineColor; ctx.fill();
+    ctx.beginPath(); ctx.arc(lastX, lastY, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff'; ctx.fill();
+
+    // ── Store for hover ──────────────────────────────────────────────────────
+    const decimals = isSmall ? 2 : 0;
+    canvas._mkt = { values, tsAll, maAll, decimals, PAD, cW, cH, minV, vRng, lineColor, glowColor, W, H };
+    canvas._mktRedraw = canvasId === 'mktChart' ? _drawMarketChart
+        : canvasId === 'vixChart' ? _drawVixChart
+        : _drawNasdaqChart;
     _initChartHoverGeneric(canvas, tooltipId);
 }
 
@@ -1848,22 +1922,33 @@ function _initChartHoverGeneric(canvas, tooltipId) {
         ctx.scale(dpr, dpr);
 
         const hx = xOf(idx), hy = yOf(values[idx]);
-        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        const { glowColor } = m;
+        // Vertical crosshair only
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
         ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
+        ctx.setLineDash([2, 4]);
         ctx.beginPath(); ctx.moveTo(hx, PAD.top); ctx.lineTo(hx, PAD.top + cH); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(PAD.left, hy); ctx.lineTo(canvas.offsetWidth - PAD.right, hy); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.beginPath(); ctx.arc(hx, hy, 5, 0, Math.PI * 2);
-        ctx.fillStyle = lineColor + '40'; ctx.fill();
-        ctx.beginPath(); ctx.arc(hx, hy, 3, 0, Math.PI * 2);
+        // Glow ring + dot
+        ctx.beginPath(); ctx.arc(hx, hy, 7, 0, Math.PI * 2);
+        ctx.fillStyle = glowColor || lineColor + '30'; ctx.fill();
+        ctx.beginPath(); ctx.arc(hx, hy, 3.5, 0, Math.PI * 2);
         ctx.fillStyle = lineColor; ctx.fill();
+        ctx.beginPath(); ctx.arc(hx, hy, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff'; ctx.fill();
 
         const tooltip = document.getElementById(tooltipId);
         if (tooltip) {
             const d = new Date(tsAll[idx] * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            const price = values[idx].toLocaleString('en-US', { maximumFractionDigits: 0 });
-            tooltip.innerHTML = `<span class="mkt-tt-date">${d}</span><span class="mkt-tt-price" style="color:${lineColor}">${price}</span>`;
+            const { decimals, maAll: ma_arr } = m;
+            const price = decimals > 0
+                ? values[idx].toFixed(decimals)
+                : values[idx].toLocaleString('en-US', { maximumFractionDigits: 0 });
+            const ma = ma_arr?.[idx];
+            const maText = ma != null
+                ? `<span class="mkt-tt-ma">MA <b style="color:rgba(251,191,36,0.95)">${decimals > 0 ? ma.toFixed(decimals) : Math.round(ma).toLocaleString('en-US')}</b></span>`
+                : '';
+            tooltip.innerHTML = `<span class="mkt-tt-date">${d}</span><span class="mkt-tt-price" style="color:${lineColor}">${price}</span>${maText}`;
             const tx = Math.min(mx + 12, canvas.offsetWidth - 120);
             const ty = Math.max(e.clientY - rect.top - 40, 4);
             tooltip.style.cssText = `display:flex;left:${tx}px;top:${ty}px`;
@@ -2246,6 +2331,21 @@ function _initNasdaqRangeTabs() {
 }
 
 function _initSP500Tabs() { /* replaced by _initChartRangeTabs */ }
+
+function _initVixRangeTabs() {
+    const tabs = document.getElementById('vixRangeTabs');
+    if (!tabs || tabs._vixInit) return;
+    tabs._vixInit = true;
+    tabs.addEventListener('click', e => {
+        const btn = e.target.closest('.mkt-range-tab');
+        if (!btn) return;
+        tabs.querySelectorAll('.mkt-range-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _vixActiveRange = btn.dataset.range;
+        _drawVixChart();
+        _updateVixStats();
+    });
+}
 
 function _initPvsRangeTabs() {
     const tabs = document.getElementById('pvsRangeTabs');
