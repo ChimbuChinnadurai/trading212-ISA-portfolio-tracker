@@ -1811,7 +1811,7 @@ def monthly_performance(pid):
     """Monthly % returns for all tickers in the portfolio for the last 12 months."""
     from datetime import datetime as _dt, timezone as _tz
 
-    cache_key = f"monthly_perf:{pid}"
+    cache_key = f"monthly_perf_v2:{pid}"
     cached = kv_get(cache_key, 900)  # 15-min TTL — current month needs fresh price
     if cached is not None:
         return jsonify({"status": "ok", "data": cached})
@@ -1875,6 +1875,181 @@ def monthly_performance(pid):
     with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, max(1, len(unique)))) as ex:
         for ticker, monthly in ex.map(_fetch_monthly, unique):
             result[ticker] = monthly
+
+    # Add S&P 500 as reference row
+    _, sp500_monthly = _fetch_monthly({"ticker": "^GSPC", "country": "US"})
+    result["S&P 500"] = sp500_monthly
+
+    kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result})
+
+
+@app.route("/api/p<pid>/daily-performance")
+def daily_performance(pid):
+    """Month-to-date daily % returns for all tickers + S&P 500."""
+    from datetime import datetime as _dt, timezone as _tz
+
+    cache_key = f"daily_perf:{pid}"
+    cached = kv_get(cache_key, 300)  # 5-min TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+
+    if pid == "combined":
+        all_rows = []
+        for p in API_KEYS:
+            rows, _ = fetch_and_cache_portfolio(p)
+            if rows:
+                all_rows.extend(rows)
+        seen, unique = set(), []
+        for row in all_rows:
+            t = row["ticker"]
+            if t not in seen:
+                seen.add(t)
+                unique.append(row)
+    else:
+        rows, _ = fetch_and_cache_portfolio(pid)
+        unique = rows or []
+
+    def _fetch_daily(row):
+        ticker = row["ticker"]
+        country = row.get("country", "US")
+        is_sp500 = ticker == "^GSPC"
+        suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
+        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+        yf_sym = f"{clean_ticker}{suffix}"
+        try:
+            resp = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
+                params={"range": "1mo", "interval": "1d"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            chart_result = resp.json()["chart"]["result"][0]
+            timestamps = chart_result.get("timestamp", [])
+            closes = list(chart_result["indicators"]["quote"][0].get("close", []))
+
+            current_price = chart_result.get("meta", {}).get("regularMarketPrice")
+            if current_price and closes:
+                closes[-1] = current_price
+
+            now = _dt.now(_tz.utc)
+            current_ym = now.strftime("%Y-%m")
+
+            daily = {}
+            for i in range(1, len(timestamps)):
+                if closes[i] is None or closes[i - 1] is None or closes[i - 1] == 0:
+                    continue
+                dt = _dt.fromtimestamp(timestamps[i], _tz.utc)
+                day_key = dt.strftime("%Y-%m-%d")
+                if not day_key.startswith(current_ym):
+                    continue
+                pct = (closes[i] - closes[i - 1]) / closes[i - 1] * 100
+                daily[day_key] = round(pct, 2)
+
+            display_key = "S&P 500" if is_sp500 else clean_ticker
+            return display_key, daily
+        except Exception as exc:
+            logger.warning("daily_perf failed for %s: %s", yf_sym, exc)
+            return ("S&P 500" if is_sp500 else ticker), {}
+
+    tasks = list(unique) + [{"ticker": "^GSPC", "country": "US"}]
+    result = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, max(1, len(tasks)))) as ex:
+        for display_key, daily in ex.map(_fetch_daily, tasks):
+            result[display_key] = daily
+
+    kv_set(cache_key, result)
+    return jsonify({"status": "ok", "data": result})
+
+
+@app.route("/api/p<pid>/yearly-performance")
+def yearly_performance(pid):
+    """Annual % returns for all tickers + S&P 500 for the last 5 years."""
+    from datetime import datetime as _dt, timezone as _tz
+
+    cache_key = f"yearly_perf:{pid}"
+    cached = kv_get(cache_key, 3600)  # 1-hour TTL
+    if cached is not None:
+        return jsonify({"status": "ok", "data": cached})
+
+    if pid == "combined":
+        all_rows = []
+        for p in API_KEYS:
+            rows, _ = fetch_and_cache_portfolio(p)
+            if rows:
+                all_rows.extend(rows)
+        seen, unique = set(), []
+        for row in all_rows:
+            t = row["ticker"]
+            if t not in seen:
+                seen.add(t)
+                unique.append(row)
+    else:
+        rows, _ = fetch_and_cache_portfolio(pid)
+        unique = rows or []
+
+    def _fetch_yearly(row):
+        ticker = row["ticker"]
+        country = row.get("country", "US")
+        is_sp500 = ticker == "^GSPC"
+        suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
+        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+        yf_sym = f"{clean_ticker}{suffix}"
+        try:
+            resp = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
+                params={"range": "5y", "interval": "1mo"},
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            chart_result = resp.json()["chart"]["result"][0]
+            timestamps = chart_result.get("timestamp", [])
+            closes = list(chart_result["indicators"]["quote"][0].get("close", []))
+
+            current_price = chart_result.get("meta", {}).get("regularMarketPrice")
+            if current_price and closes:
+                closes[-1] = current_price
+
+            # Build year -> {month: close} mapping
+            year_closes = {}
+            for i, ts in enumerate(timestamps):
+                if closes[i] is None:
+                    continue
+                dt = _dt.fromtimestamp(ts, _tz.utc)
+                yr = dt.year
+                if yr not in year_closes:
+                    year_closes[yr] = {}
+                year_closes[yr][dt.month] = closes[i]
+
+            # Annual return = (last close of year - last close of prev year) / last close of prev year
+            yearly = {}
+            sorted_years = sorted(year_closes.keys())
+            for j in range(1, len(sorted_years)):
+                yr = sorted_years[j]
+                prev_yr = sorted_years[j - 1]
+                prev_months = year_closes.get(prev_yr, {})
+                this_months = year_closes.get(yr, {})
+                if not prev_months or not this_months:
+                    continue
+                prev_last = prev_months[max(prev_months)]
+                this_last = this_months[max(this_months)]
+                if prev_last and prev_last != 0:
+                    pct = (this_last - prev_last) / prev_last * 100
+                    yearly[str(yr)] = round(pct, 2)
+
+            display_key = "S&P 500" if is_sp500 else clean_ticker
+            return display_key, yearly
+        except Exception as exc:
+            logger.warning("yearly_perf failed for %s: %s", yf_sym, exc)
+            return ("S&P 500" if is_sp500 else ticker), {}
+
+    tasks = list(unique) + [{"ticker": "^GSPC", "country": "US"}]
+    result = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, max(1, len(tasks)))) as ex:
+        for display_key, yearly in ex.map(_fetch_yearly, tasks):
+            result[display_key] = yearly
 
     kv_set(cache_key, result)
     return jsonify({"status": "ok", "data": result})

@@ -3119,8 +3119,7 @@ async function loadMonthlyPerformance() {
 function setMonthlyPerfView(view, btn) {
   document.querySelectorAll('.mpv-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  // Only 12m is implemented; other views are placeholders
-  if (view === '12m' && _monthlyPerfData) {
+  if (view === '1y' && _monthlyPerfData) {
     _renderMonthlyPerfHeatmap(_monthlyPerfData);
   }
 }
@@ -3128,6 +3127,7 @@ function setMonthlyPerfView(view, btn) {
 function _renderMonthlyPerfHeatmap(data) {
   const container = document.getElementById('monthlyPerfHeatmap');
   if (!container) return;
+  container.dataset.view = '1y';
 
   // Collect all month keys present across tickers, last 12 months sorted
   const allMonths = new Set();
@@ -3145,8 +3145,8 @@ function _renderMonthlyPerfHeatmap(data) {
     return d.toLocaleDateString('en-GB', { month: 'short', year: '2-digit' }).toUpperCase();
   });
 
-  // Sort tickers: use allRows order if available, otherwise alphabetical
-  const tickers = Object.keys(data);
+  // S&P 500 first, then portfolio rows by allRows order (or alphabetical)
+  const tickers = Object.keys(data).filter(t => t !== 'S&P 500');
   if (typeof allRows !== 'undefined' && allRows.length) {
     const order = allRows.map(r => r.ticker);
     tickers.sort((a, b) => {
@@ -3156,6 +3156,7 @@ function _renderMonthlyPerfHeatmap(data) {
   } else {
     tickers.sort();
   }
+  if (data['S&P 500']) tickers.unshift('S&P 500');
 
   // Build table
   let html = '<table class="mph-table"><thead><tr>';
@@ -3165,7 +3166,9 @@ function _renderMonthlyPerfHeatmap(data) {
 
   tickers.forEach(ticker => {
     const monthly = data[ticker] || {};
-    html += `<tr><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
+    const isSp500 = ticker === 'S&P 500';
+    const rowClass = isSp500 ? ' class="mph-sp500-row"' : '';
+    html += `<tr${rowClass}><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
     sortedMonths.forEach(mk => {
       const val = monthly[mk];
       if (val == null) {
@@ -3184,15 +3187,128 @@ function _renderMonthlyPerfHeatmap(data) {
   container.innerHTML = html;
 }
 
+function _renderMtdHeatmap(data) {
+  const container = document.getElementById('monthlyPerfHeatmap');
+  if (!container) return;
+  container.dataset.view = 'mtd';
+
+  // Collect current-month day keys only
+  const now = new Date();
+  const currentYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  const allDays = new Set();
+  Object.values(data).forEach(daily => {
+    Object.keys(daily).forEach(d => { if (d.startsWith(currentYM)) allDays.add(d); });
+  });
+  const sortedDays = Array.from(allDays).sort();
+
+  if (sortedDays.length === 0) {
+    _showElemLoading(container, 'No MTD data available yet');
+    return;
+  }
+
+  const dayLabels = sortedDays.map(d => {
+    const date = new Date(d + 'T12:00:00Z');
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
+  });
+
+  // S&P 500 first, then portfolio tickers alphabetically
+  const tickers = Object.keys(data).filter(t => t !== 'S&P 500').sort();
+  if (data['S&P 500']) tickers.unshift('S&P 500');
+
+  let html = '<table class="mph-table"><thead><tr>';
+  html += '<th class="mph-ticker-col">Ticker</th>';
+  dayLabels.forEach(lbl => { html += `<th>${lbl}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  tickers.forEach(ticker => {
+    const daily = data[ticker] || {};
+    const isSp500 = ticker === 'S&P 500';
+    const rowClass = isSp500 ? ' class="mph-sp500-row"' : '';
+    html += `<tr${rowClass}><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
+    sortedDays.forEach(dk => {
+      const val = daily[dk];
+      if (val == null) {
+        html += '<td class="mph-cell mph-empty">—</td>';
+      } else {
+        const sign = val >= 0 ? '+' : '';
+        const cls = val >= 0 ? 'mph-pos' : 'mph-neg';
+        const bg = _mphColor(val);
+        html += `<td class="mph-cell ${cls}" style="background:${bg}">${sign}${val.toFixed(1)}%</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+function _renderYearlyHeatmap(data) {
+  const container = document.getElementById('monthlyPerfHeatmap');
+  if (!container) return;
+  container.dataset.view = '5y';
+
+  const allYears = new Set();
+  Object.values(data).forEach(yearly => Object.keys(yearly).forEach(y => allYears.add(y)));
+  const sortedYears = Array.from(allYears).sort().slice(-5);
+
+  if (sortedYears.length === 0) {
+    _showElemLoading(container, 'No yearly data available yet');
+    return;
+  }
+
+  // S&P 500 first, then portfolio tickers alphabetically
+  const tickers = Object.keys(data).filter(t => t !== 'S&P 500').sort();
+  if (data['S&P 500']) tickers.unshift('S&P 500');
+
+  let html = '<table class="mph-table"><thead><tr>';
+  html += '<th class="mph-ticker-col">Ticker</th>';
+  sortedYears.forEach(y => { html += `<th>${y}</th>`; });
+  html += '</tr></thead><tbody>';
+
+  tickers.forEach(ticker => {
+    const yearly = data[ticker] || {};
+    const isSp500 = ticker === 'S&P 500';
+    const rowClass = isSp500 ? ' class="mph-sp500-row"' : '';
+    html += `<tr${rowClass}><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
+    sortedYears.forEach(yk => {
+      const val = yearly[yk];
+      if (val == null) {
+        html += '<td class="mph-cell mph-empty">—</td>';
+      } else {
+        const sign = val >= 0 ? '+' : '';
+        const cls = val >= 0 ? 'mph-pos' : 'mph-neg';
+        const bg = _mphYearlyColor(val);
+        html += `<td class="mph-cell ${cls}" style="background:${bg}">${sign}${val.toFixed(1)}%</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
 function _mphColor(pct) {
-  // Monthly return bands — same gradient style as allocation heatmap (_pnlColor)
-  // but with tighter thresholds suited to monthly % moves
+  // Monthly/daily return bands
   if (pct >= 10) return 'linear-gradient(135deg,#052e16,#15803d)';
   if (pct >= 5) return 'linear-gradient(135deg,#14532d,#16a34a)';
   if (pct >= 2) return 'linear-gradient(135deg,#166534,#22c55e)';
   if (pct >= 0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
   if (pct >= -2) return 'linear-gradient(135deg,#78350f,#b45309)';
   if (pct >= -5) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
+  return 'linear-gradient(135deg,#450a0a,#b91c1c)';
+}
+
+function _mphYearlyColor(pct) {
+  // Annual return bands — wider thresholds for full-year moves
+  if (pct >= 40)  return 'linear-gradient(135deg,#052e16,#15803d)';
+  if (pct >= 20)  return 'linear-gradient(135deg,#14532d,#16a34a)';
+  if (pct >= 8)   return 'linear-gradient(135deg,#166534,#22c55e)';
+  if (pct >= 0)   return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+  if (pct >= -8)  return 'linear-gradient(135deg,#78350f,#b45309)';
+  if (pct >= -20) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
   return 'linear-gradient(135deg,#450a0a,#b91c1c)';
 }
 

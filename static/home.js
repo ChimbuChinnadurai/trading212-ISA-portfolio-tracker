@@ -998,6 +998,46 @@ async function loadMarketView(force = false) {
 async function loadMarketMonthlyPerf() {
     const container = document.getElementById('monthlyPerfHeatmap');
     if (!container) return;
+    _showElemLoading(container, 'Loading daily performance…');
+    try {
+        const res = await fetch('/api/pcombined/daily-performance');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        window._marketMtdPerfData = json.data;
+        if (typeof _renderMtdHeatmap === 'function') _renderMtdHeatmap(json.data);
+    } catch (err) {
+        _showElemLoading(container, 'Failed to load performance data');
+    }
+}
+
+function setMarketMonthlyPerfView(view, btn) {
+    document.querySelectorAll('#monthlyPerfCard .mpv-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    if (view === 'mtd') {
+        if (window._marketMtdPerfData) {
+            if (typeof _renderMtdHeatmap === 'function') _renderMtdHeatmap(window._marketMtdPerfData);
+        } else {
+            loadMarketMonthlyPerf();
+        }
+    } else if (view === '1y') {
+        if (window._marketMonthlyPerfData) {
+            if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(window._marketMonthlyPerfData);
+        } else {
+            _loadMarket1YData();
+        }
+    } else if (view === '5y') {
+        if (window._marketYearlyPerfData) {
+            if (typeof _renderYearlyHeatmap === 'function') _renderYearlyHeatmap(window._marketYearlyPerfData);
+        } else {
+            _loadMarket5YData();
+        }
+    }
+}
+
+async function _loadMarket1YData() {
+    const container = document.getElementById('monthlyPerfHeatmap');
+    if (!container) return;
     _showElemLoading(container, 'Loading monthly performance…');
     try {
         const res = await fetch('/api/pcombined/monthly-performance');
@@ -1006,15 +1046,22 @@ async function loadMarketMonthlyPerf() {
         window._marketMonthlyPerfData = json.data;
         if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(json.data);
     } catch (err) {
-        _showElemLoading(container, 'Failed to load sector performance');
+        _showElemLoading(container, 'Failed to load monthly performance');
     }
 }
 
-function setMarketMonthlyPerfView(view, btn) {
-    document.querySelectorAll('#monthlyPerfCard .mpv-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    if (view === '12m' && window._marketMonthlyPerfData) {
-        if (typeof _renderMonthlyPerfHeatmap === 'function') _renderMonthlyPerfHeatmap(window._marketMonthlyPerfData);
+async function _loadMarket5YData() {
+    const container = document.getElementById('monthlyPerfHeatmap');
+    if (!container) return;
+    _showElemLoading(container, 'Loading yearly performance…');
+    try {
+        const res = await fetch('/api/pcombined/yearly-performance');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        window._marketYearlyPerfData = json.data;
+        if (typeof _renderYearlyHeatmap === 'function') _renderYearlyHeatmap(json.data);
+    } catch (err) {
+        _showElemLoading(container, 'Failed to load yearly performance');
     }
 }
 

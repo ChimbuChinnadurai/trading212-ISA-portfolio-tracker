@@ -11895,6 +11895,38 @@ thead .mph-ticker-col {
   opacity: 0.5;
 }
 
+/* ── View-specific cell sizing (set via data-view on container) ── */
+
+/* MTD: many day columns → compact cells */
+.monthly-perf-heatmap[data-view="mtd"] .mph-cell {
+  min-width: 46px;
+  padding: 5px 5px;
+  font-size: 0.69rem;
+}
+
+/* 1Y: 12 month columns → standard (default) */
+.monthly-perf-heatmap[data-view="1y"] .mph-cell {
+  min-width: 62px;
+  padding: 5px 8px;
+  font-size: 0.75rem;
+}
+
+/* 5Y: 5 year columns → wide cells */
+.monthly-perf-heatmap[data-view="5y"] .mph-cell {
+  min-width: 80px;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+/* S&P 500 reference row — sits at top, separator below */
+.mph-sp500-row td {
+  border-bottom: 1px solid var(--border);
+}
+
+.mph-sp500-row .mph-ticker-col {
+  background: var(--bg-secondary);
+}
+
 @media (max-width: 768px) {
   .monthly-perf-card {
     margin-top: 12px;
