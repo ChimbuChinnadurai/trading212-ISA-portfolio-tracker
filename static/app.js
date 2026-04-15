@@ -3251,7 +3251,7 @@ function _renderYearlyHeatmap(data) {
 
   const allYears = new Set();
   Object.values(data).forEach(yearly => Object.keys(yearly).forEach(y => allYears.add(y)));
-  const sortedYears = Array.from(allYears).sort().slice(-5);
+  const sortedYears = Array.from(allYears).sort().slice(-10);
 
   if (sortedYears.length === 0) {
     _showElemLoading(container, 'No yearly data available yet');

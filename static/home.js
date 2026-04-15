@@ -1026,11 +1026,11 @@ function setMarketMonthlyPerfView(view, btn) {
         } else {
             _loadMarket1YData();
         }
-    } else if (view === '5y') {
+    } else if (view === '10y') {
         if (window._marketYearlyPerfData) {
             if (typeof _renderYearlyHeatmap === 'function') _renderYearlyHeatmap(window._marketYearlyPerfData);
         } else {
-            _loadMarket5YData();
+            _loadMarket10YData();
         }
     }
 }
@@ -1050,7 +1050,7 @@ async function _loadMarket1YData() {
     }
 }
 
-async function _loadMarket5YData() {
+async function _loadMarket10YData() {
     const container = document.getElementById('monthlyPerfHeatmap');
     if (!container) return;
     _showElemLoading(container, 'Loading yearly performance…');
@@ -4879,7 +4879,7 @@ const _WL_COL_DEFS = [
     { id: 'wl-ret6m', label: '6M Return' },
     { id: 'wl-ret1y', label: '1Y Return' },
     { id: 'wl-ytd', label: 'YTD' },
-    { id: 'wl-chart', label: '48h Chart' },
+    { id: 'wl-chart', label: '7D Chart' },
 ];
 
 function _loadWlColVis() {
@@ -4977,7 +4977,7 @@ async function _loadWatchlistRow(ticker, country) {
     // Fetch price + sparkline + signals + fundamentals in parallel
     const [priceRes, sparkRes, sigRes, fundRes] = await Promise.allSettled([
         fetch(`/api/watchlist/price?ticker=${encodeURIComponent(ticker)}&country=${encodeURIComponent(country)}`).then(r => r.json()),
-        fetch(`/api/stock-sparklines?tickers=${encodeURIComponent(ticker)}&countries=${encodeURIComponent(country)}`).then(r => r.json()),
+        fetch(`/api/stock-sparklines?tickers=${encodeURIComponent(ticker)}&countries=${encodeURIComponent(country)}&range=5d`).then(r => r.json()),
         fetch(`/api/watchlist/signals?ticker=${encodeURIComponent(ticker)}&country=${encodeURIComponent(country)}`).then(r => r.json()),
         fetch(`/api/watchlist/fundamentals?ticker=${encodeURIComponent(ticker)}&country=${encodeURIComponent(country)}`).then(r => r.json()),
     ]);

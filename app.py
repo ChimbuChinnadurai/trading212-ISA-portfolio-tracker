@@ -873,9 +873,11 @@ def stock_tickers_api():
 
 @app.route("/api/stock-sparklines")
 def stock_sparklines():
-    """48-hour hourly price sparklines for multiple tickers via Yahoo Finance, cached 15 min."""
+    """Hourly price sparklines for multiple tickers via Yahoo Finance, cached 15 min.
+    Supports ?range=2d (default, 48h) or ?range=5d (7-day)."""
     tickers_raw   = request.args.get("tickers", "")
     countries_raw = request.args.get("countries", "")
+    range_req     = request.args.get("range", "2d")  # "2d" or "5d"
     if not tickers_raw:
         return jsonify({"status": "ok", "data": {}})
 
@@ -884,9 +886,12 @@ def stock_sparklines():
     if len(countries) < len(tickers):
         countries += ["US"] * (len(tickers) - len(countries))
 
+    yf_range    = "5d" if range_req == "5d" else "2d"
+    yf_interval = "1h"
+
     result = {}
     for ticker, country in zip(tickers, countries):
-        cache_key = f"stock_spark:{ticker}:{country}"
+        cache_key = f"stock_spark:{ticker}:{country}:{yf_range}"
         cached = kv_get(cache_key, 900)
         if cached is not None:
             result[ticker] = cached
@@ -896,12 +901,12 @@ def stock_sparklines():
         # T212 appends a lowercase 'l' to LSE-listed tickers (e.g. "LLOYl") — strip it
         clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
         yf_symbol    = f"{clean_ticker}{suffix}"
-        logger.info("stock_sparkline fetching %s (ticker=%s country=%s)", yf_symbol, ticker, country)
+        logger.info("stock_sparkline fetching %s (ticker=%s country=%s range=%s)", yf_symbol, ticker, country, yf_range)
         try:
-            points = _yf_fetch_points(yf_symbol, "2d", "1h")
+            points = _yf_fetch_points(yf_symbol, yf_range, yf_interval)
             if len(points) < 2:
                 # Fallback: some non-US stocks lack intraday data — use daily
-                points = _yf_fetch_points(yf_symbol, "5d", "1d")
+                points = _yf_fetch_points(yf_symbol, yf_range, "1d")
             if len(points) >= 2:
                 kv_set(cache_key, points)  # Only cache valid results
             result[ticker] = points
@@ -1968,7 +1973,7 @@ def yearly_performance(pid):
     """Annual % returns for all tickers + S&P 500 for the last 5 years."""
     from datetime import datetime as _dt, timezone as _tz
 
-    cache_key = f"yearly_perf:{pid}"
+    cache_key = f"yearly_perf_10y:{pid}"
     cached = kv_get(cache_key, 3600)  # 1-hour TTL
     if cached is not None:
         return jsonify({"status": "ok", "data": cached})
@@ -1999,7 +2004,7 @@ def yearly_performance(pid):
         try:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
-                params={"range": "5y", "interval": "1mo"},
+                params={"range": "10y", "interval": "1mo"},
                 headers={"User-Agent": "Mozilla/5.0"},
                 timeout=10,
             )
