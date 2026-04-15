@@ -3167,7 +3167,7 @@ function _renderMonthlyPerfHeatmap(data) {
   tickers.forEach(ticker => {
     const monthly = data[ticker] || {};
     const isSp500 = ticker === 'S&P 500';
-    const rowClass = isSp500 ? ' class="mph-sp500-row"' : '';
+    const rowClass = isSp500 ? '' : '';
     html += `<tr${rowClass}><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
     sortedMonths.forEach(mk => {
       const val = monthly[mk];
@@ -3224,7 +3224,7 @@ function _renderMtdHeatmap(data) {
   tickers.forEach(ticker => {
     const daily = data[ticker] || {};
     const isSp500 = ticker === 'S&P 500';
-    const rowClass = isSp500 ? ' class="mph-sp500-row"' : '';
+    const rowClass = isSp500 ? '' : '';
     html += `<tr${rowClass}><td class="mph-ticker-col"><span class="mph-ticker">${ticker}</span></td>`;
     sortedDays.forEach(dk => {
       const val = daily[dk];
@@ -3303,11 +3303,11 @@ function _mphColor(pct) {
 
 function _mphYearlyColor(pct) {
   // Annual return bands — wider thresholds for full-year moves
-  if (pct >= 40)  return 'linear-gradient(135deg,#052e16,#15803d)';
-  if (pct >= 20)  return 'linear-gradient(135deg,#14532d,#16a34a)';
-  if (pct >= 8)   return 'linear-gradient(135deg,#166534,#22c55e)';
-  if (pct >= 0)   return 'linear-gradient(135deg,#0f766e,#14b8a6)';
-  if (pct >= -8)  return 'linear-gradient(135deg,#78350f,#b45309)';
+  if (pct >= 40) return 'linear-gradient(135deg,#052e16,#15803d)';
+  if (pct >= 20) return 'linear-gradient(135deg,#14532d,#16a34a)';
+  if (pct >= 8) return 'linear-gradient(135deg,#166534,#22c55e)';
+  if (pct >= 0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
+  if (pct >= -8) return 'linear-gradient(135deg,#78350f,#b45309)';
   if (pct >= -20) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
   return 'linear-gradient(135deg,#450a0a,#b91c1c)';
 }
