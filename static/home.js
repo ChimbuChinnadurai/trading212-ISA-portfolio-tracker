@@ -1026,11 +1026,11 @@ function setMarketMonthlyPerfView(view, btn) {
         } else {
             _loadMarket1YData();
         }
-    } else if (view === '10y') {
+    } else if (view === '15y') {
         if (window._marketYearlyPerfData) {
             if (typeof _renderYearlyHeatmap === 'function') _renderYearlyHeatmap(window._marketYearlyPerfData);
         } else {
-            _loadMarket10YData();
+            _loadMarket15YData();
         }
     }
 }
@@ -1050,7 +1050,7 @@ async function _loadMarket1YData() {
     }
 }
 
-async function _loadMarket10YData() {
+async function _loadMarket15YData() {
     const container = document.getElementById('monthlyPerfHeatmap');
     if (!container) return;
     _showElemLoading(container, 'Loading yearly performance…');

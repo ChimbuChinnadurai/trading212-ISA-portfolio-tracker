@@ -1970,10 +1970,10 @@ def daily_performance(pid):
 
 @app.route("/api/p<pid>/yearly-performance")
 def yearly_performance(pid):
-    """Annual % returns for all tickers + S&P 500 for the last 5 years."""
+    """Annual % returns for all tickers + S&P 500 for the last 15 years."""
     from datetime import datetime as _dt, timezone as _tz
 
-    cache_key = f"yearly_perf_10y:{pid}"
+    cache_key = f"yearly_perf_15y:{pid}"
     cached = kv_get(cache_key, 3600)  # 1-hour TTL
     if cached is not None:
         return jsonify({"status": "ok", "data": cached})
@@ -2004,7 +2004,7 @@ def yearly_performance(pid):
         try:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
-                params={"range": "10y", "interval": "1mo"},
+                params={"range": "15y", "interval": "1mo"},
                 headers={"User-Agent": "Mozilla/5.0"},
                 timeout=10,
             )

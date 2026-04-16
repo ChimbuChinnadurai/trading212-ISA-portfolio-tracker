@@ -3247,11 +3247,11 @@ function _renderMtdHeatmap(data) {
 function _renderYearlyHeatmap(data) {
   const container = document.getElementById('monthlyPerfHeatmap');
   if (!container) return;
-  container.dataset.view = '5y';
+  container.dataset.view = '15y';
 
   const allYears = new Set();
   Object.values(data).forEach(yearly => Object.keys(yearly).forEach(y => allYears.add(y)));
-  const sortedYears = Array.from(allYears).sort().slice(-10);
+  const sortedYears = Array.from(allYears).sort().slice(-15);
 
   if (sortedYears.length === 0) {
     _showElemLoading(container, 'No yearly data available yet');

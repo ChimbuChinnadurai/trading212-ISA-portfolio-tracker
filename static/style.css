@@ -11911,8 +11911,8 @@ thead .mph-ticker-col {
   font-size: 0.75rem;
 }
 
-/* 5Y: 5 year columns → wide cells */
-.monthly-perf-heatmap[data-view="5y"] .mph-cell {
+/* 15Y: 15 year columns → wide cells */
+.monthly-perf-heatmap[data-view="15y"] .mph-cell {
   min-width: 80px;
   padding: 6px 12px;
   font-size: 0.8rem;
