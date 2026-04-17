@@ -95,6 +95,9 @@ def fetch_and_cache_portfolio(pid, force=False):
 
     total_div = round(sum(dividends.values()), 2)
     rows = build_rows(positions, instruments, dividends, gbpusd)
+    
+    # Enrichment step (cached 24h)
+    rows = enrich_rows_with_performance(rows)
 
     # Update cache
     rows_set(rows, pid=pid)
@@ -229,6 +232,10 @@ def portfolio_combined():
                     target["total_returns"] = (target.get("total_returns") or 0) + (row.get("total_returns") or 0)
                     target["fx_impact"]     = (target.get("fx_impact") or 0) + (row.get("fx_impact") or 0)
                     target["dividends"]     = (target.get("dividends") or 0) + (row.get("dividends") or 0)
+                    # Preserve performance fields
+                    for k in ["ret1d", "ret1w", "ret1m", "ret3m", "ret6m", "ret1y", "ret3y", "ret5y"]:
+                        if k not in target or target[k] is None:
+                            target[k] = row.get(k)
                     # Recalculate avg price
                     if target["quantity"] > 0:
                         target["avg_price"] = target["invested"] / target["quantity"]
@@ -726,6 +733,68 @@ def market_indicators():
     return jsonify({"status": "ok", "data": result})
 
 
+@app.route("/api/market-sp500-insights")
+def market_sp500_insights_api():
+    """YTD daily performance for S&P 500 (^GSPC).
+
+    Annual data has been removed from this endpoint — the frontend now reads
+    S&P 500 annual returns directly from /api/pcombined/yearly-performance
+    so the Annual % Change chart and the Performance Heatmap table are
+    guaranteed to always show the same numbers (single source of truth).
+    """
+    from datetime import datetime as dt
+    cache_key = "sp500_ytd_v1"
+    cached = kv_get(cache_key, 900)   # 15-min TTL — intraday data
+    if cached:
+        return jsonify({"status": "ok", "data": cached})
+
+    try:
+        # Fetch YTD data — 1y range so we can anchor to Dec 31 of the prev year
+        ytd_resp = requests.get(
+            "https://query1.finance.yahoo.com/v8/finance/chart/^GSPC",
+            params={"range": "1y", "interval": "1d"},
+            headers={"User-Agent": _YF_UA},
+            timeout=10,
+        )
+        ytd_resp.raise_for_status()
+        chart_ytd = ytd_resp.json()["chart"]["result"][0]
+        ts_ytd = chart_ytd.get("timestamp", [])
+        closes_ytd = list(chart_ytd["indicators"]["quote"][0].get("close", []))
+        current_price_ytd = chart_ytd.get("meta", {}).get("regularMarketPrice")
+        if current_price_ytd and closes_ytd:
+            closes_ytd[-1] = current_price_ytd
+
+        ytd_performance = []
+        if ts_ytd and closes_ytd:
+            current_year = dt.now().year
+            base_price = None
+            for t, c in zip(ts_ytd, closes_ytd):
+                if c is None:
+                    continue
+                if dt.fromtimestamp(t).year < current_year:
+                    base_price = c   # last prev-year close = Dec 31 anchor
+
+            year_points = [
+                (t, c) for t, c in zip(ts_ytd, closes_ytd)
+                if c is not None and dt.fromtimestamp(t).year == current_year
+            ]
+
+            if base_price and year_points:
+                for t, c in year_points:
+                    ytd_performance.append({
+                        "date": dt.fromtimestamp(t).strftime("%Y-%m-%d"),
+                        "pct": round((c / base_price - 1) * 100, 2),
+                    })
+
+        result = {"ytd": ytd_performance}
+        kv_set(cache_key, result)
+        return jsonify({"status": "ok", "data": result})
+
+    except Exception as e:
+        logger.error("Failed to fetch S&P 500 YTD: %s", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 _COUNTRY_YF_SUFFIX = {
     "UK": ".L",  "DE": ".DE", "FR": ".PA", "NL": ".AS",
     "IE": ".L",  "CH": ".SW", "AU": ".AX", "JP": ".T",
@@ -1147,6 +1216,172 @@ def stock_metrics(ticker):
         return jsonify({"status": "ok", "data": metric})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def _fetch_hist_returns_one(ticker, country):
+    """Fetch 1w..5y historical returns for a single ticker via Yahoo Finance chart API."""
+    suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
+    # Ticker cleanup (e.g. 'LLOYl' -> 'LLOY' + '.L')
+    clean = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
+    # Yahoo Finance normalization: replace dots with hyphens (e.g., 'BRK.B' -> 'BRK-B')
+    clean = clean.replace(".", "-")
+    
+    if suffix and not clean.endswith(suffix):
+        symbol = f"{clean}{suffix}"
+    else:
+        symbol = clean
+
+    cache_key = f"hist_ret_v1:{symbol}"
+    # Performance data cached for 24 hours
+    cached = kv_get(cache_key, 86400)
+    if cached is not None:
+        return ticker, cached, None
+
+    try:
+        resp = requests.get(
+            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}",
+            params={"range": "5y", "interval": "1d"},
+            headers={"User-Agent": _YF_UA},
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            return ticker, None, f"HTTP {resp.status_code}"
+            
+        resp_json = resp.json()
+        if "chart" not in resp_json or not resp_json["chart"]["result"]:
+            return ticker, None, "No chart result in Yahoo response"
+            
+        chart = resp_json["chart"]["result"][0]
+        ts_list = chart.get("timestamp", [])
+        
+        indicators = chart.get("indicators", {}).get("quote", [])
+        if not indicators or not indicators[0].get("close"):
+            return ticker, None, "No close prices in Yahoo response"
+            
+        closes  = indicators[0]["close"]
+
+        if not ts_list or not closes:
+            return ticker, None, "Empty timestamp or closes list"
+
+        # Filter out invalid price points
+        valid_points = [(int(t), float(c)) for t, c in zip(ts_list, closes) if c is not None]
+        if not valid_points:
+            return ticker, None, "No valid non-null price points found"
+
+        now_ts = time.time()
+        current_price = valid_points[-1][1]
+        
+        if current_price == 0:
+            return ticker, None, "Current price is zero, cannot calc returns"
+
+        windows = {
+            "ret1d": 1 * 86400,
+            "ret1w": 7 * 86400,
+            "ret1m": 30 * 86400,
+            "ret3m": 90 * 86400,
+            "ret6m": 180 * 86400,
+            "ret1y": 365 * 86400,
+            "ret3y": 1095 * 86400,
+            "ret5y": 1825 * 86400,
+        }
+
+        res = {}
+        for key, offset in windows.items():
+            target = now_ts - offset
+            # Find closest timestamp to target
+            best_p = None
+            min_dist = float('inf')
+            for ts, p in valid_points:
+                dist = abs(ts - target)
+                if dist < min_dist:
+                    min_dist = dist
+                    best_p = p
+
+            # Use data if match is within a reasonable window (4 days)
+            if best_p is not None and best_p != 0 and min_dist < (4 * 86400):
+                res[key] = round((current_price - best_p) / best_p * 100, 2)
+            else:
+                res[key] = None
+
+        kv_set(cache_key, res)
+        return ticker, res, None
+    except Exception as e:
+        logger.error("Error fetching hist returns for %s: %s", symbol, e)
+        return ticker, None, str(e)
+
+
+def enrich_rows_with_performance(rows):
+    """Parallel fetch historical performance for all unique tickers in rows and merge them."""
+    if not rows:
+        return rows
+        
+    # Deduplicate tickers/countries
+    seen = set()
+    unique_pairs = []
+    for r in rows:
+        t = r.get("ticker")
+        c = r.get("country") or "US"
+        if t and t not in seen:
+            seen.add(t)
+            unique_pairs.append((t, c))
+            
+    if not unique_pairs:
+        return rows
+        
+    perf_data = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(unique_pairs), 15)) as executor:
+        futures = {executor.submit(_fetch_hist_returns_one, t, c): t for t, c in unique_pairs}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                ticker, data, err = future.result()
+                if data:
+                    perf_data[ticker] = data
+            except Exception:
+                pass
+                
+    # Merge back into rows
+    for r in rows:
+        ticker = r.get("ticker")
+        data = perf_data.get(ticker, {})
+        for k in ["ret1d", "ret1w", "ret1m", "ret3m", "ret6m", "ret1y", "ret3y", "ret5y"]:
+            r[k] = data.get(k)
+            
+    return rows
+
+
+@app.route("/api/stock-historical-returns")
+def stock_historical_returns():
+    """Batch fetch 1w..5y performance for multiple tickers; returns {ticker: {ret1w, ...}}."""
+    tickers_str = request.args.get("tickers", "")
+    countries_str = request.args.get("countries", "")
+    if not tickers_str:
+        return jsonify({"status": "ok", "data": {}, "debug": "No tickers provided"})
+
+    tickers   = [t.strip().upper() for t in tickers_str.split(",") if t.strip()]
+    countries = [c.strip().upper() for c in countries_str.split(",") if c.strip()]
+
+    # Pad countries if missing
+    if len(countries) < len(tickers):
+        pad_val = countries[-1] if countries else "US"
+        countries += [pad_val] * (len(tickers) - len(countries))
+
+    results = {}
+    errors  = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(tickers), 15)) as executor:
+        futures = {executor.submit(_fetch_hist_returns_one, t, c): t for t, c in zip(tickers, countries)}
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                ticker, data, err = future.result()
+                if data:
+                    results[ticker] = data
+                if err:
+                    errors[ticker] = err
+            except Exception as e:
+                logger.error("Future failed: %s", e)
+
+    return jsonify({"status": "ok", "data": results, "errors": errors if errors else None})
+
+
 
 
 @app.route("/api/stock-news/<ticker>")

@@ -23,6 +23,7 @@ let _allTimeReturnsPct = 0;
 let _todayReturns = null;     // null = not yet fetched
 let _todayReturnsPct = null;
 let _tickerChangeMap = {};    // ticker -> change_pct (today)
+let _histReturnsData = null; // {ticker: {ret1w, ...}}
 
 /* ─── Column picker ─────────────────────────────────────────────────────── */
 const _COL_DEFS = [
@@ -41,6 +42,14 @@ const _COL_DEFS = [
   { id: 'pnl', label: 'P&L' },
   { id: 'fx_impact', label: 'FX Impact' },
   { id: 'returns_pct', label: 'Returns %' },
+  { id: 'ret1d', label: '1d %' },
+  { id: 'ret1w', label: '1w %' },
+  { id: 'ret1m', label: '1M %' },
+  { id: 'ret3m', label: '3M %' },
+  { id: 'ret6m', label: '6M %' },
+  { id: 'ret1y', label: '1y %' },
+  { id: 'ret3y', label: '3y %' },
+  { id: 'ret5y', label: '5y %' },
   { id: 'div_yield', label: 'Div Yield' },
   { id: 'rating', label: 'Rating' },
 ];
@@ -50,10 +59,12 @@ function _loadColVis() {
     const stored = JSON.parse(localStorage.getItem('colVisibility') || '{}');
     const map = {};
     _COL_DEFS.forEach(c => {
-      map[c.id] = c.locked ? true : (stored[c.id] !== undefined ? stored[c.id] : true);
+      // New historical return columns default to false
+      const isHist = c.id.startsWith('ret') && c.id !== 'returns_pct';
+      map[c.id] = c.locked ? true : (stored[c.id] !== undefined ? stored[c.id] : !isHist);
     });
     return map;
-  } catch { return Object.fromEntries(_COL_DEFS.map(c => [c.id, true])); }
+  } catch { return Object.fromEntries(_COL_DEFS.map(c => [c.id, !c.id.startsWith('ret') || c.id === 'returns_pct'])); }
 }
 
 function _saveColVis(map) {
@@ -415,6 +426,7 @@ async function loadPortfolio(force = false) {
     loadDynamicsChart();
     loadRiskMetricsStrip();
     loadRealizedUnrealized();
+    
     _loadSuccess = true;
 
   } catch (err) {
@@ -959,6 +971,14 @@ function renderTable(rows) {
           ${r.returns_pct >= 0 ? '▲' : '▼'} ${Math.abs(r.returns_pct).toFixed(2)}%
         </span>
       </td>
+      <td data-colid="ret1d" class="td-right">${_histReturnCell(r, 'ret1d')}</td>
+      <td data-colid="ret1w" class="td-right">${_histReturnCell(r, 'ret1w')}</td>
+      <td data-colid="ret1m" class="td-right">${_histReturnCell(r, 'ret1m')}</td>
+      <td data-colid="ret3m" class="td-right">${_histReturnCell(r, 'ret3m')}</td>
+      <td data-colid="ret6m" class="td-right">${_histReturnCell(r, 'ret6m')}</td>
+      <td data-colid="ret1y" class="td-right">${_histReturnCell(r, 'ret1y')}</td>
+      <td data-colid="ret3y" class="td-right">${_histReturnCell(r, 'ret3y')}</td>
+      <td data-colid="ret5y" class="td-right">${_histReturnCell(r, 'ret5y')}</td>
       <td data-colid="div_yield" class="td-right">${divYieldCell}</td>
       <td data-colid="rating" class="td-right">${_ratingCell(r)}</td>
     `;
@@ -977,6 +997,14 @@ function renderTable(rows) {
 
   _loadStockSparklines(filtered);
   _loadSparklines7d(filtered);
+}
+
+function _histReturnCell(row, key) {
+  const val = row[key];
+  if (val == null) return '<span class="cell-na">N/A</span>';
+  const cls = val >= 0 ? 'pos' : 'neg';
+  const sign = val >= 0 ? '+' : '';
+  return `<span class="pct-badge-small ${cls}">${sign}${val.toFixed(2)}%</span>`;
 }
 
 /* ─── Stock 48h Sparklines ────────────────────────────────────────────────── */

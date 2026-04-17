@@ -9,6 +9,7 @@ let _homeActivityData = null;
 let _homeDividendData = null;
 let _sp500Data = [];          // S&P 500 heatmap full dataset
 let _mktChartData = null;  // market-indicators API data
+let _spInsightsData = null; // S&P 500 insights data
 let _mktActiveRange = '6M';
 let _nasdaqActiveRange = '6M';
 let _vixActiveRange = '6M';
@@ -81,7 +82,7 @@ function _homeShowSkeletons() {
     const ids = [
         'p1-value', 'p1-returns', 'p1-pct',
         'p2-value', 'p2-returns', 'p2-pct',
-        'c-value',  'c-returns',  'c-pct',
+        'c-value', 'c-returns', 'c-pct',
     ];
     ids.forEach(id => {
         const el = document.getElementById(id);
@@ -332,11 +333,11 @@ function updateCard(prefix, stats) {
     }
 
     // Mini stats — no animation, just direct set
-    const invEl        = document.getElementById(`${prefix}-invested`);
-    const posEl        = document.getElementById(`${prefix}-positions`);
+    const invEl = document.getElementById(`${prefix}-invested`);
+    const posEl = document.getElementById(`${prefix}-positions`);
     const unrealizedEl = document.getElementById(`${prefix}-unrealized`);
-    const realizedEl   = document.getElementById(`${prefix}-realized`);
-    const cashEl       = document.getElementById(`${prefix}-cash`);
+    const realizedEl = document.getElementById(`${prefix}-realized`);
+    const cashEl = document.getElementById(`${prefix}-cash`);
 
     if (invEl && stats.invested != null)
         invEl.textContent = fmt.currency(stats.invested);
@@ -1660,6 +1661,7 @@ async function loadMarketChart() {
         _updateVixStats();
         // redraw portfolio vs S&P if data already loaded
         if (_portfolioVsData) _drawPortfolioVsChart();
+        loadMarketSP500Insights();
         return;
     }
     // Reset any previously cached null-valued object so we always re-fetch
@@ -1678,6 +1680,8 @@ async function loadMarketChart() {
             _updateVixStats();
             if (_portfolioVsData) _drawPortfolioVsChart();
         }
+
+        loadMarketSP500Insights();
     } catch (err) { console.warn('[marketChart]', err); }
 }
 
@@ -1837,11 +1841,11 @@ function _drawIndexChart(canvasId, sp, activeRange, tooltipId) {
     const yOf = v => PAD.top + (1 - (v - minV) / vRng) * cH;
 
     const isUp = values[values.length - 1] >= values[0];
-    const lineColor   = isUp ? '#4ade80' : '#f87171';
-    const glowColor   = isUp ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)';
-    const fillTop     = isUp ? 'rgba(74,222,128,0.22)' : 'rgba(248,113,113,0.22)';
-    const fillMid     = isUp ? 'rgba(74,222,128,0.06)' : 'rgba(248,113,113,0.06)';
-    const fillBottom  = 'rgba(0,0,0,0)';
+    const lineColor = isUp ? '#4ade80' : '#f87171';
+    const glowColor = isUp ? 'rgba(74,222,128,0.35)' : 'rgba(248,113,113,0.35)';
+    const fillTop = isUp ? 'rgba(74,222,128,0.22)' : 'rgba(248,113,113,0.22)';
+    const fillMid = isUp ? 'rgba(74,222,128,0.06)' : 'rgba(248,113,113,0.06)';
+    const fillBottom = 'rgba(0,0,0,0)';
 
     // ── Subtle horizontal grid lines (3 lines) ──────────────────────────────
     ctx.setLineDash([2, 4]);
@@ -1944,7 +1948,7 @@ function _drawIndexChart(canvasId, sp, activeRange, tooltipId) {
     canvas._mkt = { values, tsAll, maAll, decimals, PAD, cW, cH, minV, vRng, lineColor, glowColor, W, H };
     canvas._mktRedraw = canvasId === 'mktChart' ? _drawMarketChart
         : canvasId === 'vixChart' ? _drawVixChart
-        : _drawNasdaqChart;
+            : _drawNasdaqChart;
     _initChartHoverGeneric(canvas, tooltipId);
 }
 
@@ -5674,3 +5678,361 @@ function _dvRenderHistory(data) {
     }).join('')}</div>`;
 }
 
+
+/* ─── S&P 500 Insights Charts ────────────────────────────────────────────── */
+
+async function loadMarketSP500Insights() {
+    const annualCanvas = document.getElementById('annualChangeChart');
+    const ytdCanvas = document.getElementById('ytdPerfChart');
+    if (!annualCanvas || !ytdCanvas) return;
+
+    if (_spInsightsData) {
+        requestAnimationFrame(() => { _drawAnnualChangeChart(); _drawYTDPerformanceChart(); });
+        return;
+    }
+
+    try {
+        // Annual data: read from yearly-performance (same source as the heatmap table)
+        // so the two views are guaranteed to always show the same S&P 500 numbers.
+        // YTD data: read from market-sp500-insights (no equivalent in heatmap).
+        const [yearlyRes, ytdRes] = await Promise.all([
+            fetch('/api/pcombined/yearly-performance'),
+            fetch('/api/market-sp500-insights'),
+        ]);
+        const [yearlyJson, ytdJson] = await Promise.all([yearlyRes.json(), ytdRes.json()]);
+
+        let annual = [];
+        if (yearlyJson.status === 'ok' && yearlyJson.data['S&P 500']) {
+            // Heatmap format: {"2011": 0.0, "2012": 16.0, ...} — convert to [{year, pct}]
+            const sp = yearlyJson.data['S&P 500'];
+            annual = Object.entries(sp)
+                .map(([y, pct]) => ({ year: parseInt(y, 10), pct }))
+                .sort((a, b) => a.year - b.year);
+            // Cache heatmap data so switching to 15Y tab is instant
+            if (!window._marketYearlyPerfData) window._marketYearlyPerfData = yearlyJson.data;
+        }
+
+        const ytd = (ytdJson.status === 'ok' && ytdJson.data?.ytd) ? ytdJson.data.ytd : [];
+
+        _spInsightsData = { annual, ytd };
+        requestAnimationFrame(() => { _drawAnnualChangeChart(); _drawYTDPerformanceChart(); });
+    } catch (err) {
+        console.error('[SPInsights] Fetch failed:', err);
+    }
+}
+
+function _drawAnnualChangeChart() {
+    const canvas = document.getElementById('annualChangeChart');
+    if (!canvas || !_spInsightsData || !_spInsightsData.annual) return;
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+
+    const data = _spInsightsData.annual;
+    if (!data.length) return;
+
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    const labelColor = isDark ? '#94a3b8' : '#64748b';
+    const posColor = '#22c55e';
+    const negColor = '#ef4444';
+
+    const padT = 12, padB = 26, padL = 14, padR = 42;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+
+    const maxAbs = Math.max(...data.map(d => Math.abs(d.pct))) || 10;
+    const limit = Math.ceil(maxAbs / 10) * 10;
+
+    const yScale = val => padT + (1 - (val + limit) / (limit * 2)) * chartH;
+    const xStep = chartW / data.length;
+
+    // Grid and labels
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.font = '500 9px Inter, sans-serif';
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = 'left';
+
+    const yTicks = [-limit, -limit / 2, 0, limit / 2, limit];
+    yTicks.forEach(t => {
+        const y = yScale(t);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(W - padR, y);
+        ctx.stroke();
+        const label = (t >= 0 ? '+' : '') + t + '%';
+        ctx.fillText(label, W - padR + 5, y + 3);
+    });
+
+    // Zero-line bolder
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, yScale(0));
+    ctx.lineTo(W - padR, yScale(0));
+    ctx.stroke();
+
+    // Bars
+    const barW = Math.max(1, xStep * 0.7);
+    data.forEach((d, i) => {
+        const x = padL + i * xStep + (xStep - barW) / 2;
+        const y0 = yScale(0);
+        const yV = yScale(d.pct);
+
+        ctx.fillStyle = d.pct >= 0 ? posColor : negColor;
+        ctx.beginPath();
+        if (d.pct >= 0) {
+            ctx.roundRect(x, yV, barW, y0 - yV, [2, 2, 0, 0]);
+        } else {
+            ctx.roundRect(x, y0, barW, yV - y0, [0, 0, 2, 2]);
+        }
+        ctx.fill();
+    });
+
+    // Year labels (sparse — show ~6 evenly spaced)
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = 'center';
+    const skip = Math.max(1, Math.ceil(data.length / 6));
+    for (let i = 0; i < data.length; i += skip) {
+        const x = padL + i * xStep + xStep / 2;
+        ctx.fillText(data[i].year, x, H - 8);
+    }
+    // Always label the last bar
+    const lastX = padL + (data.length - 1) * xStep + xStep / 2;
+    ctx.fillText(data[data.length - 1].year, lastX, H - 8);
+
+    // Store metadata for hover
+    canvas._annualMeta = { data, padL, padR, padT, padB, xStep, W, H };
+    canvas._annualRedraw = _drawAnnualChangeChart;
+    _initAnnualChartHover(canvas);
+}
+
+function _drawYTDPerformanceChart() {
+    const canvas = document.getElementById('ytdPerfChart');
+    if (!canvas || !_spInsightsData || !_spInsightsData.ytd) return;
+
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const W = canvas.offsetWidth;
+    const H = canvas.offsetHeight;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+
+    const data = _spInsightsData.ytd;
+    if (!data.length) return;
+
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+    const labelColor = isDark ? '#94a3b8' : '#64748b';
+    const posColor = '#22c55e';
+    const negColor = '#ef4444';
+
+    const padT = 12, padB = 26, padL = 14, padR = 42;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+
+    const pcts = data.map(d => d.pct);
+    const minP = Math.min(...pcts, 0);
+    const maxP = Math.max(...pcts, 0);
+    const span = Math.max(Math.abs(minP), Math.abs(maxP), 2);
+    const limit = Math.ceil(span / 2) * 2;
+
+    const yScale = val => padT + (1 - (val + limit) / (limit * 2)) * chartH;
+    const xStep = data.length > 1 ? chartW / (data.length - 1) : chartW;
+
+    // Grid
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.font = '500 9px Inter, sans-serif';
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = 'left';
+
+    const yTicks = [-limit, 0, limit];
+    yTicks.forEach(t => {
+        const y = yScale(t);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(W - padR, y);
+        ctx.stroke();
+        const label = (t > 0 ? '+' : '') + t + '%';
+        ctx.fillText(label, W - padR + 5, y + 3);
+    });
+
+    // Zero-line bolder
+    ctx.strokeStyle = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(padL, yScale(0));
+    ctx.lineTo(W - padR, yScale(0));
+    ctx.stroke();
+
+    // Area Path
+    const y0 = yScale(0);
+
+    // Draw Positive Area
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(padL, padT, chartW, y0 - padT);
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(padL, y0);
+    data.forEach((d, i) => ctx.lineTo(padL + i * xStep, yScale(d.pct)));
+    ctx.lineTo(padL + (data.length - 1) * xStep, y0);
+    ctx.closePath();
+    let grad = ctx.createLinearGradient(0, padT, 0, y0);
+    grad.addColorStop(0, posColor + '33');
+    grad.addColorStop(1, posColor + '00');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = posColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Draw Negative Area
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(padL, y0, chartW, H - padB - y0);
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(padL, y0);
+    data.forEach((d, i) => ctx.lineTo(padL + i * xStep, yScale(d.pct)));
+    ctx.lineTo(padL + (data.length - 1) * xStep, y0);
+    ctx.closePath();
+    grad = ctx.createLinearGradient(0, y0, 0, H - padB);
+    grad.addColorStop(0, negColor + '00');
+    grad.addColorStop(1, negColor + '33');
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.strokeStyle = negColor;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Highlight Current Dot
+    const last = data[data.length - 1];
+    const lx = padL + (data.length - 1) * xStep;
+    const ly = yScale(last.pct);
+    ctx.beginPath();
+    ctx.arc(lx, ly, 3, 0, 2 * Math.PI);
+    ctx.fillStyle = last.pct >= 0 ? posColor : negColor;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Date labels — show 4 evenly-spaced dates
+    ctx.fillStyle = labelColor;
+    ctx.textAlign = 'center';
+    [0, Math.floor(data.length / 3), Math.floor(2 * data.length / 3), data.length - 1].forEach(idx => {
+        const d = data[idx];
+        const x = padL + idx * xStep;
+        // Parse as LOCAL date (not UTC) to avoid the midnight-UTC timezone shift
+        const [y, mo, dd] = d.date.split('-').map(Number);
+        const str = new Date(y, mo - 1, dd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        ctx.fillText(str, x, H - 8);
+    });
+
+    // Store metadata for hover
+    canvas._ytdMeta = { data, padL, padR, padT, padB, xStep, W, H, yScale };
+    canvas._ytdRedraw = _drawYTDPerformanceChart;
+    _initYTDChartHover(canvas);
+}
+
+function _initAnnualChartHover(canvas) {
+    if (canvas._annualHoverBound) return;
+    canvas._annualHoverBound = true;
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.addEventListener('mousemove', e => {
+        const m = canvas._annualMeta;
+        if (!m || !m.data.length) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (canvas.width / rect.width / dpr);
+        const idx = Math.max(0, Math.min(m.data.length - 1, Math.floor((mx - m.padL) / m.xStep)));
+
+        // Redraw base, then draw column highlight
+        if (canvas._annualRedraw) canvas._annualRedraw();
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.fillStyle = 'rgba(148,163,184,0.12)';
+        ctx.fillRect(m.padL + idx * m.xStep, m.padT, m.xStep, m.H - m.padT - m.padB);
+
+        // Tooltip
+        const d = m.data[idx];
+        const sign = d.pct >= 0 ? '+' : '';
+        const color = d.pct >= 0 ? '#22c55e' : '#ef4444';
+        const tt = document.getElementById('annualChartTooltip');
+        if (!tt) return;
+        tt.innerHTML = `<span class="mkt-tt-date">${d.year}</span><span class="mkt-tt-price" style="color:${color}">${sign}${d.pct.toFixed(1)}%</span>`;
+        const tx = Math.min(e.clientX - rect.left + 12, canvas.offsetWidth - 110);
+        const ty = Math.max(e.clientY - rect.top - 40, 4);
+        tt.style.cssText = `display:flex;left:${tx}px;top:${ty}px`;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        if (canvas._annualRedraw) canvas._annualRedraw();
+        const tt = document.getElementById('annualChartTooltip');
+        if (tt) tt.style.display = 'none';
+    });
+}
+
+function _initYTDChartHover(canvas) {
+    if (canvas._ytdHoverBound) return;
+    canvas._ytdHoverBound = true;
+    const dpr = window.devicePixelRatio || 1;
+
+    canvas.addEventListener('mousemove', e => {
+        const m = canvas._ytdMeta;
+        if (!m || !m.data.length) return;
+        const rect = canvas.getBoundingClientRect();
+        const mx = (e.clientX - rect.left) * (canvas.width / rect.width / dpr);
+        const idx = Math.max(0, Math.min(m.data.length - 1, Math.round((mx - m.padL) / m.xStep)));
+        const d = m.data[idx];
+        const x = m.padL + idx * m.xStep;
+        const yV = m.yScale(d.pct);
+        const color = d.pct >= 0 ? '#22c55e' : '#ef4444';
+
+        // Redraw base, then draw crosshair overlay
+        if (canvas._ytdRedraw) canvas._ytdRedraw();
+        const ctx = canvas.getContext('2d');
+        ctx.scale(dpr, dpr);
+        ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 4]);
+        ctx.beginPath(); ctx.moveTo(x, m.padT); ctx.lineTo(x, m.H - m.padB); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(x, yV, 7, 0, Math.PI * 2);
+        ctx.fillStyle = color + '30'; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, yV, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+        ctx.beginPath(); ctx.arc(x, yV, 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#fff'; ctx.fill();
+
+        // Tooltip
+        const sign = d.pct >= 0 ? '+' : '';
+        const [yr, mo, dd] = d.date.split('-').map(Number);
+        const dateStr = new Date(yr, mo - 1, dd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const tt = document.getElementById('ytdChartTooltip');
+        if (!tt) return;
+        tt.innerHTML = `<span class="mkt-tt-date">${dateStr}</span><span class="mkt-tt-price" style="color:${color}">${sign}${d.pct.toFixed(2)}%</span>`;
+        const tx = Math.min(e.clientX - rect.left + 12, canvas.offsetWidth - 110);
+        const ty = Math.max(e.clientY - rect.top - 40, 4);
+        tt.style.cssText = `display:flex;left:${tx}px;top:${ty}px`;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        if (canvas._ytdRedraw) canvas._ytdRedraw();
+        const tt = document.getElementById('ytdChartTooltip');
+        if (tt) tt.style.display = 'none';
+    });
+}
