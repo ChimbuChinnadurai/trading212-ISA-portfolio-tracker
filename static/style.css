@@ -10439,6 +10439,7 @@ div#sectorBarsList {
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
   white-space: nowrap;
+  text-align: justify;
 }
 
 .watchlist-table tr:last-child td {

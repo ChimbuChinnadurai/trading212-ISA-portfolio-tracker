@@ -1055,14 +1055,22 @@
                           class="sort-icon">↕</span></th>
                       <th data-colid="returns_pct" class="th-sortable th-right" data-col="returns_pct"
                         onclick="sortTable(this)">Returns % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret1d" class="th-sortable th-right" data-col="ret1d" onclick="sortTable(this)">1d % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret1w" class="th-sortable th-right" data-col="ret1w" onclick="sortTable(this)">1w % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret1m" class="th-sortable th-right" data-col="ret1m" onclick="sortTable(this)">1M % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret3m" class="th-sortable th-right" data-col="ret3m" onclick="sortTable(this)">3M % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret6m" class="th-sortable th-right" data-col="ret6m" onclick="sortTable(this)">6M % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret1y" class="th-sortable th-right" data-col="ret1y" onclick="sortTable(this)">1y % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret3y" class="th-sortable th-right" data-col="ret3y" onclick="sortTable(this)">3y % <span class="sort-icon">↕</span></th>
-                      <th data-colid="ret5y" class="th-sortable th-right" data-col="ret5y" onclick="sortTable(this)">5y % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret1d" class="th-sortable th-right" data-col="ret1d" onclick="sortTable(this)">1d
+                        % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret1w" class="th-sortable th-right" data-col="ret1w" onclick="sortTable(this)">1w
+                        % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret1m" class="th-sortable th-right" data-col="ret1m" onclick="sortTable(this)">1M
+                        % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret3m" class="th-sortable th-right" data-col="ret3m" onclick="sortTable(this)">3M
+                        % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret6m" class="th-sortable th-right" data-col="ret6m" onclick="sortTable(this)">6M
+                        % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret1y" class="th-sortable th-right" data-col="ret1y" onclick="sortTable(this)">1y
+                        % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret3y" class="th-sortable th-right" data-col="ret3y" onclick="sortTable(this)">3y
+                        % <span class="sort-icon">↕</span></th>
+                      <th data-colid="ret5y" class="th-sortable th-right" data-col="ret5y" onclick="sortTable(this)">5y
+                        % <span class="sort-icon">↕</span></th>
                       <th data-colid="div_yield" class="th-sortable th-right" data-col="div_yield"
                         onclick="sortTable(this)"
                         title="Annual dividend yield based on dividends received vs current value">Div Yield <span
@@ -1408,8 +1416,6 @@
                       <span id="mktSpChange" class="mkt-sp-change">—</span>
                     </div>
                     <div id="mktRangeTabs" class="mkt-range-tabs">
-                      <button class="mkt-range-tab" data-range="1D">1D</button>
-                      <button class="mkt-range-tab" data-range="1W">1W</button>
                       <button class="mkt-range-tab" data-range="1M">1M</button>
                       <button class="mkt-range-tab active" data-range="6M">6M</button>
                       <button class="mkt-range-tab" data-range="1Y">1Y</button>
@@ -1447,8 +1453,6 @@
                       <span id="vixCurrentChange" class="mkt-sp-change">—</span>
                     </div>
                     <div id="vixRangeTabs" class="mkt-range-tabs">
-                      <button class="mkt-range-tab" data-range="1D">1D</button>
-                      <button class="mkt-range-tab" data-range="1W">1W</button>
                       <button class="mkt-range-tab" data-range="1M">1M</button>
                       <button class="mkt-range-tab active" data-range="6M">6M</button>
                       <button class="mkt-range-tab" data-range="1Y">1Y</button>
@@ -1484,8 +1488,7 @@
                 <!-- Annual % Change Card -->
                 <section class="widget-panel insight-card">
                   <div class="panel-header">
-                    <h3 class="panel-title">Annual % Change</h3>
-                    <span class="insight-subtitle">S&amp;P 500 · full history</span>
+                    <h3 class="panel-title">S&amp;P 500 Annual % Change</h3>
                   </div>
                   <div class="insight-chart-wrap" style="height: 220px; position: relative;">
                     <canvas id="annualChangeChart"></canvas>
@@ -1496,8 +1499,7 @@
                 <!-- YTD Performance Card -->
                 <section class="widget-panel insight-card">
                   <div class="panel-header">
-                    <h3 class="panel-title">YTD Performance</h3>
-                    <span class="insight-subtitle">S&amp;P 500 · year to date</span>
+                    <h3 class="panel-title">S&amp;P 500 YTD Performance</h3>
                   </div>
                   <div class="insight-chart-wrap" style="height: 220px; position: relative;">
                     <canvas id="ytdPerfChart"></canvas>
