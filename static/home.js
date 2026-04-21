@@ -513,6 +513,7 @@ async function loadStockTicker() {
             _tickerDataMap = {};
             for (const d of _tickerData) _tickerDataMap[d.ticker] = d;
             _renderHeatmap(_tickerData);
+            if (typeof _redrawAllocationHeatmaps === 'function') _redrawAllocationHeatmaps();
             // Flash cells whose price changed
             if (Object.keys(changed).length) {
                 requestAnimationFrame(() => {
