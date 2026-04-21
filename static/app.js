@@ -2824,7 +2824,7 @@ function drawPortfolioHeatmap(rows, totalValue) {
     const pct = r.returns_pct || 0;
     const sign = pct >= 0 ? '+' : '';
     const weight = totalValue > 0 ? (r.current_value / totalValue * 100) : (r.weight || 0);
-    const bg = _pnlColor(pct);
+    const bg = _heatColor(pct);
     const tinyW = rect.w < 52;
     const tinyH = rect.h < 44;
 
@@ -2883,7 +2883,7 @@ function drawSectorHeatmap(rows, totalValue) {
     const pct = r.avgReturn;
     const sign = pct >= 0 ? '+' : '';
     const weight = totalValue > 0 ? (r.value / totalValue * 100) : 0;
-    const bg = _pnlColor(pct);
+    const bg = _heatColor(pct);
     const tinyW = rect.w < 70;
     const tinyH = rect.h < 44;
 
