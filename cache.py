@@ -39,9 +39,10 @@ class _PGConnWrapper:
         self._conn = conn
 
     def execute(self, sql, params=()):
-        cur = self._conn.cursor()
-        cur.execute(sql.replace("?", "%s"), params)
-        return cur
+        if not hasattr(self, "_cur") or self._cur.closed:
+            self._cur = self._conn.cursor()
+        self._cur.execute(sql.replace("?", "%s"), params)
+        return self._cur
 
     def __enter__(self):
         return self
@@ -392,13 +393,16 @@ def trump_sentiment_set(by_id: dict) -> None:
 def clear_all_cache() -> None:
     """Wipe all cached tables in the database."""
     if _USE_PG:
-        logger.info("Cache clear is not avaiable in production")
+        logger.info("Cache cleared is not avaiable for (PostgreSQL)")
     else:
         with _db() as conn:
             conn.execute("DELETE FROM portfolio_cache")
             conn.execute("DELETE FROM kv_cache")
             conn.execute("DELETE FROM portfolio_history")
             conn.execute("DELETE FROM portfolio_snapshots")
+            conn.execute("DELETE FROM trump_sentiment")
+            conn.execute("DELETE FROM notifications")
+        logger.info("Cache cleared (SQLite)")
 
 
 # ── Price Alerts ──────────────────────────────────────────────────────────────

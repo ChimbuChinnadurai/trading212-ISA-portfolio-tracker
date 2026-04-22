@@ -1,3 +1,4 @@
+import bisect
 import concurrent.futures
 import logging
 import os
@@ -115,18 +116,33 @@ def _top_sector(rows):
     return max(buckets, key=buckets.get) if buckets else None
 
 
-@app.route("/api/overview")
-def overview():
-    """Return aggregated summary metrics for all configured portfolios."""
+def _get_combined_rows_map() -> dict:
+    """Merge cached portfolio rows from all PIDs into a ticker-keyed dict, summing financial fields."""
+    combined = {}
+    for pid, key in API_KEYS.items():
+        if not key:
+            continue
+        rows, _ = rows_get(pid)
+        if not rows:
+            continue
+        for r in rows:
+            t = r["ticker"]
+            if t not in combined:
+                combined[t] = r.copy()
+                combined[t]["_pid"] = pid
+            else:
+                curr = combined[t]
+                curr["invested"]      = (curr.get("invested") or 0) + (r.get("invested") or 0)
+                curr["current_value"] = (curr.get("current_value") or 0) + (r.get("current_value") or 0)
+                curr["total_returns"] = (curr.get("total_returns") or 0) + (r.get("total_returns") or 0)
+    return combined
+
+
+def _build_overview_data(force=False):
+    """Build overview metrics for all configured portfolios. Returns (res, metadata)."""
     res = {}
-    total_value = 0.0
-    total_returns = 0.0
-    total_invested = 0.0
-
-    force = request.args.get("refresh", "0") == "1"
-
-    total_cash = 0.0
-    total_realized = 0.0
+    total_value = total_returns = total_invested = 0.0
+    total_cash = total_realized = 0.0
 
     for pid, api_key in API_KEYS.items():
         rows, _ = fetch_and_cache_portfolio(pid, force=force)
@@ -140,19 +156,19 @@ def overview():
         if rows:
             p_val = sum(r["current_value"] for r in rows)
             p_inv = sum(r["invested"] for r in rows)
-            total_value += p_val
+            total_value    += p_val
             total_invested += p_inv
             snapshot_add(pid, round(p_val, 2))
 
-            cash        = summary.get("cash", 0)
-            realized    = summary.get("realized_pnl", 0)
+            cash       = summary.get("cash", 0)
+            realized   = summary.get("realized_pnl", 0)
             # Prefer T212's own unrealized figure; fall back to computed if summary unavailable
-            unrealized  = summary.get("unrealized_pnl") if summary else None
+            unrealized = summary.get("unrealized_pnl") if summary else None
             if unrealized is None:
                 unrealized = round(p_val - p_inv, 2)
-            total_cash      += cash
-            total_realized  += realized
-            total_returns   += unrealized
+            total_cash     += cash
+            total_realized += realized
+            total_returns  += unrealized
 
             res[pid] = {
                 "value":          round(p_val, 2),
@@ -183,14 +199,23 @@ def overview():
         "realized_pnl":   round(total_realized, 2),
         "unrealized_pnl": round(total_returns, 2),
     }
+
     metadata = {
         "names": PORTFOLIO_NAMES,
         "freshness": {
-            "prices": kv_age("1:rows") or 0,
+            "prices":    kv_age("1:rows") or 0,
             "dividends": kv_age("total_dividends", pid="1") or 0,
-            "fx": kv_age("gbpusd") or 0
+            "fx":        kv_age("gbpusd") or 0,
         }
     }
+    return res, metadata
+
+
+@app.route("/api/overview")
+def overview():
+    """Return aggregated summary metrics for all configured portfolios."""
+    force = request.args.get("refresh", "0") == "1"
+    res, metadata = _build_overview_data(force=force)
     return jsonify({"status": "ok", "data": res, "metadata": metadata})
 
 
@@ -503,27 +528,9 @@ def portfolio_daily_history():
 def top_performers_combined():
     """Return Top 5 performers across all portfolios."""
     try:
-        combined_rows_map = {}
-        for pid, key in API_KEYS.items():
-            if not key: continue
-            rows, _ = rows_get(pid)
-            if not rows: continue
-            for r in rows:
-                t = r["ticker"]
-                if t not in combined_rows_map:
-                    combined_rows_map[t] = r.copy()
-                    combined_rows_map[t]["_pid"] = pid
-                else:
-                    curr = combined_rows_map[t]
-                    curr["invested"] += r["invested"]
-                    curr["current_value"] += r["current_value"]
-                    curr["total_returns"] += r["total_returns"]
-        
-        consolidated = list(combined_rows_map.values())
+        consolidated = list(_get_combined_rows_map().values())
         for r in consolidated:
             r["returns_pct"] = (r["total_returns"] / r["invested"] * 100) if r["invested"] > 0 else 0
-        
-        # Sort by total returns amount descending
         consolidated.sort(key=lambda x: x["total_returns"], reverse=True)
         return jsonify({"status": "ok", "data": consolidated[:5]})
     except Exception as e:
@@ -681,7 +688,7 @@ def _fetch_market_symbol(config):
             for i in range(len(c_list))
         ]
 
-        n = 1300  # display last ~5 years of trading days
+        n = _YF_TRADING_DAYS_5Y
         c_out  = [round(v, 2) for v in c_list[-n:]]
         ma_out = [round(m, 2) if m is not None else None for m in ma_list[-n:]]
         current    = c_out[-1]
@@ -809,6 +816,26 @@ _COUNTRY_YF_SUFFIX = {
     "NO": ".OL", "FI": ".HE", "BE": ".BR", "HK": ".HK",
 }
 
+_YF_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+)
+
+_YF_TRADING_DAYS_5Y = 1300  # approx 252 trading days/year × 5
+
+
+def _build_yf_symbol(ticker: str, country: str) -> tuple:
+    """Return (clean_ticker, yf_symbol) for Yahoo Finance requests.
+
+    clean_ticker: LSE 'l' suffix stripped, dots preserved (safe for display/dict keys).
+    yf_symbol: dots replaced with hyphens and exchange suffix appended (ready for YF API).
+    """
+    suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
+    clean = ticker[:-1] if suffix == ".L" and ticker.lower().endswith("l") else ticker
+    yf_clean = clean.replace(".", "-")
+    yf_sym = f"{yf_clean}{suffix}" if suffix and not yf_clean.endswith(suffix) else yf_clean
+    return clean, yf_sym
+
 
 def _yf_fetch_points(symbol, range_, interval_):
     """Fetch close prices from Yahoo Finance chart API, return [{ts, price}] list."""
@@ -863,9 +890,8 @@ def stock_tickers_api():
         for row in needs_fetch:
             ticker  = row['ticker']
             country = row.get('country', 'US')
-            suffix  = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
-            clean   = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-            sym_to_row[f"{clean}{suffix}"] = (ticker, clean, row)
+            clean, yf_sym = _build_yf_symbol(ticker, country)
+            sym_to_row[yf_sym] = (ticker, clean, row)
 
         quotes = []
         for attempt in range(2):
@@ -973,10 +999,7 @@ def stock_sparklines():
             result[ticker] = cached
             continue
 
-        suffix       = _COUNTRY_YF_SUFFIX.get(country, "")
-        # T212 appends a lowercase 'l' to LSE-listed tickers (e.g. "LLOYl") — strip it
-        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-        yf_symbol    = f"{clean_ticker}{suffix}"
+        clean_ticker, yf_symbol = _build_yf_symbol(ticker, country)
         logger.info("stock_sparkline fetching %s (ticker=%s country=%s range=%s)", yf_symbol, ticker, country, yf_range)
         try:
             points = _yf_fetch_points(yf_symbol, yf_range, yf_interval)
@@ -1056,7 +1079,7 @@ def recent_dividends(pid):
 
 FINNHUB_TOKEN      = os.environ.get("FINNHUB_TOKEN")
 TTL_EARNINGS       = 86400    # 1 day
-TTL_NEWS           = 1800     # 30 minutes
+TTL_STOCK_NEWS     = 1800     # 30 minutes — per-ticker company news (longer than general news TTL)
 TTL_DIVIDENDS_CAL  = 86400    # 24 hours
 
 
@@ -1130,9 +1153,7 @@ def stock_chart(ticker):
         period = "1w"
     range_, interval_ = PERIOD_MAP[period]
 
-    suffix = _COUNTRY_YF_SUFFIX.get(country, "")
-    clean  = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-    symbol = f"{clean}{suffix}"
+    _, symbol = _build_yf_symbol(ticker, country)
 
     cache_key = f"stock:chart:v2:{symbol}:{period}"
     TTL = 60 if period == "1d" else 300 if period == "1w" else 3600
@@ -1227,16 +1248,7 @@ def stock_metrics(ticker):
 
 def _fetch_hist_returns_one(ticker, country):
     """Fetch 1w..5y historical returns for a single ticker via Yahoo Finance chart API."""
-    suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
-    # Ticker cleanup (e.g. 'LLOYl' -> 'LLOY' + '.L')
-    clean = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-    # Yahoo Finance normalization: replace dots with hyphens (e.g., 'BRK.B' -> 'BRK-B')
-    clean = clean.replace(".", "-")
-    
-    if suffix and not clean.endswith(suffix):
-        symbol = f"{clean}{suffix}"
-    else:
-        symbol = clean
+    _, symbol = _build_yf_symbol(ticker, country)
 
     cache_key = f"hist_ret_v1:{symbol}"
     # Performance data cached for 24 hours
@@ -1292,20 +1304,21 @@ def _fetch_hist_returns_one(ticker, country):
             "ret5y": 1825 * 86400,
         }
 
+        ts_arr    = [p[0] for p in valid_points]
+        price_arr = [p[1] for p in valid_points]
+
         res = {}
         for key, offset in windows.items():
             target = now_ts - offset
-            # Find closest timestamp to target
-            best_p = None
-            min_dist = float('inf')
-            for ts, p in valid_points:
-                dist = abs(ts - target)
-                if dist < min_dist:
-                    min_dist = dist
-                    best_p = p
-
-            # Use data if match is within a reasonable window (4 days)
-            if best_p is not None and best_p != 0 and min_dist < (4 * 86400):
+            idx = bisect.bisect_left(ts_arr, target)
+            candidates = [i for i in (idx - 1, idx) if 0 <= i < len(ts_arr)]
+            if not candidates:
+                res[key] = None
+                continue
+            best_i    = min(candidates, key=lambda i: abs(ts_arr[i] - target))
+            min_dist  = abs(ts_arr[best_i] - target)
+            best_p    = price_arr[best_i]
+            if best_p != 0 and min_dist < (4 * 86400):
                 res[key] = round((current_price - best_p) / best_p * 100, 2)
             else:
                 res[key] = None
@@ -1401,7 +1414,7 @@ def stock_news(ticker):
     cache_key = f"finnhub:news:{ticker}"
 
     try:
-        data = kv_get(cache_key, TTL_NEWS)
+        data = kv_get(cache_key, TTL_STOCK_NEWS)
         if data is None:
             today = date.today()
             from_date = today - timedelta(days=365)
@@ -1528,12 +1541,6 @@ def watchlist_signals():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-_YF_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
-)
-
-
 def _yf_crumb():
     """Return (crumb, cookie_str) for Yahoo Finance v10 requests, cached 1 h."""
     cached = kv_get("yf:crumb:v3", 3600)
@@ -1591,9 +1598,7 @@ def watchlist_fundamentals():
         if cached is not None:
             return jsonify({"status": "ok", "data": cached})
 
-        suffix       = _COUNTRY_YF_SUFFIX.get(country, "")
-        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-        yf_sym       = f"{clean_ticker}{suffix}"
+        clean_ticker, yf_sym = _build_yf_symbol(ticker, country)
 
         summary = _yf_summary(yf_sym, modules="financialData,defaultKeyStatistics,summaryDetail,incomeStatementHistory")
         fin     = summary.get("financialData", {})
@@ -1693,9 +1698,7 @@ def watchlist_price():
         if cached is not None:
             return jsonify({"status": "ok", "data": cached})
 
-        suffix       = _COUNTRY_YF_SUFFIX.get(country, "")
-        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-        yf_sym       = f"{clean_ticker}{suffix}"
+        clean_ticker, yf_sym = _build_yf_symbol(ticker, country)
 
         quotes = []
         for attempt in range(2):
@@ -1998,11 +2001,7 @@ def risk_metrics_endpoint():
                 # Build per-row metadata and separate cached from uncached
                 row_meta = []
                 for row in combined_rows:
-                    tk      = row["ticker"]
-                    country = row.get("country", "US")
-                    suffix  = _COUNTRY_YF_SUFFIX.get(country, "")
-                    clean   = tk[:-1] if suffix == ".L" and tk.lower().endswith("l") else tk
-                    yf_sym  = f"{clean}{suffix}"
+                    _, yf_sym = _build_yf_symbol(row["ticker"], row.get("country", "US"))
                     row_meta.append((row, yf_sym, f"pe:{yf_sym}"))
 
                 # Check cache first; collect symbols that need fetching
@@ -2096,9 +2095,13 @@ def monthly_performance(pid):
     def _fetch_monthly(row):
         ticker = row["ticker"]
         country = row.get("country", "US")
-        suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
-        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-        yf_sym = f"{clean_ticker}{suffix}"
+        clean_ticker, yf_sym = _build_yf_symbol(ticker, country)
+
+        per_ticker_key = f"monthly_perf_ticker:{yf_sym}"
+        cached_monthly = kv_get(per_ticker_key, 900)
+        if cached_monthly is not None:
+            return clean_ticker, cached_monthly
+
         try:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
@@ -2127,6 +2130,7 @@ def monthly_performance(pid):
                 month_key = dt.strftime("%Y-%m")
                 pct = (closes[i] - closes[i - 1]) / closes[i - 1] * 100
                 monthly[month_key] = round(pct, 2)
+            kv_set(per_ticker_key, monthly)
             return clean_ticker, monthly
         except Exception as exc:
             logger.warning("monthly_perf failed for %s: %s", yf_sym, exc)
@@ -2175,9 +2179,13 @@ def daily_performance(pid):
         ticker = row["ticker"]
         country = row.get("country", "US")
         is_sp500 = ticker == "^GSPC"
-        suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
-        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-        yf_sym = f"{clean_ticker}{suffix}"
+        clean_ticker, yf_sym = _build_yf_symbol(ticker, country)
+
+        per_ticker_key = f"daily_perf_ticker:{yf_sym}"
+        cached_daily = kv_get(per_ticker_key, 300)
+        if cached_daily is not None:
+            return ("S&P 500" if is_sp500 else clean_ticker), cached_daily
+
         try:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
@@ -2208,6 +2216,7 @@ def daily_performance(pid):
                 pct = (closes[i] - closes[i - 1]) / closes[i - 1] * 100
                 daily[day_key] = round(pct, 2)
 
+            kv_set(per_ticker_key, daily)
             display_key = "S&P 500" if is_sp500 else clean_ticker
             return display_key, daily
         except Exception as exc:
@@ -2254,9 +2263,7 @@ def yearly_performance(pid):
         ticker = row["ticker"]
         country = row.get("country", "US")
         is_sp500 = ticker == "^GSPC"
-        suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
-        clean_ticker = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-        yf_sym = f"{clean_ticker}{suffix}"
+        clean_ticker, yf_sym = _build_yf_symbol(ticker, country)
         try:
             resp = requests.get(
                 f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
@@ -2329,66 +2336,7 @@ def home_data():
 
 def _home_data_inner(force):
     # ── 1. Overview ────────────────────────────────────────────────────────────
-    overview_res = {}
-    total_value = total_returns = total_invested = 0.0
-    total_cash = total_realized = 0.0
-    for pid, api_key in API_KEYS.items():
-        rows, _ = fetch_and_cache_portfolio(pid, force=force)
-        summary = {}
-        if api_key:
-            try:
-                summary = get_account_summary(api_key, pid)
-            except Exception:
-                pass
-        if rows:
-            p_val = sum(r["current_value"] for r in rows)
-            p_inv = sum(r["invested"] for r in rows)
-            total_value    += p_val
-            total_invested += p_inv
-            snapshot_add(pid, round(p_val, 2))
-            cash        = summary.get("cash", 0)
-            realized    = summary.get("realized_pnl", 0)
-            unrealized  = summary.get("unrealized_pnl") if summary else None
-            if unrealized is None:
-                unrealized = round(p_val - p_inv, 2)
-            total_cash      += cash
-            total_realized  += realized
-            total_returns   += unrealized
-            overview_res[pid] = {
-                "value":          round(p_val, 2),
-                "returns":        unrealized,
-                "returns_pct":    round((unrealized / p_inv) * 100, 2) if p_inv > 0 else 0,
-                "invested":       round(p_inv, 2),
-                "positions":      len(rows),
-                "top_sector":     _top_sector(rows),
-                "cash":           cash,
-                "realized_pnl":   realized,
-                "unrealized_pnl": unrealized,
-            }
-    all_combined_rows = []
-    for pid in API_KEYS:
-        r, _ = rows_get(pid)
-        if r:
-            all_combined_rows.extend(r)
-    overview_res["combined"] = {
-        "value":          round(total_value, 2),
-        "returns":        round(total_returns, 2),
-        "returns_pct":    round((total_returns / total_invested) * 100, 2) if total_invested > 0 else 0,
-        "invested":       round(total_invested, 2),
-        "positions":      sum(p["positions"] for p in overview_res.values() if isinstance(p, dict) and "positions" in p),
-        "top_sector":     _top_sector(all_combined_rows),
-        "cash":           round(total_cash, 2),
-        "realized_pnl":   round(total_realized, 2),
-        "unrealized_pnl": round(total_returns, 2),
-    }
-    overview_metadata = {
-        "names": PORTFOLIO_NAMES,
-        "freshness": {
-            "prices":    kv_age("1:rows") or 0,
-            "dividends": kv_age("total_dividends", pid="1") or 0,
-            "fx":        kv_age("gbpusd") or 0,
-        }
-    }
+    overview_res, overview_metadata = _build_overview_data(force=force)
 
     # ── 2. Activity ────────────────────────────────────────────────────────────
     activity_data = []
@@ -2410,24 +2358,7 @@ def _home_data_inner(force):
     performers_data = []
     under_performers_data = []
     try:
-        combined_rows_map = {}
-        for pid, key in API_KEYS.items():
-            if not key:
-                continue
-            rows, _ = rows_get(pid)
-            if not rows:
-                continue
-            for r in rows:
-                t = r["ticker"]
-                if t not in combined_rows_map:
-                    combined_rows_map[t] = r.copy()
-                    combined_rows_map[t]["_pid"] = pid
-                else:
-                    curr = combined_rows_map[t]
-                    curr["invested"]      += r["invested"]
-                    curr["current_value"] += r["current_value"]
-                    curr["total_returns"] += r["total_returns"]
-        consolidated = list(combined_rows_map.values())
+        consolidated = list(_get_combined_rows_map().values())
         for r in consolidated:
             r["returns_pct"] = (r["total_returns"] / r["invested"] * 100) if r["invested"] > 0 else 0
         consolidated.sort(key=lambda x: x["total_returns"], reverse=True)
@@ -2579,11 +2510,11 @@ def market_status_api():
     return jsonify({"status": "ok", "data": result})
 
 
-@app.route("/api/admin/clear-cache")
+@app.route("/api/admin/clear-cache", methods=["POST"])
 def api_clear_cache():
     """Force clear all cached data."""
     try:
-        clear_all_cache()
+        # clear_all_cache()
         return jsonify({"status": "ok", "message": "Cache cleared successfully"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -2880,7 +2811,7 @@ def trade_signals():
 
     # Fetch top signals in parallel
     tickers = list(unique_rows.keys())
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, max(1, len(tickers)))) as ex:
         for res in ex.map(process_ticker, tickers):
             if res:
                 results.append(res)
@@ -3291,9 +3222,7 @@ def return_attribution(pid):
             def _fetch_monthly_attr(row):
                 ticker = row["ticker"]
                 country = row.get("country", "US")
-                suffix = _COUNTRY_YF_SUFFIX.get(country.upper(), "")
-                clean = ticker[:-1] if suffix == ".L" and ticker.endswith("l") else ticker
-                yf_sym = f"{clean}{suffix}"
+                _, yf_sym = _build_yf_symbol(ticker, country)
                 try:
                     resp = requests.get(
                         f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}",
