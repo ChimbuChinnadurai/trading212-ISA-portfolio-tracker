@@ -20,14 +20,15 @@ When asked to explore the codebase or generate suggestions, provide an initial c
 
 ```bash
 # Run locally (requires .env with API keys)
-python app.py                      # serves on http://localhost:8080
+python3 app.py                      # serves on http://localhost:8080
 
 # Docker build + run
 docker build --platform=linux/amd64 -t tracker .
 docker run -p 8080:8080 --env-file .env tracker
 
 # Deploy to Google Cloud Run (bumps version tag automatically)
-./build.sh
+./scripts/build.sh
+
 
 # Clear cache without restarting
 curl -X POST http://localhost:8080/api/admin/clear-cache
