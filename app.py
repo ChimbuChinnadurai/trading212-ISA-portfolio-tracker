@@ -484,11 +484,18 @@ def portfolio_daily_history():
 
     all_days = sorted(set().union(*[set(d.keys()) for d in pid_daily.values()]))
     result = []
+    pids_active = [p for p in API_KEYS if API_KEYS[p]]
+    last_known: dict = {}  # pid -> (ts, value) — forward-fill missing days
     for day in all_days:
-        total = sum(pid_daily[pid][day][1] for pid in API_KEYS if day in pid_daily[pid])
-        ts = next((pid_daily[pid][day][0] for pid in API_KEYS if day in pid_daily[pid]), 0)
-        if total > 0:
-            result.append({"date": day, "ts": int(ts), "value": round(total, 2)})
+        for pid in pids_active:
+            if day in pid_daily[pid]:
+                last_known[pid] = pid_daily[pid][day]
+        # Only emit once every active portfolio has at least one snapshot
+        if all(p in last_known for p in pids_active):
+            total = sum(last_known[p][1] for p in pids_active)
+            ts = next((last_known[p][0] for p in pids_active), 0)
+            if total > 0:
+                result.append({"date": day, "ts": int(ts), "value": round(total, 2)})
     return jsonify({"status": "ok", "data": result})
 
 
@@ -1777,19 +1784,33 @@ def portfolio_history(pid):
     """Return up to 48 hours of portfolio value snapshots for sparkline charts."""
     if pid == "combined":
         bucket_size = 300  # 5-minute buckets
-        buckets: dict[int, dict[str, float]] = {}
+        # Gather all snapshots across portfolios sorted by time
+        all_snaps = []
         for p in API_KEYS:
+            if not API_KEYS[p]:
+                continue
             for snap in snapshot_get(p, hours=48):
-                bucket = int(snap["ts"] // bucket_size) * bucket_size
-                if bucket not in buckets:
-                    buckets[bucket] = {}
-                # Take latest value per portfolio per bucket
-                buckets[bucket][p] = snap["value"]
-        
+                all_snaps.append((snap["ts"], p, snap["value"]))
+        all_snaps.sort()
+
+        # Latest value per portfolio per bucket
+        raw_buckets: dict[int, dict[str, float]] = {}
+        for ts_snap, p, val in all_snaps:
+            bucket = int(ts_snap // bucket_size) * bucket_size
+            if bucket not in raw_buckets:
+                raw_buckets[bucket] = {}
+            raw_buckets[bucket][p] = val
+
+        # Forward-fill: carry last known value for each portfolio so every
+        # bucket reflects all portfolios, not just those that wrote in that window.
+        pids_active = [p for p in API_KEYS if API_KEYS[p]]
+        last_known: dict[str, float] = {}
         data = []
-        for ts in sorted(buckets.keys()):
-            total_v = sum(buckets[ts].values())
-            data.append({"ts": ts, "value": round(total_v, 2)})
+        for ts in sorted(raw_buckets.keys()):
+            last_known.update(raw_buckets[ts])
+            if all(p in last_known for p in pids_active):
+                total_v = sum(last_known[p] for p in pids_active)
+                data.append({"ts": ts, "value": round(total_v, 2)})
     else:
         data = snapshot_get(pid, hours=48)
     return jsonify({"status": "ok", "data": data})
