@@ -728,15 +728,15 @@ function _renderHeatmap(items) {
     container.innerHTML = html.join('');
 
     // Update session label in the heatmap header
-    const sessionLabel = document.getElementById('heatmapSessionLabel');
-    if (sessionLabel) {
-        const states = valid.map(d => d.market_state || 'REGULAR');
-        const hasPost = states.some(s => s === 'POST' || s === 'POSTPOST');
-        const hasPre = states.some(s => s === 'PRE');
-        sessionLabel.textContent = hasPre ? 'Pre-market change'
-            : hasPost ? 'After-hours change'
-                : "Today's change";
-    }
+    // const sessionLabel = document.getElementById('heatmapSessionLabel');
+    // if (sessionLabel) {
+    //     const states = valid.map(d => d.market_state || 'REGULAR');
+    //     const hasPost = states.some(s => s === 'POST' || s === 'POSTPOST');
+    //     const hasPre = states.some(s => s === 'PRE');
+    //     sessionLabel.textContent = hasPre ? 'Pre-market change'
+    //         : hasPost ? 'After-hours change'
+    //             : "Today's change";
+    // }
 
     // Randomise each cell's phase within the 10s cycle so they pulse out of sync
     container.querySelectorAll('.hm-cell').forEach(cell => {
