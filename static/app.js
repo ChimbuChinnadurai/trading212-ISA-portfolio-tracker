@@ -2829,8 +2829,7 @@ function drawPortfolioHeatmap(rows, totalValue) {
     const pct = r.returns_pct || 0;
     const sign = pct >= 0 ? '+' : '';
     const weight = totalValue > 0 ? (r.current_value / totalValue * 100) : (r.weight || 0);
-    const colorPct = _tickerDataMap[r.ticker]?.change_pct ?? null;
-    const bg = colorPct !== null ? _heatColor(colorPct) : _pnlColor(pct);
+    const bg = _pnlColor(pct);
     const tinyW = rect.w < 52;
     const tinyH = rect.h < 44;
 
@@ -2863,14 +2862,9 @@ function drawSectorHeatmap(rows, totalValue) {
   const bySecMap = {};
   rows.filter(r => r.current_value > 0).forEach(r => {
     const sec = r.sector || 'Other';
-    if (!bySecMap[sec]) bySecMap[sec] = { value: 0, weightedReturn: 0, weightedChangePct: 0, changePctValue: 0 };
+    if (!bySecMap[sec]) bySecMap[sec] = { value: 0, weightedReturn: 0 };
     bySecMap[sec].value += r.current_value;
     bySecMap[sec].weightedReturn += r.current_value * (r.returns_pct || 0);
-    const cp = _tickerDataMap[r.ticker]?.change_pct ?? null;
-    if (cp !== null) {
-      bySecMap[sec].weightedChangePct += r.current_value * cp;
-      bySecMap[sec].changePctValue += r.current_value;
-    }
   });
 
   const items = Object.entries(bySecMap)
@@ -2878,7 +2872,6 @@ function drawSectorHeatmap(rows, totalValue) {
       name,
       value: d.value,
       avgReturn: d.value > 0 ? d.weightedReturn / d.value : 0,
-      avgChangePct: d.changePctValue > 0 ? d.weightedChangePct / d.changePctValue : null,
     }))
     .sort((a, b) => b.value - a.value);
 
@@ -2895,7 +2888,7 @@ function drawSectorHeatmap(rows, totalValue) {
     const pct = r.avgReturn;
     const sign = pct >= 0 ? '+' : '';
     const weight = totalValue > 0 ? (r.value / totalValue * 100) : 0;
-    const bg = r.avgChangePct !== null ? _heatColor(r.avgChangePct) : _pnlColor(pct);
+    const bg = _pnlColor(pct);
     const tinyW = rect.w < 70;
     const tinyH = rect.h < 44;
 
