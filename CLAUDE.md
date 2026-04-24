@@ -19,16 +19,26 @@ When asked to explore the codebase or generate suggestions, provide an initial c
 ## Commands
 
 ```bash
+# One-time setup (creates .venv, installs deps, copies .env.example → .env)
+make setup                          # or: bash scripts/setup.sh
+source .venv/bin/activate
+
 # Run locally (requires .env with API keys)
+make run                            # or: python app.py
 python3 app.py                      # serves on http://localhost:8080
 
 # Docker build + run
 docker build --platform=linux/amd64 -t tracker .
 docker run -p 8080:8080 --env-file .env tracker
 
-# Deploy to Google Cloud Run (bumps version tag automatically)
-./scripts/build.sh
-
+# Deploy to Google Cloud Run (commit + build + deploy + cleanup)
+./scripts/release.sh                # full release
+./scripts/release.sh --no-commit    # skip git commit (already committed)
+./scripts/release.sh --no-cleanup   # skip old revision/image pruning
+./scripts/release.sh --dry-run      # preview cleanup without deleting
+make release                        # same as ./scripts/release.sh
+make release ARGS="--no-commit"     # pass flags via make
+# git push is still manual after release.sh completes
 
 # Clear cache without restarting
 curl -X POST http://localhost:8080/api/admin/clear-cache

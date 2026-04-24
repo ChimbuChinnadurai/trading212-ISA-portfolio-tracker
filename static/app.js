@@ -309,9 +309,9 @@ function _renderActivity(orders, dividends, warning) {
 
 
 /* ─── Load portfolio ──────────────────────────────────────────────────────── */
-async function loadPortfolio(force = false) {
+async function loadPortfolio(force = false, silent = false) {
   document.getElementById('refreshBtn').disabled = true;
-  showSkeletons();
+  if (!silent) showSkeletons();
   activeCountry = null;
   _todayReturns = null;
   _todayReturnsPct = null;
@@ -429,14 +429,14 @@ async function loadPortfolio(force = false) {
     loadDynamicsChart();
     loadRiskMetricsStrip();
     loadRealizedUnrealized();
-    
+
     _loadSuccess = true;
 
   } catch (err) {
-    showState('error', 'Network error: ' + err.message);
+    if (!silent) showState('error', 'Network error: ' + err.message);
   } finally {
     document.getElementById('refreshBtn').disabled = false;
-    hideSkeletons();
+    if (!silent) hideSkeletons();
     if (_loadSuccess && force) showRefreshSuccess();
   }
 }
@@ -1289,15 +1289,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   showState('table');   // show dashboard skeleton immediately — router calls loadPortfolio()
 
-  // Auto-refresh every 5 minutes — only when a portfolio/stocks view is active
-  setInterval(() => {
-    if (!PORTFOLIO_ID) return;
-    const portfolioVisible = document.getElementById('view-portfolio')?.style.display !== 'none';
-    const stocksVisible = document.getElementById('view-stocks')?.style.display !== 'none';
-    // Use the correct loader for each view so renderTable() is always called
-    if (stocksVisible && typeof loadStocksView === 'function') loadStocksView(false);
-    else if (portfolioVisible) loadPortfolio();
-  }, 30 * 1000);
+  // Auto-refresh every 5 minutes — silent background update, no skeleton flash
+  // setInterval(() => {
+  //   if (!PORTFOLIO_ID) return;
+  //   const portfolioVisible = document.getElementById('view-portfolio')?.style.display !== 'none';
+  //   const stocksVisible = document.getElementById('view-stocks')?.style.display !== 'none';
+  //   if (stocksVisible && typeof loadStocksView === 'function') loadStocksView(false, true);
+  //   else if (portfolioVisible) loadPortfolio(false, true);
+  // }, 30 * 1000);
 });
 
 /* ─── Analyst Ratings panel renderer ─────────────────────────────────────── */
@@ -3068,10 +3067,10 @@ function drawDonutCharts(rows, totalValue) {
    STOCKS VIEW — Holdings table (separate from portfolio view)
    ═══════════════════════════════════════════════════════════════════════════ */
 
-async function loadStocksView(force = false) {
+async function loadStocksView(force = false, silent = false) {
   const btn = document.getElementById('refreshBtn');
   if (btn) btn.disabled = true;
-  showStocksState('loading');
+  if (!silent) showStocksState('loading');
 
   try {
     const url = force
@@ -3108,9 +3107,9 @@ async function loadStocksView(force = false) {
     _loadStockSparklines(allRows);
     if (Object.keys(_tickerChangeMap).length) renderTopMovers();
 
-    showStocksState('table');
+    if (!silent) showStocksState('table');
   } catch (err) {
-    showStocksState('error', 'Network error: ' + err.message);
+    if (!silent) showStocksState('error', 'Network error: ' + err.message);
   } finally {
     if (btn) btn.disabled = false;
   }
