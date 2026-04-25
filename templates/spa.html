@@ -179,22 +179,6 @@
 
     <!-- ═══ SIDEBAR ═══ -->
     <aside class="sidebar" id="sidebar">
-      <!-- <div class="sidebar-brand">
-        <div class="sidebar-logo" onclick="navigate('home')">
-          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="32" height="32" rx="9" fill="url(#sbLg)" />
-            <defs>
-              <linearGradient id="sbLg" x1="0" y1="0" x2="32" y2="32">
-                <stop offset="0%" stop-color="#0058be" />
-                <stop offset="100%" stop-color="#2170e4" />
-              </linearGradient>
-            </defs>
-            <path d="M7 22 L11 14 L15 18 L19 10 L25 16" stroke="white" stroke-width="2.5" stroke-linecap="round"
-              stroke-linejoin="round" />
-          </svg>
-        </div>
-      </div> -->
-
       <nav class="sidebar-nav">
 
         <!-- Home -->
@@ -217,18 +201,6 @@
             <span class="nav-label">Holdings</span>
           </a>
         </div>
-
-        <!-- Activity -->
-        <!-- <a class="nav-item" data-route="activity" onclick="navigate('activity')">
-          <span class="material-symbols-outlined nav-icon">history</span>
-          <span class="nav-label">Activity</span>
-        </a> -->
-
-        <!-- Calendar -->
-        <!-- <a class="nav-item" data-route="calendar" onclick="navigate('calendar')">
-          <span class="material-symbols-outlined nav-icon">calendar_month</span>
-          <span class="nav-label">Calendar</span>
-        </a> -->
 
         <!-- Dividends -->
         <a class="nav-item" data-route="dividends/combined" onclick="navigate('dividends/combined')">
@@ -589,11 +561,7 @@
               <div class="ov-card home-heatmap-card">
                 <div class="ov-header">
                   <span class="ov-label">Stocks Heatmap</span>
-                  <span class="rc-label-wrap">
-                    <!-- <span id="heatmapSessionLabel" style="font-size:0.75rem;color:var(--text-secondary)">Today's
-                      change</span>
-                    <span id="rc-heatmap" class="refresh-clock" data-refresh-secs="5"></span> -->
-                  </span>
+                  <span class="rc-label-wrap"></span>
                 </div>
                 <div id="heatmapContainer" class="heatmap-container">
                   <div class="hm-skel"></div>
@@ -653,7 +621,6 @@
                   <span class="ov-label">Fear &amp; Greed Index</span>
                   <span class="rc-label-wrap">
                     <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
-                    <!-- <span id="rc-fg" class="refresh-clock" data-refresh-secs="60"></span> -->
                   </span>
                 </div>
                 <div class="fg-gauge-wrap">
@@ -771,7 +738,6 @@
                         <span id="mktStatusDot" class="mkt-status-dot" title="Checking market…"></span>
                         <button class="s-toggle-btn active" id="returnsBtnAllTime"
                           onclick="setReturnsMode('alltime')">All-time</button>
-                        <!-- <button class="s-toggle-btn" id="returnsBtnToday" onclick="setReturnsMode('today')">Today</button> -->
                       </div>
                     </div>
                     <div class="s-card-value-row">
@@ -823,35 +789,6 @@
                   </div>
                 </div><!-- /summary-cards -->
               </div><!-- /summary-row -->
-
-              <!-- Risk Metrics Strip -->
-              <!-- <div class="risk-strip" id="riskStrip">
-                <div class="risk-strip-item skeleton" id="rs-volatility">
-                  <span class="rs-label">Volatility</span>
-                  <span class="rs-value" id="rsVolatility">—</span>
-                  <span class="rs-sub">Annualised</span>
-                </div>
-                <div class="risk-strip-item skeleton" id="rs-sharpe">
-                  <span class="rs-label">Sharpe Ratio</span>
-                  <span class="rs-value" id="rsSharpe">—</span>
-                  <span class="rs-sub">Risk-adj return</span>
-                </div>
-                <div class="risk-strip-item skeleton" id="rs-beta">
-                  <span class="rs-label">Beta vs SPY</span>
-                  <span class="rs-value" id="rsBeta">—</span>
-                  <span class="rs-sub">Market sensitivity</span>
-                </div>
-                <div class="risk-strip-item skeleton" id="rs-twr">
-                  <span class="rs-label">TWR vs SPY</span>
-                  <span class="rs-value" id="rsTwr">—</span>
-                  <span class="rs-sub">1-year alpha</span>
-                </div>
-                <div class="risk-strip-item skeleton" id="rs-maxdd">
-                  <span class="rs-label">Max Drawdown</span>
-                  <span class="rs-value neg" id="rsMaxDD">—</span>
-                  <span class="rs-sub">Peak-to-trough</span>
-                </div>
-              </div> -->
 
               <!-- 2-column portfolio layout: charts left, panels right -->
               <div class="portfolio-layout">
@@ -983,10 +920,6 @@
 
             <!-- Full-width holdings table -->
             <div class="table-wrapper card" id="stocksTableWrapper" style="display:none">
-              <!-- <div class="panel-header">
-                <h3 class="panel-title" id="stocksTableTitle">Holdings</h3>
-                <div class="filter-bar" id="filterBar"></div>
-              </div> -->
               <div class="table-toolbar">
                 <div class="toolbar-left">
                   <div class="search-wrap">
@@ -1155,115 +1088,6 @@
 
           </div>
         </div><!-- /view-news -->
-
-        <!-- ═══ VIEW: ACTIVITY ═══ -->
-        <!-- <div id="view-activity" class="spa-view" style="display:none">
-          <div class="view-main">
-            <p class="act-view-subtitle">Recent trades and dividend payments across all portfolios</p>
-            <div class="act-layout"> -->
-
-        <!-- Left: Recent Activity -->
-        <!-- <section class="widget-panel act-panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">Recent Activity</h3>
-                </div>
-                <div id="activityTimelineList" class="activity-list-home">
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-55"></div>
-                      <div class="skeleton skel-line skel-w-35"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-65"></div>
-                      <div class="skeleton skel-line skel-w-40"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                </div>
-              </section> -->
-
-        <!-- Right: Dividend History -->
-        <!-- <section class="widget-panel act-panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">Dividend History</h3>
-                </div>
-                <div id="divHistoryList" class="activity-list-home">
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-50"></div>
-                      <div class="skeleton skel-line skel-w-30"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                  <div class="skel-item">
-                    <div class="skeleton skel-dot"></div>
-                    <div class="skel-body">
-                      <div class="skeleton skel-line skel-w-60"></div>
-                      <div class="skeleton skel-line skel-w-40"></div>
-                    </div>
-                    <div class="skeleton skel-amount"></div>
-                  </div>
-                </div>
-              </section> -->
-
-        <!-- </div>/act-layout -->
-
-        <!-- </div>/view-main -->
-        <!-- </div>/view-activity -->
-
-        <!-- ═══ VIEW: CALENDAR ═══ -->
-        <!-- <div id="view-calendar" class="spa-view" style="display:none">
-          <div class="view-main">
-            <p class="cal-view-subtitle">Dividend payouts and upcoming earnings for your holdings</p>
-
-            <div class="calendar-layout">
-
-               Left: Dividend Calendar -->
-        <!-- <section class="widget-panel widget-dividends calendar-panel">
-          <div class="panel-header">
-            <h3 class="panel-title">Dividend Calendar</h3>
-            <span class="panel-subtitle">Upcoming ex-div &amp; pay dates</span>
-          </div>
-          <div id="divCalendarList" class="activity-list-home">
-            <div class="skel-card">
-              <div class="skel-card-row">
-                <div class="skeleton skel-line skel-w-45"></div>
-                <div class="skeleton skel-line skel-w-45"></div>
-              </div>
-            </div>
-          </div>
-        </section> -->
-
-        <!-- Right: Upcoming Earnings -->
-        <!-- <section class="widget-panel widget-earnings calendar-panel">
-                <div class="panel-header">
-                  <h3 class="panel-title">Upcoming Earnings</h3>
-                  <span class="panel-subtitle">Next 6 months</span>
-                </div>
-                <div id="earningsList" class="activity-list-home">
-                  <div class="skel-card">
-                    <div class="skel-card-header">
-                      <div class="skeleton skel-line skel-w-30"></div>
-                      <div class="skeleton skel-amount"></div>
-                    </div>
-                    <div class="skel-card-row">
-                      <div class="skeleton skel-line skel-w-25"></div>
-                      <div class="skeleton skel-line skel-w-20"></div>
-                    </div>
-                  </div>
-                </div>
-              </section>
-
-            </div></calendar-layout
-
-      </div>< /view-main -->
-        <!-- </div>/view-calendar -->
 
         <!-- ═══ VIEW: Dividends & Passive Income ═══ -->
         <div id="view-dividends" class="spa-view" style="display:none">
@@ -1887,12 +1711,8 @@
                   id="spAvgPrice">0.00</span></div>
               <div class="sp-metric"><span class="sp-metric-label">Current Price</span><span class="sp-metric-value"
                   id="spCurrentPrice">0.00</span></div>
-              <!-- <div class="sp-metric"><span class="sp-metric-label">Category</span><span class="sp-metric-value"
-                  id="spSector">Sector</span></div> -->
               <div class="sp-metric"><span class="sp-metric-label">Breakeven</span><span class="sp-metric-value"
                   id="spBreakeven">—</span></div>
-              <!-- <div class="sp-metric sp-metric-wide"><span class="sp-metric-label">Held Since</span><span
-                  class="sp-metric-value" id="spHeldSince">—</span></div> -->
             </div>
           </div>
           <!-- Price Chart -->
@@ -1918,7 +1738,6 @@
             </div>
             <div class="sp-chart-loading" id="spChartLoading">Loading chart…</div>
           </div>
-          <!-- <div class="sp-divider"></div> -->
           <div id="spAnalystRatingsSection" style="display:none">
             <div class="sp-analyst-header">
               <span class="sp-analyst-title">Analyst Ratings</span>
@@ -2055,12 +1874,6 @@
         </div>
         <div class="side-panel-content" id="rebalancePanelContent"></div>
       </div>
-
-      <!-- <footer class="footer">
-        <div class="footer-item">
-          <span id="cacheBanner" class="cache-badge-footer" style="display:none"></span>
-        </div>
-      </footer> -->
 
     </div><!-- /app-main -->
   </div><!-- /app-shell -->

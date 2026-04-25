@@ -3,7 +3,6 @@ ai_digest.py — Daily market digest from Finviz
 """
 
 import logging
-import os
 
 logger = logging.getLogger("ai_digest")
 
@@ -33,7 +32,7 @@ _GENERATORS = {
 }
 
 
-def generate_digest(provider: str, context: dict) -> str:
+def generate_digest(provider: str, _context: dict) -> str:
     """Generate a market digest string using the requested provider."""
     # Only Finviz is supported now
     provider = "finviz"

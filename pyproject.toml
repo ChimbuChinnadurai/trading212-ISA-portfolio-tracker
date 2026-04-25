@@ -1,0 +1,30 @@
+[project]
+name = "trading212-portfolio-tracker"
+version = "0.1.0"
+description = "Multi-portfolio tracker for Trading 212 with market data, AI insights, and dividend calendar"
+requires-python = ">=3.10"
+dependencies = [
+    "flask==3.0.3",
+    "gunicorn==22.0.0",
+    "requests==2.32.3",
+    "psycopg2-binary==2.9.9",
+    "finvizfinance==0.14.1",
+    "google-genai>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "python-dotenv",
+]
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+reportUnusedImport = "none"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+ignore = ["E501"]

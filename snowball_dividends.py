@@ -4,12 +4,6 @@ snowball_dividends.py — Dividend calendar data via Snowball Analytics (public 
 Covers both US stocks (*.US.USD / type=nyse) and UK stocks (*.LSE.GBP / type=lse).
 Called by the background refresh thread in app.py every 6 hours.
 Results are stored in the shared kv cache under key  snowball:div:<TICKER>.
-
-To revert to Massive API for US stocks:
-  1. Uncomment the MASSIVE block below.
-  2. In app.py restore the MASSIVE_API_KEY env-var read.
-  3. Replace the US section of fetch_all_dividends() with the commented-out version.
-  4. Restore _format_div_entries() calls in upcoming_dividends() for US tickers.
 """
 
 import logging
@@ -18,99 +12,14 @@ import time
 
 import requests
 
-from cache import kv_get, kv_set, rows_get
+from cache import kv_set, rows_get
 
-# ---------------------------------------------------------------------------
-# Config
-# ---------------------------------------------------------------------------
+# ── Config ────────────────────────────────────────────────────────────────────
 DIV_REFRESH_INTERVAL = int(os.environ.get("DIV_REFRESH_SECONDS", 21600))  # 6 hours
 DIV_CACHE_KEY_PREFIX  = "snowball:div"
 LAST_REFRESH_KEY      = "snowball:div:last_refresh"
 TTL_DIVIDENDS_CAL     = 86400   # serve cached data for up to 24 h
 _CALL_SLEEP_SECS      = 10      # polite delay between each Snowball request
-
-# ---------------------------------------------------------------------------
-# ── MASSIVE API (kept for easy revert) ──────────────────────────────────────
-# Uncomment the entire block below and wire it back into fetch_all_dividends()
-# to switch US stocks back to Massive.
-# ---------------------------------------------------------------------------
-# import collections
-# import threading
-#
-# _MASSIVE_BASE   = "https://api.massive.com/stocks/v1/dividends"
-# _massive_times  = collections.deque(maxlen=5)
-# _massive_lock   = threading.Lock()
-#
-# def _massive_rate_limited_get(url: str, timeout: int = 12):
-#     """5-req/min sliding-window rate limiter for the Massive API."""
-#     _log = logging.getLogger("massive-api")
-#     with _massive_lock:
-#         now = time.time()
-#         if len(_massive_times) == 5:
-#             oldest = _massive_times[0]
-#             wait = 61 - (now - oldest)
-#             if wait > 0:
-#                 _log.debug("Rate limit window full — sleeping %.1fs", wait)
-#                 time.sleep(wait)
-#         _massive_times.append(time.time())
-#     return requests.get(url, timeout=timeout)
-#
-# def _fetch_us_massive(us_ticker_info: dict, api_key: str):
-#     """Fetch US dividends from Massive API and store in kv cache."""
-#     _log = logging.getLogger("div-refresh")
-#     success, errors = 0, 0
-#     for ticker in us_ticker_info:
-#         cache_key = f"massive:div:{ticker}"
-#         try:
-#             url = (
-#                 f"{_MASSIVE_BASE}"
-#                 f"?ticker={ticker}&limit=100&sort=ex_dividend_date.desc"
-#                 f"&apiKey={api_key}"
-#             )
-#             resp = _massive_rate_limited_get(url)
-#             if resp.status_code == 429:
-#                 _log.warning("Rate limit hit for %s — retry next cycle", ticker)
-#                 errors += 1
-#                 continue
-#             if resp.status_code != 200:
-#                 _log.warning("Massive HTTP %d for %s", resp.status_code, ticker)
-#                 errors += 1
-#                 continue
-#             body   = resp.json()
-#             entries = body.get("results", []) if body.get("status") == "OK" else []
-#             if not isinstance(entries, list):
-#                 entries = []
-#             kv_set(cache_key, entries)
-#             success += 1
-#         except Exception as exc:
-#             _log.error("Massive error for %s: %s", ticker, exc)
-#             errors += 1
-#     _log.info("Massive refresh — %d ok / %d errors", success, errors)
-#
-# def _format_div_entries(ticker, info, entries, today_str):
-#     """Format raw Massive API entries into frontend dicts."""
-#     qty, out = info["quantity"], []
-#     for d in entries:
-#         pay_date = d.get("pay_date", "")
-#         if not pay_date or pay_date < today_str:
-#             continue
-#         amount = float(d.get("cash_amount") or 0)
-#         out.append({
-#             "ticker":           ticker,
-#             "company_name":     info["company_name"],
-#             "pid":              info["pid"],
-#             "ex_dividend_date": d.get("ex_dividend_date", ""),
-#             "declaration_date": d.get("declaration_date", ""),
-#             "record_date":      d.get("record_date", ""),
-#             "payment_date":     pay_date,
-#             "amount_per_share": amount,
-#             "frequency":        d.get("frequency"),
-#             "currency":         d.get("currency", "USD"),
-#             "quantity":         round(qty, 4),
-#             "expected_payout":  round(amount * qty, 4),
-#         })
-#     return out
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -262,10 +171,11 @@ def fetch_all_dividends(api_keys: dict) -> None:
     for i, (ticker, asset_suffix, exchange_type, _info) in enumerate(tasks):
         cache_key = f"{DIV_CACHE_KEY_PREFIX}:{ticker}"
         entries = _snowball_fetch(ticker, asset_suffix, exchange_type)
-        if entries or True:   # cache even empty lists so endpoint doesn't mark as missing
-            kv_set(cache_key, entries)
-            _log.debug("Snowball: cached %d entries for %s", len(entries), ticker)
-            success += 1 if entries else 0
+        # Cache even empty lists so the endpoint doesn't mark the ticker as missing
+        kv_set(cache_key, entries)
+        _log.debug("Snowball: cached %d entries for %s", len(entries), ticker)
+        if entries:
+            success += 1
         else:
             errors += 1
 
