@@ -298,6 +298,10 @@ if [[ "$RUN_CLEANUP" -eq 1 ]]; then
 fi
 
 # ── Summary ────────────────────────────────────────────────────────────────────
+SERVICE_URL=$(gcloud run services describe "$CR_SERVICE" \
+    --region="$CR_REGION" --project="$GCP_PROJECT" \
+    --format="value(status.url)" 2>/dev/null || true)
+
 TOTAL=$(( $(date +%s) - RELEASE_START ))
 echo -e "\n${GREEN}${BOLD}══════════════════════════════════════════${RESET}"
 echo -e "${GREEN}${BOLD}  Done in ${TOTAL}s${RESET}"
@@ -308,4 +312,5 @@ else
     echo -e "${GREEN}${BOLD}  Image : ${FULL_IMAGE}${RESET}"
     echo -e "${YELLOW}${BOLD}  Push  : git push   ← still manual${RESET}"
 fi
+[[ -n "$SERVICE_URL" ]] && echo -e "${CYAN}${BOLD}  URL   : ${SERVICE_URL}${RESET}"
 echo -e "${GREEN}${BOLD}══════════════════════════════════════════${RESET}"
