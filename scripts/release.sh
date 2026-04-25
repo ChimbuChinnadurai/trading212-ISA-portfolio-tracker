@@ -2,6 +2,11 @@
 # release.sh — Commit, build, deploy, and clean up in one shot.
 #              Git push is intentionally left manual.
 #
+# Build & deploy (Phase 2) is skipped automatically when only non-critical
+# files changed (*.md, *.sh, Makefile, .gitignore, etc.). It runs only when
+# at least one of these is modified: *.py *.js *.css *.html requirements.txt
+# Dockerfile pyproject.toml
+#
 # Usage:
 #   ./scripts/release.sh                         # commit → build → deploy → cleanup
 #   ./scripts/release.sh --no-commit             # skip git commit phase
@@ -9,6 +14,7 @@
 #   ./scripts/release.sh --keep-revisions 5      # keep 5 Cloud Run revisions (default 3)
 #   ./scripts/release.sh --keep-images 3         # keep 3 Artifact Registry images (default 5)
 #   ./scripts/release.sh --dry-run               # preview cleanup without deleting
+#   ./scripts/release.sh --force-deploy          # force Phase 2 even for docs-only changes
 set -euo pipefail
 
 # ── Colours ────────────────────────────────────────────────────────────────────
@@ -38,15 +44,17 @@ AR_PACKAGE="portfolio"
 RUN_COMMIT=1
 RUN_CLEANUP=1
 DRY_RUN=0
+FORCE_DEPLOY=0
 KEEP_REVISIONS=3
 KEEP_IMAGES=5
 
 # ── Argument parsing ───────────────────────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --no-commit)      RUN_COMMIT=0;   shift ;;
-        --no-cleanup)     RUN_CLEANUP=0;  shift ;;
-        --dry-run)        DRY_RUN=1;      shift ;;
+        --no-commit)      RUN_COMMIT=0;    shift ;;
+        --no-cleanup)     RUN_CLEANUP=0;   shift ;;
+        --dry-run)        DRY_RUN=1;       shift ;;
+        --force-deploy)   FORCE_DEPLOY=1;  shift ;;
         --keep-revisions)
             [[ "${2:-}" =~ ^[0-9]+$ ]] || die "--keep-revisions requires a positive integer"
             KEEP_REVISIONS="$2"; shift 2 ;;
@@ -54,7 +62,7 @@ while [[ $# -gt 0 ]]; do
             [[ "${2:-}" =~ ^[0-9]+$ ]] || die "--keep-images requires a positive integer"
             KEEP_IMAGES="$2"; shift 2 ;;
         -h|--help)
-            sed -n '2,9p' "$0" | sed 's/^# \?//'; exit 0 ;;
+            sed -n '2,12p' "$0" | sed 's/^# \?//'; exit 0 ;;
         *)
             die "Unknown argument: $1. Use --help for usage." ;;
     esac
@@ -127,10 +135,33 @@ Files changed: $TOTAL_FILES  |  Lines changed: ${TOTAL_LINES:-?}  |  $TIMESTAMP"
     fi
 fi
 
+# ── Deploy gate: skip Phase 2 if only non-critical files changed ──────────────
+# Core files: anything that affects the running application
+CORE_RE='\.(py|js|css|html)$|requirements\.txt$|Dockerfile$|pyproject\.toml$'
+SKIP_DEPLOY=0
+FULL_IMAGE=""
+
+if [[ "$FORCE_DEPLOY" -eq 0 ]]; then
+    if git rev-parse HEAD~1 &>/dev/null; then
+        LAST_COMMIT_CORE=$(git diff HEAD~1 HEAD --name-only | grep -E "$CORE_RE" || true)
+        if [[ -z "$LAST_COMMIT_CORE" ]]; then
+            SKIP_DEPLOY=1
+            CHANGED_ALL=$(git diff HEAD~1 HEAD --name-only | tr '\n' ' ')
+            SKIP_REASON="Only non-critical files changed: ${CHANGED_ALL:-none}"
+        fi
+    fi
+fi
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 2 — Docker build, push & Cloud Run deploy
 # ══════════════════════════════════════════════════════════════════════════════
 phase "PHASE 2 — Build & Deploy"
+
+if [[ "$SKIP_DEPLOY" -eq 1 ]]; then
+    warn "Skipping build & deploy — $SKIP_REASON"
+    warn "Deploy only runs when these change: *.py *.js *.css *.html requirements.txt Dockerfile pyproject.toml"
+    warn "Use --force-deploy to override."
+else
 
 step_start 1 "Resolve version tag"
 RAW_TAGS=$(gcloud artifacts docker images list "$REPO" \
@@ -175,6 +206,8 @@ gcloud run services update-traffic "$CR_SERVICE" \
     --region="$CR_REGION" \
     --to-latest
 step_end
+
+fi  # end SKIP_DEPLOY check
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PHASE 3 — Cleanup old revisions & images
@@ -267,7 +300,12 @@ fi
 # ── Summary ────────────────────────────────────────────────────────────────────
 TOTAL=$(( $(date +%s) - RELEASE_START ))
 echo -e "\n${GREEN}${BOLD}══════════════════════════════════════════${RESET}"
-echo -e "${GREEN}${BOLD}  Release complete in ${TOTAL}s${RESET}"
-echo -e "${GREEN}${BOLD}  Image : ${FULL_IMAGE}${RESET}"
-echo -e "${YELLOW}${BOLD}  Push  : git push   ← still manual${RESET}"
+echo -e "${GREEN}${BOLD}  Done in ${TOTAL}s${RESET}"
+if [[ "$SKIP_DEPLOY" -eq 1 ]]; then
+    echo -e "${YELLOW}${BOLD}  Deploy: skipped (docs-only change)${RESET}"
+    echo -e "${YELLOW}${BOLD}  Tip   : use --force-deploy to override${RESET}"
+else
+    echo -e "${GREEN}${BOLD}  Image : ${FULL_IMAGE}${RESET}"
+    echo -e "${YELLOW}${BOLD}  Push  : git push   ← still manual${RESET}"
+fi
 echo -e "${GREEN}${BOLD}══════════════════════════════════════════${RESET}"
