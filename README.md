@@ -10,8 +10,6 @@ A full-featured web application that fetches your **Shares ISA** positions from 
 - **Fear & Greed Index** — gauge + 30-day history
 - Recent combined activity feed
 - Top performers (by total return %)
-- Dividend Calendar (upcoming ex-div and pay dates)
-- Upcoming Earnings calendar
 - Market News sidebar (CNBC RSS, refreshes every 5 min)
 - Market status pills (NASDAQ + LSE open/close)
 
@@ -49,8 +47,8 @@ A full-featured web application that fetches your **Shares ISA** positions from 
 - Monthly performance breakdown
 
 ### AI Features (optional, requires `SHOW_AI_FEATURES=1`)
-- AI Trade Signals (TradingView TA + AI analysis) with ticker exclusions
-- AI Market Digest (Finviz / Claude / Gemini)
+- AI Trade Signals (TradingView TA + Gemini analysis) with ticker exclusions
+- AI Market Digest (Finviz — no API key required)
 - Interactive Gemini chat
 
 ---
@@ -58,51 +56,51 @@ A full-featured web application that fetches your **Shares ISA** positions from 
 ## Local Development
 
 ```bash
-# 1. Create a virtual environment
-python -m venv .venv && source .venv/bin/activate
+# 1. One-time setup: creates .venv, installs deps, copies .env.example → .env
+make setup
+source .venv/bin/activate
 
-# 2. Install dependencies
-pip install -r requirements.txt
+# 2. Edit .env — set TRADING212_API_KEY_1 and any optional keys
 
-# 3. Configure environment
-cp .env.example .env
-# Edit .env — set TRADING212_API_KEY_1 and any optional keys
-
-# 4. Run
-python app.py
+# 3. Run
+make run        # or: python app.py
 ```
 
 Open http://localhost:8080
+
+> **Manual setup (without Make):**
+> ```bash
+> python -m venv .venv && source .venv/bin/activate
+> pip install -r requirements.txt
+> cp .env.example .env
+> python app.py
+> ```
 
 ---
 
 ## Docker
 
 ```bash
-docker build -t portfolio-tracker .
-docker run -p 8080:8080 --env-file .env portfolio-tracker
+make docker      # build image
+make docker-run  # run on port 8080
 ```
 
 ---
 
 ## Deploy to GCP Cloud Run
 
+Use the release script — it handles git commit, Docker build, push, Cloud Run deploy, and cleanup in one step:
+
 ```bash
-PROJECT_ID=your-gcp-project
-IMAGE=us-central1-docker.pkg.dev/$PROJECT_ID/portfolio/tracker
-
-# Build & push
-docker build -t $IMAGE .
-docker push $IMAGE
-
-# Deploy
-gcloud run deploy portfolio-tracker \
-  --image $IMAGE \
-  --region us-central1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --set-env-vars "TRADING212_API_KEY_1=xxx,PORTFOLIO_NAME_1=Chimbu,PORTFOLIO_NAME_2=Poornima"
+./scripts/release.sh                 # full release (commit + build + deploy + cleanup)
+./scripts/release.sh --no-commit     # skip git commit (already committed)
+./scripts/release.sh --no-cleanup    # skip old revision/image pruning
+./scripts/release.sh --dry-run       # preview cleanup without deleting
+make release                         # same as ./scripts/release.sh
+make release ARGS="--no-commit"      # pass flags via make
 ```
+
+> **git push is manual** — run `git push` after `release.sh` completes.
 
 Store secrets in Secret Manager for production:
 

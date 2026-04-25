@@ -27,9 +27,12 @@ source .venv/bin/activate
 make run                            # or: python app.py
 python3 app.py                      # serves on http://localhost:8080
 
+# Freeze current deps to requirements.txt (after pip install <new-package>)
+make freeze
+
 # Docker build + run
-docker build --platform=linux/amd64 -t tracker .
-docker run -p 8080:8080 --env-file .env tracker
+make docker                         # or: docker build --platform=linux/amd64 -t tracker .
+make docker-run                     # or: docker run -p 8080:8080 --env-file .env tracker
 
 # Deploy to Google Cloud Run (commit + build + deploy + cleanup)
 ./scripts/release.sh                # full release
@@ -58,20 +61,28 @@ cache.py         — SQLite/PostgreSQL KV store (kv_get/set, rows_get/set, snaps
 portfolio.py     — enriches raw T212 rows: FX, sector, weight, YOC, div yield
 fx.py            — GBP/USD rate (Yahoo Finance), GBX→GBP, ISIN→country
 sectors.py       — hardcoded ticker→sector map + keyword fallback
+yf.py            — Yahoo Finance: crumb auth, history fetch, performance enrichment
+helpers.py       — shared state: API_KEYS, PORTFOLIO_NAMES, fetch_and_cache_portfolio()
     ↓
-app.py           — 50+ Flask REST endpoints + background refresh threads
+app.py           — Flask app creation, blueprint registration, background threads
+routes/
+  portfolio.py   — holdings, dividends, activity, overview endpoints
+  market.py      — market data, news, Finviz, watchlist, stock info endpoints
+  performance.py — monthly/daily/yearly perf, risk metrics, attribution endpoints
+  ai.py          — TradingView signals, Trump posts, Gemini AI endpoints
+  alerts.py      — price alerts, notifications, cache admin endpoints
 finviz_data.py   — Finviz scraper: news, signals, insider, sector perf, stock details
-ai_digest.py     — multi-provider market digest (Finviz / Claude / Gemini)
+ai_digest.py     — Finviz market digest (no API key required)
 gemini_utils.py  — Gemini AI: market summary, trade signals, portfolio chat
-snowball_dividends.py — dividend data fetcher (Snowball Analytics)
+snowball_dividends.py — dividend calendar fetcher (Snowball Analytics public API)
     ↓
 templates/spa.html   — single Jinja shell; all views rendered client-side
 static/router.js     — hash-based SPA router: view lifecycle, timers, breadcrumbs
-static/home.js       — Home / Market / Watchlist / AI views (~4200 lines)
-static/app.js        — Portfolio detail view (~2400 lines)
+static/home.js       — Home / Market / Watchlist / AI views (~6000 lines)
+static/app.js        — Portfolio detail view (~4200 lines)
 static/ai_intelligence.js — AI Intelligence view
 static/currency.js   — GBP↔USD display conversion (shared)
-static/style.css     — all styles, dark/light/glass themes (~8100 lines)
+static/style.css     — all styles, dark/light/glass themes (~13400 lines)
 ```
 
 ### Key design decisions
@@ -87,17 +98,15 @@ static/style.css     — all styles, dark/light/glass themes (~8100 lines)
 `router.js` owns all view transitions. Navigation always goes through `navigate(route)` → `location.hash = route` → `hashchange` event → `_router()`. Never manipulate `location.hash` directly outside `navigate()`. Routes:
 
 ```
-#home                → Home view
+#home                    → Home view
 #portfolio/1|2|combined  → Portfolio detail
 #stocks/1|2|combined     → Holdings table
 #dividends/1|2|combined  → Dividends view
-#market              → Market view
-#metrics             → Metrics view
-#news                → News view
-#calendar            → Calendar view
-#activity            → Activity view
-#watchlist           → Watchlist view
-#ai-intelligence     → AI Intelligence view
+#market                  → Market view
+#metrics                 → Metrics view
+#news                    → News view
+#watchlist               → Watchlist view
+#ai-intelligence         → AI Intelligence view
 ```
 
 ### Configuration loading (production)
