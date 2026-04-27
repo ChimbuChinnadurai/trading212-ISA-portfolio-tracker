@@ -1601,11 +1601,9 @@ function drawAnalystGauge(canvasId, score, consensus) {
 
   const cons = (consensus || '').toLowerCase();
   const labelDefs = [
-    { pos: 0, lines: ['Strong', 'sell'], align: 'right', active: cons === 'strong sell' },
-    { pos: 25, lines: ['Sell'], align: 'right', active: cons === 'sell' },
-    { pos: 50, lines: ['Neutral'], align: 'center', active: cons === 'hold' },
-    { pos: 75, lines: ['Buy'], align: 'left', active: cons === 'buy' },
-    { pos: 100, lines: ['Strong', 'buy'], align: 'left', active: cons === 'strong buy' },
+    { pos: 0,   lines: ['Strong', 'sell'], align: 'right',  active: cons === 'strong sell' },
+    { pos: 50,  lines: ['Neutral'],        align: 'center', active: cons === 'hold'        },
+    { pos: 100, lines: ['Strong', 'buy'],  align: 'left',   active: cons === 'strong buy'  },
   ];
   const labelR = outerR + 14;
   const lineH = fontSize + 2;
@@ -1773,6 +1771,189 @@ window.openStockPanel = function (r) {
     const sec = document.getElementById('spAnalystRatingsSection');
     if (sec) sec.style.display = 'none';
   }
+
+  // Earnings history chart — Savvy Trader only covers US tickers
+  if (r.country === 'US') {
+    loadStockEarnings(r.ticker);
+  } else {
+    const sec = document.getElementById('spEarningsSection');
+    if (sec) sec.style.display = 'none';
+  }
+}
+
+/* ─── Earnings History Chart ──────────────────────────────────────────────── */
+
+async function loadStockEarnings(ticker) {
+  const sec = document.getElementById('spEarningsSection');
+  if (!sec) return;
+  sec.style.display = 'none';
+  try {
+    const res  = await fetch(`/api/stock-earnings/${encodeURIComponent(ticker)}`);
+    const json = await res.json();
+    if (json.status !== 'ok') return;
+    const items = (json.data || []).filter(e =>
+      e.revenue != null || e.revenueEstimate != null || e.eps != null || e.epsEstimate != null
+    );
+    if (items.length < 2) return;
+    sec.style.display = '';
+    requestAnimationFrame(() => _drawEarningsChart('spEarningsCanvas', items));
+  } catch (_) {}
+}
+
+function _drawEarningsChart(canvasId, allData) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const hist     = allData.filter(e => e.earningsDate < todayStr && (e.revenue != null || e.eps != null));
+  const upcoming = allData.filter(e => e.earningsDate >= todayStr);
+  const items    = [...hist.slice(-8), ...upcoming.slice(0, 2)];
+  if (!items.length) return;
+
+  const useRev = items.some(e => e.revenue != null || e.revenueEstimate != null);
+
+  const W   = canvas.offsetWidth || 280;
+  const H   = 160;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const isDark  = document.documentElement.getAttribute('data-theme') !== 'light';
+  const C_BEAT  = '#10b981';
+  const C_MISS  = '#ef4444';
+  const C_EST   = isDark ? '#475569' : '#cbd5e1';
+  const C_UPCOM = isDark ? '#2d3748' : '#e2e8f0';
+  const C_GRID  = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const C_TEXT  = isDark ? '#64748b' : '#9ca3af';
+
+  const padL = 42, padR = 6, padT = 10, padB = 28;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  // Y scale
+  const vals = items.flatMap(e => {
+    const a = useRev ? e.revenue         : e.eps;
+    const s = useRev ? e.revenueEstimate : e.epsEstimate;
+    return [a, s].filter(v => v != null && isFinite(v));
+  });
+  if (!vals.length) return;
+
+  const rawMax = Math.max(...vals);
+  const rawMin = Math.min(0, ...vals);
+  const rawRng = rawMax - rawMin || rawMax * 0.2 || 1;
+  const yHi    = rawMax + rawRng * 0.15;
+  const yLo    = rawMin - rawRng * 0.02;
+  const yRng   = yHi - yLo;
+
+  const yScale = v => padT + chartH * (1 - (v - yLo) / yRng);
+  const zeroY  = yScale(Math.max(0, yLo));
+
+  // Gridlines + Y labels
+  ctx.font = '500 9px system-ui,sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 4; i++) {
+    const v = yLo + (yRng * i) / 4;
+    const y = Math.round(yScale(v));
+    ctx.fillStyle = C_GRID;
+    ctx.fillRect(padL, y, chartW, 1);
+    ctx.fillStyle = C_TEXT;
+    ctx.fillText(_fmtEarnAxis(v, useRev), padL - 4, y);
+  }
+  if (rawMin < 0) {
+    ctx.fillStyle = isDark ? '#475569' : '#94a3b8';
+    ctx.fillRect(padL, Math.round(zeroY), chartW, 1);
+  }
+
+  // Bars
+  const n      = items.length;
+  const groupW = chartW / n;
+  const barW   = Math.max(4, Math.min(13, groupW * 0.33));
+  const pairW  = barW * 2 + 2;
+  const hitRects = [];
+
+  items.forEach((e, i) => {
+    const isUp   = e.earningsDate >= todayStr;
+    const actual = useRev ? e.revenue         : e.eps;
+    const est    = useRev ? e.revenueEstimate : e.epsEstimate;
+    const cX     = padL + (i + 0.5) * groupW;
+    const estX   = Math.round(cX - pairW / 2);
+    const actX   = Math.round(cX - pairW / 2 + barW + 2);
+
+    if (est != null) {
+      const y0 = Math.round(est >= 0 ? yScale(est) : zeroY);
+      const y1 = Math.round(est >= 0 ? zeroY       : yScale(est));
+      ctx.fillStyle = isUp ? C_UPCOM : C_EST;
+      ctx.fillRect(estX, y0, barW, Math.max(1, y1 - y0));
+    }
+    if (actual != null) {
+      const beat = est == null || actual >= est;
+      const y0   = Math.round(actual >= 0 ? yScale(actual) : zeroY);
+      const y1   = Math.round(actual >= 0 ? zeroY          : yScale(actual));
+      ctx.fillStyle = beat ? C_BEAT : C_MISS;
+      ctx.fillRect(actX, y0, barW, Math.max(1, y1 - y0));
+    }
+
+    ctx.font = '500 8px system-ui,sans-serif';
+    ctx.fillStyle = C_TEXT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${e.period || ''} '${String(e.periodYear || '').slice(-2)}`, cX, H - padB + 4);
+
+    hitRects.push({ x1: padL + i * groupW, x2: padL + (i + 1) * groupW, e, isUp });
+  });
+
+  // Tooltip
+  const tooltip = document.getElementById('spEarningsTooltip');
+  canvas.onmousemove = (ev) => {
+    if (!tooltip) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx   = ev.clientX - rect.left;
+    const hit  = hitRects.find(r => mx >= r.x1 && mx < r.x2);
+    if (!hit) { tooltip.style.display = 'none'; return; }
+
+    const { e, isUp } = hit;
+    const actual = useRev ? e.revenue         : e.eps;
+    const est    = useRev ? e.revenueEstimate : e.epsEstimate;
+    const beat   = actual != null && est != null ? actual >= est : null;
+
+    let html = `<div class="sp-earn-tt-hd">${e.period} ${e.periodYear}</div>`;
+    if (e.revenue != null)        html += `<div>Rev: <b>${_fmtEarnVal(e.revenue, true)}</b></div>`;
+    if (e.revenueEstimate != null) html += `<div>Est Rev: ${_fmtEarnVal(e.revenueEstimate, true)}</div>`;
+    if (e.eps != null)            html += `<div>EPS: <b>$${e.eps.toFixed(2)}</b></div>`;
+    if (e.epsEstimate != null)    html += `<div>Est EPS: $${e.epsEstimate.toFixed(2)}</div>`;
+    if (beat !== null)            html += `<div class="${beat ? 'earn-tt-beat' : 'earn-tt-miss'}">${beat ? '▲ Beat' : '▼ Miss'}</div>`;
+    if (isUp)                     html += `<div class="earn-tt-upcoming">Upcoming</div>`;
+
+    tooltip.innerHTML = html;
+    tooltip.style.display = 'block';
+    tooltip.style.left = Math.min(mx + 10, W - 135) + 'px';
+    tooltip.style.top  = '4px';
+  };
+  canvas.onmouseleave = () => { if (tooltip) tooltip.style.display = 'none'; };
+}
+
+function _fmtEarnAxis(v, isRevenue) {
+  if (v === 0) return '0';
+  const abs = Math.abs(v), s = v < 0 ? '-' : '';
+  if (!isRevenue) return `${s}${abs.toFixed(abs < 10 ? 1 : 0)}`;
+  if (abs >= 1e12) return `${s}${(abs / 1e12).toFixed(1)}T`;
+  if (abs >= 1e9)  return `${s}${(abs / 1e9).toFixed(0)}B`;
+  if (abs >= 1e6)  return `${s}${(abs / 1e6).toFixed(0)}M`;
+  return `${s}${abs.toFixed(0)}`;
+}
+
+function _fmtEarnVal(v, isRevenue) {
+  if (v == null) return '—';
+  const abs = Math.abs(v), p = v < 0 ? '-$' : '$';
+  if (!isRevenue) return `${p}${abs.toFixed(2)}`;
+  if (abs >= 1e12) return `${p}${(abs / 1e12).toFixed(2)}T`;
+  if (abs >= 1e9)  return `${p}${(abs / 1e9).toFixed(1)}B`;
+  if (abs >= 1e6)  return `${p}${(abs / 1e6).toFixed(0)}M`;
+  return `${p}${abs.toFixed(0)}`;
 }
 
 window.closeStockPanel = function () {

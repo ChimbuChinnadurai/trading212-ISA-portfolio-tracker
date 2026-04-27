@@ -5326,7 +5326,7 @@ html[data-theme="dark"] .div-tl-status--pending {
 .sp-divider {
   height: 1px;
   background: var(--border);
-  margin: 32px 0;
+  margin: 15px 0;
 }
 
 .sp-chart-section {
@@ -6426,6 +6426,76 @@ html[data-theme="light"] .rating-strong-sell {
 
 .ar-strong-sell {
   background: #f97316;
+}
+
+/* ── Earnings History Chart ──────────────────────────────────────────────── */
+.sp-earnings-section {
+  padding: 10px 0 4px;
+}
+
+.sp-earnings-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.sp-earnings-tooltip {
+  position: absolute;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 6px 9px;
+  font-size: 0.71rem;
+  color: #e2e8f0;
+  pointer-events: none;
+  z-index: 10;
+  min-width: 115px;
+  max-width: 148px;
+  line-height: 1.55;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.sp-earn-tt-hd {
+  font-weight: 700;
+  font-size: 0.73rem;
+  margin-bottom: 3px;
+  color: #f1f5f9;
+}
+
+.earn-tt-beat {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.earn-tt-miss {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+.earn-tt-upcoming {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 0.68rem;
+}
+
+.sp-earn-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.67rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.sp-earn-leg-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.sp-earn-leg-est {
+  background: var(--border-bright, #475569);
 }
 
 /* ── News Side Panel ─────────────────────────────────────────────────────── */
@@ -9095,6 +9165,13 @@ html[data-theme="dark"] .nav-group-header.active {
 .ue-hour-dmh {
   background: rgba(100, 116, 139, 0.15);
   color: #94a3b8;
+}
+
+.ue-estimates {
+  font-size: 0.64rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
 }
 
 /* Responsive: collapse to single column on narrow screens */

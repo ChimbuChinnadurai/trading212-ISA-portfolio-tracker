@@ -3807,7 +3807,7 @@ async function loadUpcomingEvents() {
             const q = e.quarter ? `Q${e.quarter}` : '';
             const y = e.year ? `${e.year}` : '';
             const label = [q, y].filter(Boolean).join(' ') + ' Earnings';
-            events.push({ date: d, ticker: e.symbol || '—', company: e._company_name || e.symbol, type: 'earnings', label, hour: e.hour || '' });
+            events.push({ date: d, ticker: e.symbol || '—', company: e._company_name || e.symbol, type: 'earnings', label, hour: e.hour || '', epsEstimate: e.epsEstimate ?? null, revenueEstimate: e.revenueEstimate ?? null });
         }
 
         // ── Dividends ─────────────────────────────────────────────────────
@@ -3846,6 +3846,13 @@ function _renderUpcomingEvents(events) {
         const day = String(d.getDate()).padStart(2, '0');
         return `${day} ${MONTHS[d.getMonth()]}`;
     }
+    function fmtRev(v) {
+        if (v == null) return null;
+        if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
+        if (v >= 1e9)  return `$${(v / 1e9).toFixed(1)}B`;
+        if (v >= 1e6)  return `$${(v / 1e6).toFixed(0)}M`;
+        return `$${v}`;
+    }
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -3868,13 +3875,23 @@ function _renderUpcomingEvents(events) {
         const tickerHtml = ev.type === 'earnings'
             ? `<a class="ue-ticker-link" href="https://earningshub.com/earnings-calendar?symbol=${encodeURIComponent(ev.ticker)}" target="_blank" rel="noopener" title="${esc(ev.company)}">${esc(ev.ticker)}</a>`
             : `<span title="${esc(ev.company)}">${esc(ev.ticker)}</span>`;
+        const hourLabel = ev.hour === 'amc' ? 'After Market Close' : ev.hour === 'bmo' ? 'Before Market Open' : 'During Market Hours';
         const hourHtml = ev.type === 'earnings' && ev.hour
-            ? ` <span class="ue-hour ue-hour-${ev.hour}" title="${ev.hour === 'amc' ? 'After Market Close' : ev.hour === 'bmo' ? 'Before Market Open' : 'During Market Hours'}">${ev.hour.toUpperCase()}</span>`
+            ? ` <span class="ue-hour ue-hour-${ev.hour}" title="${hourLabel}">${ev.hour.toUpperCase()}</span>`
+            : '';
+        const estParts = [];
+        if (ev.type === 'earnings') {
+            if (ev.epsEstimate != null) estParts.push(`EPS $${ev.epsEstimate.toFixed(2)}`);
+            const rev = fmtRev(ev.revenueEstimate);
+            if (rev) estParts.push(`Rev ${rev}`);
+        }
+        const estimatesHtml = estParts.length
+            ? `<div class="ue-estimates">${estParts.join(' · ')}</div>`
             : '';
         return `<div class="ue-row${todayCls}">
                 <span class="ue-col-date">${fmtDate(ev.date)}</span>
                 <span class="ue-col-ticker">${tickerHtml}</span>
-                <span class="ue-col-event"><span class="ue-badge ${badgeCls}">${esc(ev.label)}</span>${hourHtml}</span>
+                <span class="ue-col-event"><span class="ue-badge ${badgeCls}">${esc(ev.label)}</span>${hourHtml}${estimatesHtml}</span>
             </div>`;
     }).join('')}
     </div>`;
@@ -5113,12 +5130,14 @@ async function openWatchlistStockPanel(ticker, country) {
     const activitySec = document.getElementById('spActivitySection');
     const analystSec = document.getElementById('spAnalystRatingsSection');
     const fundSec = document.getElementById('spFundamentalsSection');
+    const earnSec = document.getElementById('spEarningsSection');
 
     // Reset sections
     if (portfolioSec) portfolioSec.style.display = 'none';
     if (activitySec) activitySec.style.display = 'none';
     if (analystSec) analystSec.style.display = 'none';
     if (fundSec) fundSec.style.display = 'none';
+    if (earnSec) earnSec.style.display = 'none';
     const newsList = document.getElementById('spNewsList');
     if (newsList) _showElemLoading(newsList, 'Loading news…');
 
@@ -5208,6 +5227,11 @@ async function openWatchlistStockPanel(ticker, country) {
     // Fundamentals (Yahoo Finance) — only for US/CA stocks
     if (country === 'US' || country === 'CA') {
         if (typeof window['loadStockMetrics'] === 'function') window['loadStockMetrics'](ticker);
+    }
+
+    // Earnings history chart — Savvy Trader only covers US tickers
+    if (country === 'US') {
+        if (typeof loadStockEarnings === 'function') loadStockEarnings(ticker);
     }
 
     // News — always

@@ -1745,6 +1745,21 @@
             </div>
             <div id="spAnalystRatings"></div>
           </div>
+          <!-- Earnings History Chart -->
+          <div id="spEarningsSection" class="sp-earnings-section" style="display:none">
+            <div class="sp-chart-header" style="margin-bottom:6px">
+              <h3 class="sp-section-title">Earnings History</h3>
+              <div class="sp-earn-legend">
+                <span class="sp-earn-leg-dot" style="background:#10b981"></span><span>Beat</span>
+                <span class="sp-earn-leg-dot" style="background:#ef4444;margin-left:6px"></span><span>Miss</span>
+                <span class="sp-earn-leg-dot sp-earn-leg-est" style="margin-left:6px"></span><span>Est.</span>
+              </div>
+            </div>
+            <div class="sp-earnings-wrap">
+              <canvas id="spEarningsCanvas" style="width:100%;display:block"></canvas>
+              <div id="spEarningsTooltip" class="sp-earnings-tooltip" style="display:none"></div>
+            </div>
+          </div>
           <div class="sp-divider"></div>
           <div class="sp-fundamentals-section" id="spFundamentalsSection" style="display:none">
             <div class="sp-chart-header">

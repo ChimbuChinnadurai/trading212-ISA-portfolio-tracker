@@ -456,9 +456,20 @@ def market_digest():
 
 @market_bp.route("/api/earnings")
 def earnings():
-    """Upcoming earnings for held US stocks over the next 6 months. Per-symbol cache 1 day."""
-    if not FINNHUB_TOKEN:
-        return jsonify({"status": "error", "message": "Finnhub token not configured"}), 503
+    """Upcoming earnings for held US stocks over the next 6 months. Per-symbol cache 1 day.
+
+    Data source: Savvy Trader (https://api.savvytrader.com/pricing/assets/{symbol}/earnings).
+    Returns full history; filtered here to today → +183 days.
+    """
+    def _hour_from_time(t: str) -> str:
+        """Derive AMC/BMO/DMH from earningsTime (HH:MM:SS, US Eastern)."""
+        if not t:
+            return ""
+        if t >= "16:00:00":
+            return "amc"
+        if t < "09:30:00":
+            return "bmo"
+        return "dmh"
 
     try:
         us_tickers: dict = {}
@@ -473,33 +484,71 @@ def earnings():
                         if symbol not in us_tickers:
                             us_tickers[symbol] = r.get("company_name") or symbol
 
-        today     = date.today()
-        end       = today + timedelta(days=183)
-        today_str = str(today)
+        today_str = str(date.today())
+        end_str   = str(date.today() + timedelta(days=183))
         all_earnings: list = []
 
         for symbol, company_name in us_tickers.items():
-            cache_key = f"finnhub:earnings:{symbol}"
+            cache_key = f"savvy:earnings:{symbol}"
             data      = kv_get(cache_key, TTL_EARNINGS)
             if data is None:
                 try:
                     resp = requests.get(
-                        f"https://finnhub.io/api/v1/calendar/earnings"
-                        f"?from={today}&to={end}&symbol={symbol}&token={FINNHUB_TOKEN}",
+                        f"https://api.savvytrader.com/pricing/assets/{symbol}/earnings",
                         timeout=10,
                     )
-                    data = resp.json().get("earningsCalendar", []) if resp.status_code == 200 else []
+                    data = resp.json() if resp.status_code == 200 else []
+                    if not isinstance(data, list):
+                        data = []
                 except Exception:
                     data = []
                 kv_set(cache_key, data)
-                time.sleep(0.12)  # ~8 req/s — within free-tier limit
 
             for e in data:
-                e["_company_name"] = company_name
-            all_earnings.extend(e for e in data if e.get("date", "") >= today_str)
+                d = e.get("earningsDate", "")
+                if not d or d < today_str or d > end_str:
+                    continue
+                period  = e.get("period", "")
+                quarter = int(period[1]) if period and period.startswith("Q") and len(period) > 1 else None
+                all_earnings.append({
+                    "date":            d,
+                    "symbol":          symbol,
+                    "quarter":         quarter,
+                    "year":            e.get("periodYear"),
+                    "hour":            _hour_from_time(e.get("earningsTime", "")),
+                    "epsEstimate":     e.get("epsEstimate"),
+                    "revenueEstimate": e.get("revenueEstimate"),
+                    "isDateConfirmed": e.get("isDateConfirmed", False),
+                    "_company_name":   company_name,
+                })
 
         all_earnings.sort(key=lambda x: x.get("date", ""))
         return jsonify({"status": "ok", "data": all_earnings})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@market_bp.route("/api/stock-earnings/<ticker>")
+def stock_earnings_history(ticker):
+    """Full earnings history for one ticker from Savvy Trader. Cached 24h.
+
+    Shares the same cache key as the portfolio /api/earnings route so a warm
+    portfolio fetch avoids a duplicate network call here.
+    """
+    ticker    = ticker.upper().strip()
+    cache_key = f"savvy:earnings:{ticker}"
+    try:
+        data = kv_get(cache_key, TTL_EARNINGS)
+        if data is None:
+            resp = requests.get(
+                f"https://api.savvytrader.com/pricing/assets/{ticker}/earnings",
+                timeout=10,
+            )
+            data = resp.json() if resp.status_code == 200 else []
+            if not isinstance(data, list):
+                data = []
+            kv_set(cache_key, data)
+        return jsonify({"status": "ok", "data": data})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
