@@ -3807,7 +3807,7 @@ async function loadUpcomingEvents() {
             const q = e.quarter ? `Q${e.quarter}` : '';
             const y = e.year ? `${e.year}` : '';
             const label = [q, y].filter(Boolean).join(' ') + ' Earnings';
-            events.push({ date: d, ticker: e.symbol || '—', company: e._company_name || e.symbol, type: 'earnings', label });
+            events.push({ date: d, ticker: e.symbol || '—', company: e._company_name || e.symbol, type: 'earnings', label, hour: e.hour || '' });
         }
 
         // ── Dividends ─────────────────────────────────────────────────────
@@ -3865,10 +3865,16 @@ function _renderUpcomingEvents(events) {
         const badgeCls = ev.type === 'earnings' ? 'ue-badge-earnings'
             : ev.type === 'ex-date' ? 'ue-badge-exdate'
                 : 'ue-badge-paydate';
+        const tickerHtml = ev.type === 'earnings'
+            ? `<a class="ue-ticker-link" href="https://earningshub.com/earnings-calendar?symbol=${encodeURIComponent(ev.ticker)}" target="_blank" rel="noopener" title="${esc(ev.company)}">${esc(ev.ticker)}</a>`
+            : `<span title="${esc(ev.company)}">${esc(ev.ticker)}</span>`;
+        const hourHtml = ev.type === 'earnings' && ev.hour
+            ? ` <span class="ue-hour ue-hour-${ev.hour}" title="${ev.hour === 'amc' ? 'After Market Close' : ev.hour === 'bmo' ? 'Before Market Open' : 'During Market Hours'}">${ev.hour.toUpperCase()}</span>`
+            : '';
         return `<div class="ue-row${todayCls}">
                 <span class="ue-col-date">${fmtDate(ev.date)}</span>
-                <span class="ue-col-ticker" title="${esc(ev.company)}">${esc(ev.ticker)}</span>
-                <span class="ue-col-event"><span class="ue-badge ${badgeCls}">${esc(ev.label)}</span></span>
+                <span class="ue-col-ticker">${tickerHtml}</span>
+                <span class="ue-col-event"><span class="ue-badge ${badgeCls}">${esc(ev.label)}</span>${hourHtml}</span>
             </div>`;
     }).join('')}
     </div>`;

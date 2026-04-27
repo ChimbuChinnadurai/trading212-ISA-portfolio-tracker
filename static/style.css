@@ -9060,6 +9060,43 @@ html[data-theme="dark"] .nav-group-header.active {
   color: #10b981;
 }
 
+.ue-ticker-link {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.ue-ticker-link:hover {
+  color: var(--accent, #3b82f6);
+  text-decoration: underline;
+}
+
+.ue-hour {
+  display: inline-block;
+  font-size: 0.60rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+
+.ue-hour-amc {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+.ue-hour-bmo {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+
+.ue-hour-dmh {
+  background: rgba(100, 116, 139, 0.15);
+  color: #94a3b8;
+}
+
 /* Responsive: collapse to single column on narrow screens */
 @media (max-width: 1200px) {
   .home-body {
