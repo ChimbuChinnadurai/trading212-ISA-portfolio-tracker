@@ -73,8 +73,6 @@ function _hideElemLoading(el) {
 
 let _pvsShowSP = true;
 let _pvsShowPvs = true;
-let _signalsData = {};        // cache per signal type
-let _insiderData = {};
 let _tradeSignalsData = null;
 
 /* ─── Overview card skeleton + count-up helpers ─────────────────────────── */
@@ -986,13 +984,9 @@ async function loadHomeWidgets() {
 async function loadMarketView(force = false) {
     if (force) {
         _sp500Data = [];
-        _signalsData = {};
-        _insiderData = {};
     }
     loadSP500Data();
     loadMarketChart();
-    loadMarketSignals(_activeSignal || 'gainers');
-    loadInsiderTrading(_activeInsiderPeriod || 'latest');
     loadInlineTradeSignals();
     loadMarketMonthlyPerf();
 }
@@ -3015,157 +3009,6 @@ async function loadExcludedTickers() {
 }
 
 
-/* ─── Market Signals ─────────────────────────────────────────────────────── */
-
-let _activeSignal = 'gainers';
-
-async function loadMarketSignals(signalType) {
-    _activeSignal = signalType || _activeSignal;
-    const listEl = document.getElementById('signalsList');
-
-    // Use cached data if available for this signal type
-    if (_signalsData[_activeSignal]) {
-        _renderSignals(_signalsData[_activeSignal]);
-        return;
-    }
-
-    if (listEl) listEl.innerHTML = '<div class="activity-empty">Loading…</div>';
-    try {
-        const res = await fetch(`/api/finviz/signals?type=${encodeURIComponent(_activeSignal)}`);
-        const json = await res.json();
-        if (json.status === 'ok') {
-            _signalsData[_activeSignal] = json.data || [];
-            _renderSignals(_signalsData[_activeSignal]);
-        }
-    } catch (err) {
-        if (listEl) listEl.innerHTML = '<div class="activity-empty">Error loading signals</div>';
-    }
-}
-
-function _renderSignals(data) {
-    const listEl = document.getElementById('signalsList');
-    if (!listEl) return;
-    if (!data || data.length === 0) {
-        listEl.innerHTML = '<div class="activity-empty">No data available</div>';
-        return;
-    }
-    listEl.innerHTML = data.map(s => {
-        const sign = s.change_pct >= 0 ? '+' : '';
-        const chgCls = s.change_pct >= 0 ? 'pos' : 'neg';
-        const capStr = s.market_cap ? _fmtCap(s.market_cap) : '—';
-        const volStr = s.volume ? _fmtVol(s.volume) : '—';
-        return `<div class="signal-item">
-            <div class="signal-ticker-chip">${esc(s.ticker)}</div>
-            <div class="signal-info">
-                <span class="signal-company">${esc(s.company)}</span>
-                <span class="signal-meta">${esc(s.sector || '—')} · Cap ${capStr} · Vol ${volStr}</span>
-            </div>
-            <div class="signal-right">
-                <span class="signal-price">$${s.price != null ? s.price.toFixed(2) : '—'}</span>
-                <span class="signal-change ${chgCls}">${sign}${s.change_pct.toFixed(2)}%</span>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function _initSignalTabs() {
-    const tabs = document.getElementById('signalTabs');
-    if (!tabs || tabs._signalInit) return;
-    tabs._signalInit = true;
-    tabs.addEventListener('click', e => {
-        const btn = e.target.closest('.signal-tab');
-        if (!btn) return;
-        tabs.querySelectorAll('.signal-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        _signalsData[btn.dataset.signal] = null; // bust cache on tab switch
-        loadMarketSignals(btn.dataset.signal);
-    });
-}
-
-function _fmtCap(n) {
-    if (n >= 1e12) return `$${(n / 1e12).toFixed(1)}T`;
-    if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
-    if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
-    return `$${n}`;
-}
-
-function _fmtVol(n) {
-    if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`;
-    if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
-    if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`;
-    return String(n);
-}
-
-
-/* ─── Insider Trading ────────────────────────────────────────────────────── */
-
-let _activeInsiderPeriod = 'latest';
-
-async function loadInsiderTrading(period) {
-    _activeInsiderPeriod = period || _activeInsiderPeriod;
-    const listEl = document.getElementById('insiderList');
-
-    if (_insiderData[_activeInsiderPeriod]) {
-        _renderInsider(_insiderData[_activeInsiderPeriod]);
-        return;
-    }
-
-    if (listEl) listEl.innerHTML = '<div class="activity-empty">Loading…</div>';
-    try {
-        const res = await fetch(`/api/finviz/insider?period=${encodeURIComponent(_activeInsiderPeriod)}`);
-        const json = await res.json();
-        if (json.status === 'ok') {
-            _insiderData[_activeInsiderPeriod] = json.data || [];
-            _renderInsider(_insiderData[_activeInsiderPeriod]);
-        }
-    } catch (err) {
-        if (listEl) listEl.innerHTML = '<div class="activity-empty">Error loading insider data</div>';
-    }
-}
-
-function _renderInsider(data) {
-    const listEl = document.getElementById('insiderList');
-    if (!listEl) return;
-    if (!data || data.length === 0) {
-        listEl.innerHTML = '<div class="activity-empty">No insider trades found</div>';
-        return;
-    }
-    listEl.innerHTML = data.map(t => {
-        const badge = t.is_buy
-            ? '<span class="insider-badge insider-buy">BUY</span>'
-            : '<span class="insider-badge insider-sell">SELL</span>';
-        const valStr = t.value != null ? `$${_fmtVol(t.value)}` : '—';
-        const sharesStr = t.shares != null ? _fmtVol(t.shares) + ' sh' : '—';
-        const role = t.relationship ? t.relationship.replace(/Director/g, 'Dir').replace(/Officer/g, 'Ofcr') : '';
-        return `<div class="insider-item">
-            <div class="signal-ticker-chip">${esc(t.ticker || '—')}</div>
-            <div class="signal-info">
-                <span class="signal-company">${esc(t.insider || '—')}</span>
-                <span class="signal-meta">${esc(role)} · ${esc(t.date || '—')}</span>
-            </div>
-            <div class="signal-right">
-                ${badge}
-                <span class="signal-meta" style="margin-top:2px">${sharesStr} · ${valStr}</span>
-            </div>
-        </div>`;
-    }).join('');
-}
-
-function _initInsiderTabs() {
-    const tabs = document.getElementById('insiderTabs');
-    if (!tabs || tabs._insiderInit) return;
-    tabs._insiderInit = true;
-    tabs.addEventListener('click', e => {
-        const btn = e.target.closest('.signal-tab');
-        if (!btn) return;
-        tabs.querySelectorAll('.signal-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        _insiderData[btn.dataset.period] = null; // bust cache on tab switch
-        loadInsiderTrading(btn.dataset.period);
-    });
-}
-
-
 /* ─── Market Session Status (server-side via T212 exchange metadata) ─────── */
 
 let _mktStatusData = null;
@@ -4156,12 +3999,6 @@ function onCurrencyChange() {
     if (_overviewData) renderOverview(_overviewData);
     if (_homeActivityData) _renderHomeActivity(_homeActivityData);
     if (_homeDividendData) _renderHomeDividends(_homeDividendData);
-}
-
-/* ─── Tab initialisation (called once after DOM ready) ───────────────────── */
-function initFinvizTabs() {
-    _initSignalTabs();
-    _initInsiderTabs();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

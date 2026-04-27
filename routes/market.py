@@ -24,9 +24,6 @@ Routes
   GET  /api/watchlist/price                Current price + company name for any ticker
   GET  /api/watchlist/tickers  (GET/POST)  Persist the watchlist ticker list
   GET  /api/finviz/news                    Market news from Finviz
-  GET  /api/finviz/insider                 Insider trading data from Finviz
-  GET  /api/finviz/signals                 Screener signals from Finviz
-  GET  /api/finviz/stock/<ticker>          Stock fundamentals from Finviz
 
 Internal helpers exported for background threads
 ------------------------------------------------
@@ -1266,44 +1263,3 @@ def finviz_news():
     kv_set(cache_key, data)
     return jsonify({"status": "ok", "data": data, "cached": False})
 
-
-@market_bp.route("/api/finviz/insider")
-def finviz_insider():
-    """Insider trading data from Finviz. ?period=latest|top+week|top+owner+trade"""
-    period = flask_request.args.get("period", "latest")
-    if period not in ("latest", "top week", "top owner trade"):
-        period = "latest"
-    cache_key = f"finviz:insider:{period.replace(' ', '_')}"
-    cached    = kv_get(cache_key, 1800)
-    if cached is not None:
-        return jsonify({"status": "ok", "data": cached, "period": period, "cached": True})
-    data = fvd.get_insider_trading(period)
-    kv_set(cache_key, data)
-    return jsonify({"status": "ok", "data": data, "period": period, "cached": False})
-
-
-@market_bp.route("/api/finviz/signals")
-def finviz_signals():
-    """Screener signals from Finviz.
-    ?type=gainers|losers|volume|newhighs|newlows|upgrades|downgrades|oversold|overbought"""
-    signal_type = flask_request.args.get("type", "gainers")
-    cache_key   = f"finviz:signals:{signal_type}"
-    cached      = kv_get(cache_key, 300)
-    if cached is not None:
-        return jsonify({"status": "ok", "data": cached, "signal": signal_type, "cached": True})
-    data = fvd.get_market_signals(signal_type, limit=15)
-    kv_set(cache_key, data)
-    return jsonify({"status": "ok", "data": data, "signal": signal_type, "cached": False})
-
-
-@market_bp.route("/api/finviz/stock/<ticker>")
-def finviz_stock_details(ticker):
-    """Fundamentals, signals, analyst ratings and insider activity for one stock. Cached 10 min."""
-    ticker    = ticker.upper().strip()
-    cache_key = f"finviz:stock:{ticker}"
-    cached    = kv_get(cache_key, 600)
-    if cached is not None:
-        return jsonify({"status": "ok", "data": cached, "cached": True})
-    data = fvd.get_stock_details(ticker)
-    kv_set(cache_key, data)
-    return jsonify({"status": "ok", "data": data, "cached": False})
