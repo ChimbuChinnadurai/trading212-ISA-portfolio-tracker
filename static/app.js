@@ -297,7 +297,6 @@ function _renderActivity(orders, dividends, warning) {
         <div class="activity-dot ${dotClass}"></div>
         <div class="activity-content">
           <span class="activity-company">${esc(company)}</span>
-          <span class="activity-ticker activity-ticker-sm">${esc(ticker)}</span>
           <div class="activity-desc">${actionWord}${qty > 0 ? ' · ' + fmt.number(qty, 4) + ' shares' : type ? ' · ' + type.replace(/_/g, ' ').toLowerCase() : ''}</div>
           <div class="activity-time">${timeStr}</div>
         </div>
