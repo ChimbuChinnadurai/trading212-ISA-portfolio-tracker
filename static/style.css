@@ -80,39 +80,15 @@ html[data-theme="dark"] {
   --accent: #9d8aff;
   --accent-dim: #7b61ff;
   --accent-glow: rgba(157, 138, 255, .25);
+  --accent-secondary: #6f9fff;
+  --accent-tertiary: #f5b356;
 
   --red: #ff5e57;
-  --green: #32ff7e;
+  --green: #3dcc78;
 
   --text-primary: #dcdcdc;
   --text-secondary: #a0a0a0;
-  --text-muted: #707070;
-
-  --shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
-  --shadow-card: 6px 6px 0px rgba(0, 0, 0, 0.4);
-}
-
-/* ─── Dark mode overrides ────────────────────────────────────────────────── */
-html[data-theme="dark"] {
-  --bg: #1c1c1a;
-  --bg-card: #262624;
-  --bg-table: #262624;
-  --bg-row-alt: #161614;
-  --bg-hover: #2a2a28;
-  --bg-sidebar: #161614;
-  --border: #dcdcdc;
-  --border-bright: #ffffff;
-
-  --accent: #9d8aff;
-  --accent-dim: #7b61ff;
-  --accent-glow: rgba(157, 138, 255, .25);
-
-  --red: #ff5e57;
-  --green: #32ff7e;
-
-  --text-primary: #dcdcdc;
-  --text-secondary: #a0a0a0;
-  --text-muted: #707070;
+  --text-muted: #888888;
 
   --shadow: 4px 4px 0px rgba(0, 0, 0, 0.4);
   --shadow-card: 6px 6px 0px rgba(0, 0, 0, 0.4);
@@ -221,43 +197,43 @@ html[data-theme="dark"] .sidebar {
 }
 
 html[data-theme="dark"] .widget-activity {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="dark"] .widget-dividends {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="dark"] .widget-signals {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="dark"] .widget-earnings {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="dark"] .widget-news {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="dark"] .home-news {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="dark"] .news-item {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="dark"] .news-item:hover {
-  background: #1a2846;
-  border-color: #3b82f6;
+  background: var(--bg-hover);
+  border-color: var(--accent-secondary);
 }
 
 /* Skeleton width utilities */
@@ -318,17 +294,17 @@ html[data-theme="dark"] .news-item:hover {
 }
 
 html[data-theme="light"] .news-item {
-  background: #ffffff;
-  border: 1px solid #c2c6d6;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 html[data-theme="light"] .news-item:hover {
-  background: #f2f4f6;
+  background: var(--bg-hover);
   border-color: var(--accent);
 }
 
 html[data-theme="dark"] body {
-  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, .08), transparent);
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(157, 138, 255, .06), transparent);
 }
 
 /* ─── Dark mode: button & chip borders ─────────────────────────────────────── */
@@ -384,11 +360,6 @@ html[data-theme="dark"] .filter-pill:hover {
 
 html[data-theme="dark"] .table-wrapper {
   border: 1px solid var(--border);
-}
-
-/* ─── Dark mode: sidebar & topbar borders ──────────────────────────────────── */
-html[data-theme="dark"] .sidebar {
-  border-right: 1.5px solid var(--border);
 }
 
 .sidebar {
@@ -508,7 +479,7 @@ body {
 }
 
 html[data-theme="dark"] .header {
-  background: rgba(15, 22, 41, 0.85);
+  background: var(--bg-card);
   box-shadow: none;
   border-bottom: 1px solid var(--border);
 }
@@ -534,7 +505,7 @@ html[data-theme="dark"] .header {
   flex-shrink: 0;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 0 12px rgba(0, 88, 190, .25);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .logo-wrap svg {
@@ -928,8 +899,8 @@ html[data-theme="light"] .s-card::before {
 }
 
 .s-card-blue .s-card-icon {
-  background: rgba(0, 88, 190, .10);
-  color: #2170e4;
+  background: rgba(77, 124, 254, .10);
+  color: var(--accent-secondary);
 }
 
 .s-card-teal .s-card-icon {
@@ -2127,9 +2098,9 @@ th.sort-desc .sort-icon::before {
 }
 
 .cb-UK {
-  background: rgba(0, 88, 190, .10);
-  color: #2170e4;
-  border-color: rgba(0, 88, 190, .25);
+  background: rgba(77, 124, 254, .10);
+  color: var(--accent-secondary);
+  border-color: rgba(77, 124, 254, .25);
 }
 
 .cb-US {
@@ -2145,9 +2116,9 @@ th.sort-desc .sort-icon::before {
 }
 
 .cb-FR {
-  background: rgba(0, 88, 190, .10);
-  color: #2170e4;
-  border-color: rgba(0, 88, 190, .25);
+  background: rgba(139, 92, 246, .10);
+  color: #8b5cf6;
+  border-color: rgba(139, 92, 246, .25);
 }
 
 .cb-IE {
@@ -2293,7 +2264,7 @@ th.sort-desc .sort-icon::before {
 .weight-bar-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(135deg, #0058be, #2170e4);
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
 }
 
 .weight-val {
@@ -3073,7 +3044,7 @@ th.sort-desc .sort-icon::before {
 
 /* ─── Country colors for allocation bar ─────────────────────────────────── */
 .ac-UK {
-  background: #3b82f6;
+  background: var(--accent-secondary);
 }
 
 .ac-US {
@@ -3774,7 +3745,7 @@ html[data-theme="dark"] .ov-card:hover {
 
 .ov-card-combined:hover {
   transform: translateY(-2px);
-  box-shadow: 0px 16px 40px rgba(0, 88, 190, .1);
+  box-shadow: 0px 16px 40px rgba(123, 97, 255, .12);
 }
 
 .ov-header {
@@ -4212,7 +4183,7 @@ html[data-theme="dark"] .ov-card:hover {
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid var(--border-bright);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(59, 130, 246, 0.03) 100%);
+  background: linear-gradient(135deg, rgba(123, 97, 255, 0.07) 0%, rgba(123, 97, 255, 0.02) 100%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   margin-bottom: 2px;
@@ -4221,7 +4192,7 @@ html[data-theme="dark"] .ov-card:hover {
 }
 
 .digest-hero-card:hover {
-  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+  box-shadow: 0 4px 20px var(--accent-glow);
   transform: translateY(-1px);
 }
 
@@ -4298,7 +4269,7 @@ html[data-theme="dark"] .ov-card:hover {
 }
 
 html[data-theme="light"] .digest-hero-card {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(59, 130, 246, 0.01) 100%);
+  background: linear-gradient(135deg, rgba(123, 97, 255, 0.06) 0%, rgba(123, 97, 255, 0.01) 100%);
 }
 
 html[data-theme="light"] .digest-item-card--up {
@@ -4311,7 +4282,7 @@ html[data-theme="light"] .digest-item-card--down {
 
 .ticker-chip {
   display: inline-block;
-  background: rgba(59, 130, 246, 0.12);
+  background: rgba(123, 97, 255, 0.10);
   color: var(--accent);
   border-radius: 4px;
   padding: 0 4px;
@@ -4322,7 +4293,7 @@ html[data-theme="light"] .digest-item-card--down {
 }
 
 html[data-theme="dark"] .ticker-chip {
-  background: rgba(59, 130, 246, 0.2);
+  background: rgba(157, 138, 255, 0.18);
 }
 
 /* ── Fear & Greed side-panel indicator charts ────────────────────────────── */
@@ -4878,17 +4849,17 @@ html[data-theme="dark"] .ticker-chip {
 }
 
 .div-tl-status--pending {
-  background: rgba(0, 88, 190, .10);
+  background: rgba(123, 97, 255, .10);
   color: var(--accent);
 }
 
 .div-tl-status--upcoming {
-  background: rgba(0, 88, 190, .10);
+  background: rgba(123, 97, 255, .10);
   color: var(--accent);
 }
 
 .div-tl-status--buy {
-  background: rgba(0, 88, 190, .10);
+  background: rgba(123, 97, 255, .10);
   color: var(--accent);
 }
 
@@ -4903,7 +4874,7 @@ html[data-theme="dark"] .ticker-chip {
 }
 
 .div-tl-date-badge--buy {
-  background: rgba(0, 88, 190, 0.08);
+  background: rgba(123, 97, 255, 0.08);
   color: var(--accent);
 }
 
@@ -4918,8 +4889,8 @@ html[data-theme="dark"] .ticker-chip {
 }
 
 html[data-theme="dark"] .div-tl-status--buy {
-  background: rgba(59, 130, 246, .15);
-  color: #60a5fa;
+  background: rgba(157, 138, 255, .18);
+  color: var(--accent);
 }
 
 html[data-theme="dark"] .div-tl-status--sell {
@@ -4933,8 +4904,8 @@ html[data-theme="dark"] .div-tl-status--received {
 }
 
 html[data-theme="dark"] .div-tl-status--pending {
-  background: rgba(59, 130, 246, .15);
-  color: #60a5fa;
+  background: rgba(157, 138, 255, .18);
+  color: var(--accent);
 }
 
 .div-cal-progress {
@@ -5640,8 +5611,8 @@ html[data-theme="light"] .side-panel-backdrop {
 }
 
 .cal-ev-buy {
-  background: rgba(0, 88, 190, .12);
-  color: #2170e4;
+  background: rgba(77, 124, 254, .12);
+  color: var(--accent-secondary);
 }
 
 .cal-ev-sell {
@@ -5728,8 +5699,8 @@ html[data-theme="light"] .cal-nav {
 }
 
 .sp-icon-buy {
-  background: rgba(0, 88, 190, .10);
-  color: #2170e4;
+  background: rgba(77, 124, 254, .10);
+  color: var(--accent-secondary);
 }
 
 .sp-icon-sell {
@@ -5834,8 +5805,8 @@ html[data-theme="light"] .cal-nav {
 .earnings-quarter {
   font-size: 0.68rem;
   font-weight: 700;
-  background: rgba(0, 88, 190, .10);
-  color: #2170e4;
+  background: rgba(77, 124, 254, .10);
+  color: var(--accent-secondary);
   padding: 1px 7px;
   border-radius: 4px;
 }
@@ -6092,8 +6063,8 @@ html[data-theme="light"] .cal-nav {
 .news-cat {
   font-size: 0.65rem;
   font-weight: 600;
-  background: rgba(0, 88, 190, .08);
-  color: #2170e4;
+  background: rgba(77, 124, 254, .08);
+  color: var(--accent-secondary);
   padding: 1px 6px;
   border-radius: 4px;
   text-transform: capitalize;
@@ -6799,13 +6770,13 @@ html[data-theme="light"] .rating-strong-sell {
 
 /* Pre-market: blue */
 .mkt-pre {
-  background: rgba(0, 88, 190, .08);
-  color: #2170e4;
-  border-color: rgba(0, 88, 190, .18);
+  background: rgba(77, 124, 254, .08);
+  color: var(--accent-secondary);
+  border-color: rgba(77, 124, 254, .18);
 }
 
 .mkt-pre .mkt-dot {
-  background: #2170e4;
+  background: var(--accent-secondary);
 }
 
 /* After-hours: purple */
@@ -7124,7 +7095,7 @@ html[data-theme="light"] .rating-strong-sell {
 }
 
 html[data-theme="dark"] .nav-item.active {
-  background: rgba(59, 130, 246, 0.18) !important;
+  background: var(--accent-glow) !important;
   color: var(--accent) !important;
   box-shadow: none;
 }
@@ -7201,7 +7172,7 @@ html[data-theme="dark"] .nav-item.active {
 }
 
 html[data-theme="dark"] .nav-group-header.active {
-  background: rgba(59, 130, 246, 0.18) !important;
+  background: var(--accent-glow) !important;
 }
 
 .nav-group-header.active .nav-icon.material-symbols-outlined {
@@ -8639,9 +8610,9 @@ html[data-theme="dark"] .nav-group-header.active {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: 3px;
-  background: rgba(59, 130, 246, 0.1);
+  background: rgba(123, 97, 255, 0.10);
   color: var(--accent);
-  border: 1px solid rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(123, 97, 255, 0.20);
   white-space: nowrap;
 }
 
@@ -9043,7 +9014,7 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 .home-act-icon.div {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(123, 97, 255, 0.12);
   color: var(--accent);
 }
 
@@ -9239,7 +9210,7 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 .ue-row-today {
-  background: rgba(59, 130, 246, 0.06);
+  background: rgba(123, 97, 255, 0.06);
   border-radius: 6px;
   padding-left: 4px;
   padding-right: 4px;
@@ -9282,8 +9253,8 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 .ue-badge-exdate {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background: rgba(77, 124, 254, 0.15);
+  color: var(--accent-secondary);
 }
 
 .ue-badge-paydate {
@@ -10513,9 +10484,9 @@ div#sectorBarsList {
 }
 
 .wl-type-stock {
-  background: rgba(59, 130, 246, 0.12);
-  color: #3b82f6;
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(77, 124, 254, 0.12);
+  color: var(--accent-secondary);
+  border: 1px solid rgba(77, 124, 254, 0.25);
 }
 
 .wl-type-etf {
@@ -10957,8 +10928,8 @@ div#sectorBarsList {
 
 /* ── Widget: Market Signals ──────────────────────────────────────────────── */
 html[data-theme="dark"] .widget-signals {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 /* ── Drawdown Analysis widget ────────────────────────────────────────────── */
@@ -11029,8 +11000,8 @@ html[data-theme="dark"] .widget-signals {
 /* ── Widget: Insider Trading ─────────────────────────────────────────────── */
 
 html[data-theme="dark"] .widget-insider {
-  background: #0f1629;
-  border: 1px solid #1e2d4a;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 
@@ -12386,10 +12357,10 @@ thead .mph-ticker-col {
   background: linear-gradient(135deg, var(--bg-card) 55%, rgba(16, 185, 129, 0.06));
 }
 
-/* Card 2 — This Year: blue tint */
+/* Card 2 — This Year: accent tint */
 .dv-kpi-card:nth-child(2) {
   border-left: 3px solid var(--accent);
-  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(59, 130, 246, 0.06));
+  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(123, 97, 255, 0.06));
 }
 
 /* Card 3 — Projected Annual: amber tint */
@@ -13307,7 +13278,7 @@ thead .mph-ticker-col {
 }
 
 .notif-unread {
-  background: rgba(59, 130, 246, 0.06);
+  background: rgba(123, 97, 255, 0.06);
 }
 
 .notif-icon {
