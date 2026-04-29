@@ -402,7 +402,7 @@ html {
 body {
   background: var(--bg);
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'JetBrains Mono', monospace;
   min-height: 100vh;
   line-height: 1.5;
   transition: background .2s, color .2s;
