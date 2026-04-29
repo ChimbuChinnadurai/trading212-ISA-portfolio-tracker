@@ -2412,15 +2412,14 @@ th.sort-desc .sort-icon::before {
   box-sizing: border-box;
   text-align: center;
   gap: 1px;
-  background-color: #1e293b;
-  /* Fallback for missing gradients */
+  background-color: #2c2c2a;
 }
 
 .hm-cell:hover {
-  transform: scale(1.05) rotate(0.5deg);
   z-index: 100;
-  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.15);
-  filter: brightness(1.1);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.55), inset 0 0 0 3.5px rgba(255, 255, 255, 0.15);
+  filter: brightness(1.18) saturate(1.12);
+  transition: filter .1s, box-shadow .1s;
 }
 
 .hm-t {
