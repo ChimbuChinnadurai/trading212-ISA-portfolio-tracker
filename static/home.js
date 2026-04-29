@@ -637,6 +637,7 @@ function _renderHeatmap(items) {
         sectorMap[sec].items.push({ ...d, value: val });
     }
     const sectors = Object.values(sectorMap);
+    if (sectors.length === 0) return;
 
     const secRects = _computeTreemap(sectors, CW, CH);
 
@@ -723,7 +724,9 @@ function _renderHeatmap(items) {
             );
         }
     }
-    container.innerHTML = html.join('');
+    if (html.length > 0) {
+        container.innerHTML = html.join('');
+    }
 
     // Update session label in the heatmap header
     // const sessionLabel = document.getElementById('heatmapSessionLabel');
@@ -737,16 +740,8 @@ function _renderHeatmap(items) {
     // }
 
     // Randomise each cell's phase within the 10s cycle so they pulse out of sync
-    container.querySelectorAll('.hm-cell').forEach(cell => {
-        const delay = (-Math.random() * 10).toFixed(2); // random start point in -10..0s
-        cell.style.setProperty('--hm-delay', `${delay}s`);
-    });
-
-    // Scan-line sweep to signal fresh data
+    // Disable flickering animations/scan-line sweep
     container.classList.remove('hm-scanning');
-    void container.offsetWidth; // force reflow so animation restarts cleanly
-    container.classList.add('hm-scanning');
-    setTimeout(() => container.classList.remove('hm-scanning'), 900);
 
     if (!container._hmClickBound) {
         container._hmClickBound = true;
@@ -3692,8 +3687,8 @@ function _renderUpcomingEvents(events) {
     function fmtRev(v) {
         if (v == null) return null;
         if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
-        if (v >= 1e9)  return `$${(v / 1e9).toFixed(1)}B`;
-        if (v >= 1e6)  return `$${(v / 1e6).toFixed(0)}M`;
+        if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+        if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
         return `$${v}`;
     }
 
