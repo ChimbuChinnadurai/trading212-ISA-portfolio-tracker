@@ -289,12 +289,10 @@ html[data-theme="dark"] .news-item:hover {
 }
 
 html[data-theme="light"] .news-item {
-  background: var(--bg-card);
   border: 1px solid var(--border);
 }
 
 html[data-theme="light"] .news-item:hover {
-  background: var(--bg-hover);
   border-color: var(--accent);
 }
 
@@ -6158,7 +6156,6 @@ html[data-theme="light"] .skeleton::after {
 .fund-range-wrap {
   margin-bottom: 14px;
   padding: 10px 12px;
-  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
 }
@@ -6255,7 +6252,6 @@ html[data-theme="light"] .skeleton::after {
 }
 
 .fund-cell {
-  background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 6px 8px;
@@ -6354,7 +6350,6 @@ html[data-theme="light"] .rating-strong-sell {
   margin-bottom: 12px;
   border-radius: 8px;
   overflow: hidden;
-  background: var(--bg-row-alt);
   padding: 6px 8px 4px;
   box-sizing: border-box;
 }
