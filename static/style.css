@@ -194,8 +194,6 @@ html[data-theme="dark"] {
 div#ov-fg {
   border: 1.5px solid var(--border);
   background: var(--bg-card);
-  border-radius: var(--radius);
-  transform: rotate(-0.5deg);
 }
 
 /* Legacy dark mode overrides removed */
@@ -408,10 +406,9 @@ html[data-theme="dark"] .topbar {
 }
 
 .topbar {
-  margin: 10px 16px;
   background: var(--bg-card);
-  border: 1.5px solid var(--border);
-  border-radius: 2px;
+  /* border: 1.5px solid var(--border); */
+  /* border-radius: 2px; */
   box-shadow: var(--shadow);
   position: relative;
   overflow: visible;
@@ -432,12 +429,10 @@ html[data-theme="dark"] .topbar {
 
 .topbar::before {
   left: 20px;
-  transform: rotate(-3deg);
 }
 
 .topbar::after {
   right: 20px;
-  transform: rotate(2deg);
 }
 
 /* ─── Dark mode: restore borders on borderless cards ───────────────────────── */
@@ -824,7 +819,7 @@ html[data-theme="dark"] .header {
 .s-card {
   background: var(--bg-card);
   border: 1.5px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 15px;
   padding: 22px 24px 18px;
   display: flex;
   flex-direction: column;
@@ -1449,7 +1444,6 @@ html[data-theme="light"] .s-card::before {
 
 .activity-title {
   font-size: 0.65rem;
-  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -1744,7 +1738,7 @@ html[data-theme="light"] .s-card::before {
 /* ─── Table Wrapper ───────────────────────────────────────────────────────── */
 .table-wrapper {
   background: var(--bg-table);
-  border-radius: var(--radius);
+  border-radius: 15px;
   box-shadow: var(--shadow-card);
   overflow: hidden;
   display: flex;
@@ -3746,8 +3740,8 @@ th.sort-desc .sort-icon::before {
 
 .ov-card {
   background: var(--bg-card);
-  border-radius: 14px;
-  padding: 12px 16px;
+  border-radius: 15px;
+  padding: 5px 5px;
   cursor: pointer;
   box-shadow: var(--shadow-card);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
@@ -3787,7 +3781,7 @@ html[data-theme="dark"] .ov-card:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  padding: 5px 5px;
   border-bottom: 1.5px solid var(--border);
   background: rgba(0, 0, 0, 0.02);
 }
@@ -4519,7 +4513,7 @@ html[data-theme="dark"] .ticker-chip {
 
 .widget-panel {
   background: var(--bg-card);
-  border-radius: 16px;
+  border-radius: 15px;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -7045,8 +7039,6 @@ html[data-theme="light"] .rating-strong-sell {
   background: rgba(247, 249, 251, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0px 1px 0px rgba(25, 28, 30, .07);
   position: relative;
   z-index: 100;
 }
@@ -7094,7 +7086,7 @@ html[data-theme="light"] .rating-strong-sell {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  background: var(--bg);
+  background: var(--bg-card);
 }
 
 .nav-item {
@@ -7113,7 +7105,7 @@ html[data-theme="light"] .rating-strong-sell {
 .portfolio-heatmap-card {
   background: var(--bg-card);
   border: 1.5px solid var(--border);
-  border-radius: 2px;
+  border-radius: 15px;
   box-shadow: var(--shadow);
   padding: 20px;
   margin-bottom: 20px;
@@ -7585,6 +7577,7 @@ html[data-theme="dark"] .nav-group-header.active {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: var(--bg-card);
 }
 
 /* Activity, Calendar, and Market views fill the full viewport height */
@@ -7883,7 +7876,7 @@ html[data-theme="dark"] .nav-group-header.active {
   min-height: 0;
   background: var(--bg-card);
   border: 1.5px solid var(--border);
-  border-radius: 2px;
+  border-radius: 15px;
   box-shadow: var(--shadow);
   position: relative;
 }
@@ -8989,7 +8982,8 @@ html[data-theme="dark"] .nav-group-header.active {
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  height: 240px;
+  min-height: 240px;
+  height: auto;
 }
 
 .home-activity-list {
@@ -9543,7 +9537,7 @@ html[data-theme="dark"] .nav-group-header.active {
 .risk-metric-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 15px;
   padding: 18px 20px;
   display: flex;
   flex-direction: column;
@@ -9870,6 +9864,7 @@ html[data-theme="dark"] .nav-group-header.active {
   flex: 1;
   position: relative;
   min-height: 0;
+  border-radius: 15px;
 }
 
 .mkt-chart-wrap canvas {
@@ -11718,6 +11713,7 @@ html[data-theme="dark"] .widget-insider {
 /* ── Dynamics of Portfolio Returns ──────────────────────────────────────── */
 .dynamics-returns-card {
   margin-top: 0;
+  border-radius: 15px;
 }
 
 .dynamics-header {
@@ -12371,7 +12367,7 @@ thead .mph-ticker-col {
 .dv-kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 15px;
   padding: 14px 16px;
   display: flex;
   align-items: flex-start;
@@ -12486,7 +12482,7 @@ thead .mph-ticker-col {
 .dv-chart-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 15px;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -12549,7 +12545,7 @@ thead .mph-ticker-col {
 .dv-history-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 15px;
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
