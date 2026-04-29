@@ -62,7 +62,8 @@ pre,
   --radius-sm: 1px;
   --shadow: 4px 4px 0px rgba(42, 42, 42, 0.1);
   --shadow-card: 6px 6px 0px rgba(42, 42, 42, 0.08);
-  --sidebar-w: 220px;
+  --sidebar-w: 180px;
+  --sidebar-collapsed-w: 52px;
   --topbar-h: 64px;
 }
 
@@ -186,14 +187,8 @@ div#ov-fg {
 }
 
 html[data-theme="dark"] .sidebar {
-  width: var(--sidebar-w);
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
   background: var(--bg-sidebar);
   border-right: 1.5px solid var(--border);
-  z-index: 200;
-  min-height: 0;
 }
 
 html[data-theme="dark"] .widget-activity {
@@ -7222,24 +7217,27 @@ html[data-theme="dark"] .nav-group-header.active {
 .sidebar-footer {
   padding: 8px 6px;
   flex-shrink: 0;
-  background: var(--bg);
 }
 
 .sidebar-collapse-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  width: 100%;
+  gap: 16px;
+  padding: 11px 20px;
+  width: calc(100% - 24px);
+  margin: 2px 12px;
   border: none;
   background: none;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 0.82rem;
-  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 4px;
   transition: background .14s, color .14s;
   white-space: nowrap;
   overflow: hidden;
+  font-family: inherit;
+  letter-spacing: -0.01em;
 }
 
 .sidebar-collapse-btn:hover {
@@ -7248,13 +7246,21 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 .collapse-icon {
-  width: 16px;
-  height: 16px;
   flex-shrink: 0;
   transition: transform .22s ease;
+  font-size: 18px !important;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Collapsed sidebar — icons only */
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-w);
+}
+
 .sidebar.collapsed .nav-label,
 .sidebar.collapsed .nav-chevron,
 .sidebar.collapsed .sidebar-brand-text,
@@ -7268,15 +7274,34 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 .sidebar.collapsed .nav-sub {
-  padding-left: 12px;
+  padding-left: 0;
+}
+
+.sidebar.collapsed .nav-item,
+.sidebar.collapsed .nav-group-header {
+  padding: 11px 0;
+  justify-content: center;
+  margin: 2px 4px;
+  gap: 0;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  padding: 6px 4px;
+}
+
+.sidebar.collapsed .sidebar-collapse-btn {
+  padding: 11px 0;
+  justify-content: center;
+  gap: 0;
 }
 
 .sidebar.collapsed .collapse-icon {
   transform: rotate(180deg);
-}
-
-.sidebar.collapsed .sidebar-collapse-btn .nav-label {
-  display: none;
 }
 
 /* Mobile scrim */

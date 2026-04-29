@@ -543,13 +543,13 @@ function _heatColor(pct) {
     const v = pct ?? 0;
     // Thresholds tuned for daily % change (vs total-return in Position Heatmap)
     if (Math.abs(v) < 0.05) return '#2c2c2a';
-    if (v >= 3)    return 'linear-gradient(160deg,#14532d,#22c55e)';
-    if (v >= 1.5)  return 'linear-gradient(160deg,#166534,#4ade80)';
-    if (v >= 0.5)  return 'linear-gradient(160deg,#15803d,#34d474)';
-    if (v > 0)     return 'linear-gradient(160deg,#0f766e,#2dd4bf)';
-    if (v >= -0.5) return 'linear-gradient(160deg,#92400e,#f97316)';
-    if (v >= -1.5) return 'linear-gradient(160deg,#991b1b,#ef4444)';
-    return 'linear-gradient(160deg,#7f1d1d,#dc2626)';
+    if (v >= 3) return 'linear-gradient(160deg,#15572a,#1d7a3c)';
+    if (v >= 1.5) return 'linear-gradient(160deg,#1a6b35,#22944a)';
+    if (v >= 0.5) return 'linear-gradient(160deg,#1e7d40,#27ab54)';
+    if (v > 0) return 'linear-gradient(160deg,#17726a,#1c9c8c)';
+    if (v >= -0.5) return 'linear-gradient(160deg,#8c3c12,#be541c)';
+    if (v >= -1.5) return 'linear-gradient(160deg,#8c1c1c,#c22828)';
+    return 'linear-gradient(160deg,#6a1212,#961a1a)';
 }
 
 function _computeTreemap(items, W, H) {
