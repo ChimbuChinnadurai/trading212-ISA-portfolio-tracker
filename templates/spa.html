@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap"
     rel="stylesheet">
   <link
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
@@ -20,30 +20,32 @@
   <style>
     /* Critical inline CSS — prevents FOUC while style.css loads */
     :root {
-      --bg: #f7f9fb;
-      --bg-card: #ffffff;
-      --bg-sidebar: #f2f4f6;
-      --bg-row-alt: #f2f4f6;
-      --bg-hover: #eceef0;
-      --border: #c2c6d6;
-      --accent: #0058be;
-      --text-primary: #191c1e;
-      --text-secondary: #424754;
-      --radius: 12px;
+      --bg: #f5f2eb;
+      --bg-card: #fffefc;
+      --bg-sidebar: #ebe7dd;
+      --bg-row-alt: #ebe7dd;
+      --bg-hover: #e2decb;
+      --border: #2a2a2a;
+      --accent: #7b61ff;
+      --accent-secondary: #4d7cfe;
+      --accent-tertiary: #f3a444;
+      --text-primary: #2a2a2a;
+      --text-secondary: #4a4a4a;
+      --radius: 2px;
       --sidebar-w: 72px;
-      --topbar-h: 54px;
+      --topbar-h: 64px;
     }
 
     html[data-theme="dark"] {
-      --bg: #080d18;
-      --bg-card: #0f1629;
-      --bg-sidebar: #0b1120;
-      --bg-row-alt: #131d35;
-      --bg-hover: #1a2846;
-      --border: #1e2d4a;
-      --accent: #3b82f6;
-      --text-primary: #e2e8f0;
-      --text-secondary: #7c8fad;
+      --bg: #1c1c1a;
+      --bg-card: #262624;
+      --bg-sidebar: #161614;
+      --bg-row-alt: #161614;
+      --bg-hover: #2a2a28;
+      --border: #dcdcdc;
+      --accent: #9d8aff;
+      --text-primary: #dcdcdc;
+      --text-secondary: #a0a0a0;
     }
 
     *,
@@ -138,6 +140,15 @@
       gap: 1px;
     }
 
+    .ov-main-val {
+  font-family: 'PT Serif', serif;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
     .topbar-title {
       font-size: 0.875rem;
       font-weight: 600;
@@ -152,19 +163,33 @@
     }
 
     /* View container — scrolls, flex column so children can fill height */
-    .view-container {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      overflow-x: hidden;
-      background: var(--bg);
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 88, 190, .06), transparent);
-    }
+html[data-theme="light"] .view-container {
+  background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(123, 97, 255, .04), transparent);
+  position: relative;
+}
 
-    html[data-theme="light"] .view-container {
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 88, 190, .04), transparent);
-    }
+.view-container::before {
+  content: '✦';
+  position: fixed;
+  top: 100px;
+  right: 10%;
+  font-size: 40px;
+  color: var(--accent-tertiary);
+  opacity: 0.15;
+  pointer-events: none;
+  filter: blur(1px);
+}
+
+.view-container::after {
+  content: '✻';
+  position: fixed;
+  bottom: 100px;
+  left: 5%;
+  font-size: 60px;
+  color: var(--accent);
+  opacity: 0.1;
+  pointer-events: none;
+}
 
     .ov-card,
     .widget-panel {
@@ -175,6 +200,22 @@
 </head>
 
 <body>
+  <div class="paper-texture"></div>
+
+  <!-- SVG Filters for Rough Edges -->
+  <svg style="position: absolute; width: 0; height: 0;" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="rough-edge">
+        <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" />
+      </filter>
+      <filter id="rough-edge-subtle">
+        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="1" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" />
+      </filter>
+    </defs>
+  </svg>
+
   <div class="app-shell" id="appRoot">
 
     <!-- ═══ SIDEBAR ═══ -->
@@ -722,6 +763,7 @@
                 <div class="summary-cards">
 
                   <div class="s-card s-card-blue">
+                    <div class="s-card-tape"></div>
                     <div class="s-card-top">
                       <div class="s-card-icon">
                         <span class="material-symbols-outlined">account_balance_wallet</span>
@@ -772,6 +814,7 @@
                   </div>
 
                   <div class="s-card s-card-teal">
+                    <div class="s-card-tape"></div>
                     <div class="s-card-top">
                       <div class="s-card-icon">
                         <span class="material-symbols-outlined">payments</span>
