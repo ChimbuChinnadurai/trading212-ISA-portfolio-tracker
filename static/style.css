@@ -151,20 +151,17 @@ html[data-theme="dark"] {
 /* #2 — Per-portfolio identity: left border + gradient tint */
 #ov1 {
   border: 1.5px solid var(--border);
-  transform: rotate(-0.5deg);
   background: var(--bg-card);
   position: relative;
 }
 
 #ov2 {
   border: 1.5px solid var(--border);
-  transform: rotate(0.8deg);
   background: var(--bg-card);
 }
 
 .ov-card.ov-card-combined {
   border: 1.5px solid var(--border);
-  transform: rotate(-0.3deg);
   background: var(--bg-card);
 }
 
@@ -825,17 +822,14 @@ html[data-theme="dark"] .header {
 
 .s-card.s-card-blue {
   border: 1.5px solid var(--border);
-  transform: rotate(-0.5deg);
 }
 
 div#returnsCard {
   border: 1.5px solid var(--border);
-  transform: rotate(0.6deg);
 }
 
 .s-card.s-card-teal {
   border: 1.5px solid var(--border);
-  transform: rotate(-0.3deg);
 }
 
 /* Coloured top accent bars — dark mode only */
