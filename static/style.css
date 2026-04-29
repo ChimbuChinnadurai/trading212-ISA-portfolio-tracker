@@ -12370,30 +12370,6 @@ thead .mph-ticker-col {
   box-shadow: var(--shadow-card);
 }
 
-/* Card 1 — Total Received: green tint */
-.dv-kpi-card:nth-child(1) {
-  border-left: 3px solid #10b981;
-  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(16, 185, 129, 0.06));
-}
-
-/* Card 2 — This Year: accent tint */
-.dv-kpi-card:nth-child(2) {
-  border-left: 3px solid var(--accent);
-  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(123, 97, 255, 0.06));
-}
-
-/* Card 3 — Projected Annual: amber tint */
-.dv-kpi-card:nth-child(3) {
-  border-left: 3px solid var(--amber);
-  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(245, 158, 11, 0.06));
-}
-
-/* Card 4 — Avg Monthly: purple tint */
-.dv-kpi-card:nth-child(4) {
-  border-left: 3px solid var(--purple);
-  background: linear-gradient(135deg, var(--bg-card) 55%, rgba(139, 92, 246, 0.06));
-}
-
 .dv-kpi-card--accent {
   border-color: #10b98140;
   background: linear-gradient(135deg, var(--bg-card) 60%, #10b98108);
