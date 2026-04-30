@@ -58,7 +58,7 @@ pre,
   --text-secondary: #4a4a4a;
   --text-muted: #7a7a7a;
 
-  --radius: 2px;
+  --radius: 15px;
   --radius-sm: 1px;
   --shadow: 4px 4px 0px rgba(42, 42, 42, 0.1);
   --shadow-card: 6px 6px 0px rgba(42, 42, 42, 0.08);
@@ -10246,6 +10246,48 @@ html[data-theme="dark"] .nav-group-header.active {
 }
 
 /* #9 — Watchlist row hover with left highlight bar */
+.wl-drag-th {
+  width: 24px;
+  padding: 0;
+}
+
+.wl-drag-handle {
+  width: 24px;
+  padding: 0 4px;
+  text-align: center;
+  color: var(--text-muted);
+  opacity: 0;
+  cursor: grab;
+  user-select: none;
+  transition: opacity 0.15s;
+}
+
+.wl-drag-handle .material-symbols-outlined {
+  font-size: 16px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.wl-drag-handle:active {
+  cursor: grabbing;
+}
+
+.wl-table-row:hover .wl-drag-handle {
+  opacity: 0.5;
+}
+
+.wl-table-row.wl-row-dragging {
+  opacity: 0.4;
+}
+
+.wl-table-row.wl-row-drag-before > td {
+  border-top: 2px solid var(--accent);
+}
+
+.wl-table-row.wl-row-drag-after > td {
+  border-bottom: 2px solid var(--accent);
+}
+
 .wl-table-row {
   cursor: pointer;
   transition: background 0.15s ease;

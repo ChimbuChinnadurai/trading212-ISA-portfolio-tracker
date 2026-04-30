@@ -4609,6 +4609,7 @@ function _wlCloseTypeDropdown() {
 }
 
 let _wlDragSrcId = null;
+let _wlRowDragSrcId = null;
 
 function _wlRenderTabs() {
     const container = document.getElementById('wlTabs');
@@ -4900,6 +4901,7 @@ function _renderWatchlistTable(list) {
 
         const _s = 'skeleton skeleton-text wl-cell-skel';
         row.innerHTML = `
+            <td class="wl-drag-handle" draggable="true" onclick="event.stopPropagation()"><span class="material-symbols-outlined">drag_indicator</span></td>
             <td data-colid="wl-ticker"><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
             <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}">${typeBadge} <span class="${_s}"></span></td>
             <td data-colid="wl-price" class="wl-price" id="wl-price-${ticker}"><span class="${_s}"></span></td>
@@ -4929,6 +4931,74 @@ function _renderWatchlistTable(list) {
     });
     // Apply saved column visibility to newly rendered rows
     _applyWlColVis(_loadWlColVis());
+    _wlInitRowDrag(tbody);
+}
+
+function _wlInitRowDrag(tbody) {
+    if (!tbody || tbody._dragInit) return;
+    tbody._dragInit = true;
+
+    tbody.addEventListener('dragstart', e => {
+        const handle = e.target.closest('.wl-drag-handle');
+        if (!handle) { e.preventDefault(); return; }
+        const row = handle.closest('.wl-table-row');
+        if (!row) return;
+        _wlRowDragSrcId = row.id;
+        row.classList.add('wl-row-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    tbody.addEventListener('dragend', () => {
+        tbody.querySelectorAll('.wl-table-row').forEach(r =>
+            r.classList.remove('wl-row-dragging', 'wl-row-drag-before', 'wl-row-drag-after')
+        );
+        _wlRowDragSrcId = null;
+    });
+
+    tbody.addEventListener('dragover', e => {
+        e.preventDefault();
+        const row = e.target.closest('.wl-table-row');
+        tbody.querySelectorAll('.wl-table-row').forEach(r =>
+            r.classList.remove('wl-row-drag-before', 'wl-row-drag-after')
+        );
+        if (!row || row.id === _wlRowDragSrcId || row.style.display === 'none') return;
+        const rect = row.getBoundingClientRect();
+        row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'wl-row-drag-before' : 'wl-row-drag-after');
+    });
+
+    tbody.addEventListener('dragleave', e => {
+        if (!tbody.contains(e.relatedTarget)) {
+            tbody.querySelectorAll('.wl-table-row').forEach(r =>
+                r.classList.remove('wl-row-drag-before', 'wl-row-drag-after')
+            );
+        }
+    });
+
+    tbody.addEventListener('drop', async e => {
+        e.preventDefault();
+        const row = e.target.closest('.wl-table-row');
+        const srcId = _wlRowDragSrcId;
+        _wlRowDragSrcId = null;
+        if (!row || !srcId || row.id === srcId) return;
+
+        const srcTicker = srcId.replace('wl-row-', '');
+        const targetTicker = row.id.replace('wl-row-', '');
+        const rect = row.getBoundingClientRect();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;
+
+        const list = await _wlLoad();
+        const srcIdx = list.findIndex(r => r.ticker === srcTicker);
+        if (srcIdx === -1) return;
+        const [moved] = list.splice(srcIdx, 1);
+        const newTgtIdx = list.findIndex(r => r.ticker === targetTicker);
+        if (newTgtIdx === -1) { list.push(moved); } else {
+            list.splice(insertBefore ? newTgtIdx : newTgtIdx + 1, 0, moved);
+        }
+        await _wlSave(list);
+
+        const srcRow = document.getElementById(srcId);
+        if (srcRow) insertBefore ? row.before(srcRow) : row.after(srcRow);
+    });
 }
 
 // ── Watchlist column picker ───────────────────────────────────────────────────
