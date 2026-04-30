@@ -85,21 +85,21 @@ function _updateBreadcrumb(route) {
     const iconEl = document.getElementById('topbarSectionIcon');
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
     const sectionMap = {
-        'portfolio/1': { label: names['1'] || 'Portfolio 1', icon: 'pie_chart' },
-        'portfolio/2': { label: names['2'] || 'Portfolio 2', icon: 'pie_chart' },
-        'portfolio/combined': { label: 'Portfolio', icon: 'pie_chart' },
-        'stocks/1': { label: 'Holdings', icon: 'table_chart' },
-        'stocks/2': { label: 'Holdings', icon: 'table_chart' },
-        'stocks/combined': { label: 'Holdings', icon: 'table_chart' },
+        'portfolio/1': { label: '', icon: 'pie_chart' },
+        'portfolio/2': { label: '', icon: 'pie_chart' },
+        'portfolio/combined': { label: '', icon: 'pie_chart' },
+        'stocks/1': { label: '', icon: 'table_chart' },
+        'stocks/2': { label: '', icon: 'table_chart' },
+        'stocks/combined': { label: '', icon: 'table_chart' },
         'news': { label: 'Market News', icon: 'newspaper' },
         'calendar': { label: 'Market Calendar', icon: 'event' },
         'activity': { label: 'Activity', icon: 'history' },
         'market': { label: 'Market', icon: 'candlestick_chart' },
         'metrics': { label: 'Metrics', icon: 'analytics' },
         'watchlist': { label: 'Watchlist', icon: 'bookmark' },
-        'dividends/combined': { label: 'Dividends & Income', icon: 'payments' },
-        'dividends/1': { label: 'Dividends & Income', icon: 'payments' },
-        'dividends/2': { label: 'Dividends & Income', icon: 'payments' },
+        'dividends/combined': { label: '', icon: 'payments' },
+        'dividends/1': { label: '', icon: 'payments' },
+        'dividends/2': { label: '', icon: 'payments' },
     };
 
     if (route === 'home') {
@@ -114,7 +114,7 @@ function _updateBreadcrumb(route) {
             const name = (typeof PORTFOLIO_NAMES !== 'undefined' && PORTFOLIO_NAMES['1']) || 'there';
             greetEl.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
         }
-    } else if (route.startsWith('portfolio/') || route.startsWith('stocks/')) {
+    } else if (route.startsWith('portfolio/') || route.startsWith('stocks/') || route.startsWith('dividends/')) {
         const pSection = sectionMap[route];
         if (greetEl && pSection) greetEl.textContent = pSection.label;
         if (iconEl) iconEl.style.display = 'none';
@@ -167,7 +167,7 @@ function switchPid(pid) {
     const route = _currentRoute || '';
     const viewType = route.startsWith('stocks/') ? 'stocks'
         : route.startsWith('dividends/') ? 'dividends'
-        : 'portfolio';
+            : 'portfolio';
     navigate(`${viewType}/${pid}`);
 }
 
@@ -543,7 +543,7 @@ function _activateMetricsView() {
     if (typeof loadMetricsView === 'function') loadMetricsView();
 }
 
-function _deactivateMetricsView() {}
+function _deactivateMetricsView() { }
 
 /* ── Detail view lifecycle ───────────────────────────────────────────────── */
 function _resetDetailView() {
