@@ -3628,9 +3628,10 @@ async function loadUpcomingEvents() {
     const cutoffStr = toYMD(cutoff);
 
     try {
-        const [earnResult, divResult] = await Promise.allSettled([
+        const [earnResult, divResult, macroResult] = await Promise.allSettled([
             fetch('/api/earnings').then(r => r.json()),
             fetch('/api/upcoming-dividends').then(r => r.json()),
+            fetch('/api/macro-events').then(r => r.json()),
         ]);
 
         const events = [];
@@ -3659,6 +3660,13 @@ async function loadUpcomingEvents() {
             if (payDate >= todayStr && payDate <= cutoffStr) {
                 events.push({ date: payDate, ticker: d.ticker, company: d.company_name || d.ticker, type: 'pay-date', label: 'Dividend Pay' });
             }
+        }
+
+        // ── Macro events (FOMC, BoE, ECB, CPI, NFP, GDP) ─────────────────
+        const macroData = (macroResult.status === 'fulfilled' && macroResult.value.status === 'ok')
+            ? (macroResult.value.data || []) : [];
+        for (const m of macroData) {
+            events.push({ date: m.date, ticker: null, type: 'macro', category: m.category, label: m.label, country: m.country, description: m.description });
         }
 
         events.sort((a, b) => a.date.localeCompare(b.date));
@@ -3698,6 +3706,9 @@ function _renderUpcomingEvents(events) {
         return d.getTime() === today.getTime();
     }
 
+    const _MACRO_FLAG = { US: '🇺🇸', UK: '🇬🇧', EU: '🇪🇺' };
+    const _MACRO_INST = { fomc: 'Fed', boe: 'BoE', ecb: 'ECB', cpi: '', nfp: '', gdp: '' };
+
     el.innerHTML = `<div class="ue-table">
         <div class="ue-header">
             <span class="ue-col-date">Date</span>
@@ -3706,26 +3717,36 @@ function _renderUpcomingEvents(events) {
         </div>
         ${events.map(ev => {
         const todayCls = isToday(ev.date) ? ' ue-row-today' : '';
-        const badgeCls = ev.type === 'earnings' ? 'ue-badge-earnings'
-            : ev.type === 'ex-date' ? 'ue-badge-exdate'
-                : 'ue-badge-paydate';
-        const tickerHtml = ev.type === 'earnings'
-            ? `<a class="ue-ticker-link" href="https://earningshub.com/earnings-calendar?symbol=${encodeURIComponent(ev.ticker)}" target="_blank" rel="noopener" title="${esc(ev.company)}">${esc(ev.ticker)}</a>`
-            : `<span title="${esc(ev.company)}">${esc(ev.ticker)}</span>`;
-        const hourLabel = ev.hour === 'amc' ? 'After Market Close' : ev.hour === 'bmo' ? 'Before Market Open' : 'During Market Hours';
-        const hourHtml = ev.type === 'earnings' && ev.hour
-            ? ` <span class="ue-hour ue-hour-${ev.hour}" title="${hourLabel}">${ev.hour.toUpperCase()}</span>`
-            : '';
-        const estParts = [];
-        if (ev.type === 'earnings') {
-            if (ev.epsEstimate != null) estParts.push(`EPS $${ev.epsEstimate.toFixed(2)}`);
-            const rev = fmtRev(ev.revenueEstimate);
-            if (rev) estParts.push(`Rev ${rev}`);
+
+        let badgeCls, tickerHtml, hourHtml = '', estimatesHtml = '';
+
+        if (ev.type === 'macro') {
+            badgeCls = `ue-badge-${ev.category}`;
+            const flag = _MACRO_FLAG[ev.country] || '';
+            const inst = _MACRO_INST[ev.category] || ev.country;
+            tickerHtml = `<span class="ue-macro-inst" title="${esc(ev.description)}">${flag}${inst ? ` <span class="ue-macro-code">${esc(inst)}</span>` : ''}</span>`;
+            estimatesHtml = `<div class="ue-estimates">${esc(ev.description)}</div>`;
+        } else {
+            badgeCls = ev.type === 'earnings' ? 'ue-badge-earnings'
+                : ev.type === 'ex-date' ? 'ue-badge-exdate'
+                    : 'ue-badge-paydate';
+            tickerHtml = ev.type === 'earnings'
+                ? `<a class="ue-ticker-link" href="https://earningshub.com/earnings-calendar?symbol=${encodeURIComponent(ev.ticker)}" target="_blank" rel="noopener" title="${esc(ev.company)}">${esc(ev.ticker)}</a>`
+                : `<span title="${esc(ev.company)}">${esc(ev.ticker)}</span>`;
+            const hourLabel = ev.hour === 'amc' ? 'After Market Close' : ev.hour === 'bmo' ? 'Before Market Open' : 'During Market Hours';
+            hourHtml = ev.type === 'earnings' && ev.hour
+                ? ` <span class="ue-hour ue-hour-${ev.hour}" title="${hourLabel}">${ev.hour.toUpperCase()}</span>`
+                : '';
+            const estParts = [];
+            if (ev.type === 'earnings') {
+                if (ev.epsEstimate != null) estParts.push(`EPS $${ev.epsEstimate.toFixed(2)}`);
+                const rev = fmtRev(ev.revenueEstimate);
+                if (rev) estParts.push(`Rev ${rev}`);
+            }
+            estimatesHtml = estParts.length ? `<div class="ue-estimates">${estParts.join(' · ')}</div>` : '';
         }
-        const estimatesHtml = estParts.length
-            ? `<div class="ue-estimates">${estParts.join(' · ')}</div>`
-            : '';
-        return `<div class="ue-row${todayCls}">
+
+        return `<div class="ue-row${todayCls}${ev.type === 'macro' ? ' ue-row-macro' : ''}">
                 <span class="ue-col-date">${fmtDate(ev.date)}</span>
                 <span class="ue-col-ticker">${tickerHtml}</span>
                 <span class="ue-col-event"><span class="ue-badge ${badgeCls}">${esc(ev.label)}</span>${hourHtml}${estimatesHtml}</span>

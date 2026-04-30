@@ -9281,6 +9281,54 @@ html[data-theme="dark"] .nav-group-header.active {
   color: #10b981;
 }
 
+.ue-badge-fomc {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+.ue-badge-boe {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.ue-badge-ecb {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+
+.ue-badge-cpi {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.ue-badge-nfp {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.ue-badge-gdp {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+
+.ue-row-macro {
+  opacity: 0.88;
+}
+
+.ue-macro-inst {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.78rem;
+}
+
+.ue-macro-code {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
 .ue-ticker-link {
   color: var(--text-primary);
   text-decoration: none;
