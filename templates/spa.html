@@ -273,7 +273,8 @@
         </a>
 
         <div class="nav-group" id="navGroupPortfolio">
-          <a class="nav-group-header" data-route="portfolio/combined" data-tooltip="Portfolio" onclick="navigate('portfolio/combined')">
+          <a class="nav-group-header" data-route="portfolio/combined" data-tooltip="Portfolio"
+            onclick="navigate('portfolio/combined')">
             <span class="material-symbols-outlined nav-icon">pie_chart</span>
             <span class="nav-label">Portfolio</span>
           </a>
@@ -281,7 +282,8 @@
 
         <!-- Stocks group -->
         <div class="nav-group" id="navGroupStocks">
-          <a class="nav-group-header" data-route="stocks/combined" data-tooltip="Holdings" onclick="navigate('stocks/combined')">
+          <a class="nav-group-header" data-route="stocks/combined" data-tooltip="Holdings"
+            onclick="navigate('stocks/combined')">
             <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
             <span class="nav-label">Holdings</span>
           </a>
@@ -557,15 +559,15 @@
                           <span class="ov-mini-val" id="p1-invested">—</span>
                         </div>
                         <div class="ov-mini-row">
-                          <span class="ov-mini-label">Unrealized P&amp;L</span>
+                          <span class="ov-mini-label">Unrealized</span>
                           <span class="ov-mini-val" id="p1-unrealized">—</span>
                         </div>
                         <div class="ov-mini-row">
-                          <span class="ov-mini-label">Realized P&amp;L</span>
+                          <span class="ov-mini-label">Realized</span>
                           <span class="ov-mini-val" id="p1-realized">—</span>
                         </div>
                         <div class="ov-mini-row">
-                          <span class="ov-mini-label">Cash Available</span>
+                          <span class="ov-mini-label">Cash</span>
                           <span class="ov-mini-val" id="p1-cash">—</span>
                         </div>
                       </div>
@@ -598,15 +600,15 @@
                       <span class="ov-mini-val" id="p2-invested">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Unrealized P&amp;L</span>
+                      <span class="ov-mini-label">Unrealized</span>
                       <span class="ov-mini-val" id="p2-unrealized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Realized P&amp;L</span>
+                      <span class="ov-mini-label">Realized</span>
                       <span class="ov-mini-val" id="p2-realized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Cash Available</span>
+                      <span class="ov-mini-label">Cash</span>
                       <span class="ov-mini-val" id="p2-cash">—</span>
                     </div>
                   </div>
@@ -635,15 +637,15 @@
                       <span class="ov-mini-val" id="c-invested">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Unrealized P&amp;L</span>
+                      <span class="ov-mini-label">Unrealized</span>
                       <span class="ov-mini-val" id="c-unrealized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Realized P&amp;L</span>
+                      <span class="ov-mini-label">Realized</span>
                       <span class="ov-mini-val" id="c-realized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Cash Available</span>
+                      <span class="ov-mini-label">Cash</span>
                       <span class="ov-mini-val" id="c-cash">—</span>
                     </div>
                   </div>
@@ -730,7 +732,7 @@
               <div class="ov-card" id="ov-upcoming-events">
                 <div class="ov-header">
                   <span class="ov-label">Upcoming Events</span>
-                  <span style="font-size:0.72rem;color:var(--text-muted)">Next 30 days</span>
+                  <span style="font-size:0.72rem;color:var(--text-muted)">Next 60 days</span>
                 </div>
                 <div id="upcomingEventsList" class="upcoming-events-body">
                   <div class="skel-item">
@@ -1198,7 +1200,8 @@
               </div>
               <div class="social-feed-scroll" id="ytVideosList">
                 <div class="yt-empty-state">
-                  <span class="material-symbols-outlined" style="font-size:40px;color:var(--text-muted)">subscriptions</span>
+                  <span class="material-symbols-outlined"
+                    style="font-size:40px;color:var(--text-muted)">subscriptions</span>
                   <p>No channels configured yet.</p>
                   <button class="btn-primary-sm" onclick="openYtChannelsModal()">Add a Channel</button>
                 </div>
@@ -2152,9 +2155,8 @@
   </div>
 
   <!-- ── YouTube Channel Management Modal ──────────────────────────────── -->
-  <div id="ytChannelsModal" class="modal-overlay"
-       style="display:none;align-items:center;justify-content:center"
-       onclick="if(event.target===this)closeYtChannelsModal()">
+  <div id="ytChannelsModal" class="modal-overlay" style="display:none;align-items:center;justify-content:center"
+    onclick="if(event.target===this)closeYtChannelsModal()">
     <div class="modal-box yt-channels-box">
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:8px">

@@ -3620,7 +3620,7 @@ async function loadUpcomingEvents() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const cutoff = new Date(today);
-    cutoff.setDate(today.getDate() + 30);
+    cutoff.setDate(today.getDate() + 60);
 
     function toYMD(d) {
         return d.toISOString().slice(0, 10);
@@ -6200,8 +6200,8 @@ function _ytFmtDuration(secs) {
 function _ytRelDate(iso) {
     if (!iso) return '';
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
     if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
     return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -6224,7 +6224,7 @@ async function _loadYtVideos() {
     if (!list) return;
 
     try {
-        const res  = await fetch('/api/yt/videos');
+        const res = await fetch('/api/yt/videos');
         const json = await res.json();
         if (json.status !== 'ok') throw new Error(json.message || 'Failed');
         _ytVideos = json.videos || [];
@@ -6249,7 +6249,7 @@ function _renderYtVideoList(videos) {
     }
 
     list.innerHTML = videos.map(v => {
-        const esc = s => (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+        const esc = s => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
         const hasAnalysis = v.gemini_analysis && v.gemini_analysis.trim().length > 0;
         return `
           <div class="yt-feed-item" onclick="openYtSidebar('${esc(v.video_id)}')">
@@ -6275,7 +6275,7 @@ function openYtSidebar(videoId) {
     const video = _ytVideos.find(v => v.video_id === videoId);
     if (!video) return;
 
-    document.getElementById('ytSidebarTitle').textContent   = video.title;
+    document.getElementById('ytSidebarTitle').textContent = video.title;
     document.getElementById('ytSidebarChannel').textContent = video.channel_name;
 
     // Embed iframe
@@ -6308,7 +6308,7 @@ function openYtChannelsModal() {
 
 function closeYtChannelsModal() {
     document.getElementById('ytChannelsModal').style.display = 'none';
-    document.getElementById('ytChannelIdInput').value  = '';
+    document.getElementById('ytChannelIdInput').value = '';
     document.getElementById('ytChannelNameInput').value = '';
     document.getElementById('ytAddError').style.display = 'none';
 }
@@ -6317,14 +6317,14 @@ async function _loadYtChannelsList() {
     const container = document.getElementById('ytChannelsList');
     container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.8rem">Loading…</p>';
     try {
-        const res  = await fetch('/api/yt/channels');
+        const res = await fetch('/api/yt/channels');
         const json = await res.json();
-        const chs  = json.channels || [];
+        const chs = json.channels || [];
         if (!chs.length) {
             container.innerHTML = '<p class="yt-no-channels">No channels added yet.</p>';
             return;
         }
-        const esc = s => (s || '').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        const esc = s => (s || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
         container.innerHTML = chs.map(ch => `
           <div class="yt-channel-row">
             <div class="yt-channel-info">
@@ -6345,33 +6345,33 @@ async function _loadYtChannelsList() {
 
 async function addYtChannel() {
     const channelId = document.getElementById('ytChannelIdInput').value.trim();
-    const name      = document.getElementById('ytChannelNameInput').value.trim();
-    const errEl     = document.getElementById('ytAddError');
-    const btn       = document.getElementById('ytAddBtn');
+    const name = document.getElementById('ytChannelNameInput').value.trim();
+    const errEl = document.getElementById('ytAddError');
+    const btn = document.getElementById('ytAddBtn');
 
     errEl.style.display = 'none';
     if (!channelId || !name) {
-        errEl.textContent    = 'Both Channel ID and name are required.';
-        errEl.style.display  = 'block';
+        errEl.textContent = 'Both Channel ID and name are required.';
+        errEl.style.display = 'block';
         return;
     }
 
-    btn.disabled    = true;
+    btn.disabled = true;
     btn.textContent = 'Adding…';
     try {
-        const res  = await fetch('/api/yt/channels', {
-            method:  'POST',
+        const res = await fetch('/api/yt/channels', {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ channel_id: channelId, name }),
+            body: JSON.stringify({ channel_id: channelId, name }),
         });
         const json = await res.json();
         if (json.status !== 'ok') throw new Error(json.message || 'Error adding channel');
-        document.getElementById('ytChannelIdInput').value  = '';
+        document.getElementById('ytChannelIdInput').value = '';
         document.getElementById('ytChannelNameInput').value = '';
         await _loadYtChannelsList();
         await _loadYtVideos();
     } catch (e) {
-        errEl.textContent   = e.message;
+        errEl.textContent = e.message;
         errEl.style.display = 'block';
     } finally {
         btn.disabled = false;

@@ -10678,6 +10678,10 @@ div#sectorBarsList {
   transition: border-color 0.2s;
 }
 
+input {
+  font-family: 'JetBrains Mono', monospace;
+}
+
 .watchlist-input:focus {
   border-color: var(--accent);
 }
@@ -13693,8 +13697,13 @@ thead .mph-ticker-col {
   transition: background .12s;
 }
 
-.yt-feed-item:hover { background: var(--bg-hover); }
-.yt-feed-item:last-child { border-bottom: none; }
+.yt-feed-item:hover {
+  background: var(--bg-hover);
+}
+
+.yt-feed-item:last-child {
+  border-bottom: none;
+}
 
 .yt-feed-thumb {
   position: relative;
@@ -13779,7 +13788,7 @@ thead .mph-ticker-col {
   font-size: 0.62rem;
   font-weight: 700;
   color: var(--accent);
-  background: var(--accent-glow, rgba(123,97,255,.15));
+  background: var(--accent-glow, rgba(123, 97, 255, .15));
   padding: 1px 5px;
   border-radius: 10px;
 }
@@ -13819,7 +13828,9 @@ thead .mph-ticker-col {
   transition: opacity .14s;
 }
 
-.btn-primary-sm:hover { opacity: .85; }
+.btn-primary-sm:hover {
+  opacity: .85;
+}
 
 /* ═══ YouTube Video Sidebar ══════════════════════════════════════════════════ */
 
@@ -13903,7 +13914,9 @@ thead .mph-ticker-col {
   color: var(--text-primary);
 }
 
-.yt-analysis-body strong { color: var(--text-primary); }
+.yt-analysis-body strong {
+  color: var(--text-primary);
+}
 
 .yt-analysis-h {
   font-size: 0.82rem;
@@ -13917,9 +13930,13 @@ thead .mph-ticker-col {
   margin: 4px 0 8px;
 }
 
-.yt-analysis-body li { margin-bottom: 3px; }
+.yt-analysis-body li {
+  margin-bottom: 3px;
+}
 
-.yt-ap { margin: 6px 0; }
+.yt-ap {
+  margin: 6px 0;
+}
 
 .yt-analysis-pending {
   color: var(--text-secondary);
