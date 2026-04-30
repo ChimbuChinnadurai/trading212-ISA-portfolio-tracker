@@ -69,6 +69,13 @@ _SECTOR_ETFS = {
 
 _WL_TTL = 10 * 365 * 24 * 3600  # ~10 years — effectively permanent for watchlist
 
+_WL_DEFAULT_CATEGORIES = [
+    {"id": "stock", "label": "Stock", "tabLabel": "Stocks", "icon": "trending_up", "noCountry": False, "placeholder": "Ticker (e.g. AAPL, NVDA)"},
+    {"id": "etf", "label": "ETF", "tabLabel": "ETFs", "icon": "account_balance", "noCountry": False, "placeholder": "Ticker (e.g. VOO, QQQ)"},
+    {"id": "crypto", "label": "Crypto", "tabLabel": "Crypto", "icon": "currency_bitcoin", "noCountry": True, "placeholder": "Ticker (e.g. BTC, ETH, SOL)", "autoCryptoSuffix": True},
+    {"id": "commodity", "label": "Commodity", "tabLabel": "Commodities", "icon": "diamond", "noCountry": True, "placeholder": "Yahoo symbol (e.g. GC=F Gold, SI=F Silver, CL=F Oil)"},
+]
+
 
 # ── Market indicator helpers ───────────────────────────────────────────────────
 
@@ -1247,6 +1254,24 @@ def save_watchlist_tickers():
     if not isinstance(tickers, list):
         return jsonify({"status": "error", "message": "tickers must be a list"}), 400
     kv_set("watchlist_tickers", tickers)
+    return jsonify({"status": "ok"})
+
+
+@market_bp.route("/api/watchlist/categories", methods=["GET"])
+def get_watchlist_categories():
+    """Return persisted watchlist categories (falls back to built-in defaults)."""
+    stored = kv_get("watchlist_categories", _WL_TTL)
+    return jsonify({"status": "ok", "data": stored if stored is not None else _WL_DEFAULT_CATEGORIES})
+
+
+@market_bp.route("/api/watchlist/categories", methods=["POST"])
+def save_watchlist_categories():
+    """Persist the full watchlist categories list."""
+    body = flask_request.get_json(silent=True) or {}
+    cats = body.get("categories", [])
+    if not isinstance(cats, list):
+        return jsonify({"status": "error", "message": "categories must be a list"}), 400
+    kv_set("watchlist_categories", cats)
     return jsonify({"status": "ok"})
 
 

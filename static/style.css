@@ -9766,6 +9766,8 @@ html[data-theme="dark"] .nav-group-header.active {
   flex-direction: column;
   overflow: hidden;
   height: 400px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
 }
 
 /* Portfolio vs S&P legend */
@@ -9992,6 +9994,8 @@ html[data-theme="dark"] .nav-group-header.active {
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  border: 1px solid var(--border);
+  border-radius: 15px;
 }
 
 .pvs-gain-accent {
@@ -10376,29 +10380,85 @@ div#sectorBarsList {
 
 /* Type toggle (Stock / ETF) */
 .wl-type-toggle {
+  position: relative;
   display: flex;
-  background: var(--bg-row-alt);
+  align-items: center;
+}
+
+.wl-type-dropdown {
+  position: relative;
+}
+
+.wl-type-sel-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 8px;
   border: 1px solid var(--border);
-  border-radius: 99px;
-  padding: 2px;
-  gap: 2px;
-}
-
-.wl-type-btn {
-  padding: 3px 12px;
-  border-radius: 99px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  font-weight: 600;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  transition: border-color 0.15s;
 }
 
-.wl-type-btn.active {
-  background: var(--accent);
-  color: #fff;
+.wl-type-sel-btn:hover {
+  border-color: var(--accent);
+}
+
+.wl-type-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  z-index: 200;
+  padding: 4px;
+}
+
+.wl-type-panel.open {
+  display: block;
+}
+
+.wl-type-opt {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s;
+  box-sizing: border-box;
+}
+
+.wl-type-opt:hover {
+  background: var(--bg-hover);
+}
+
+.wl-type-opt.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.wl-type-panel-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
+}
+
+.wl-type-add-cat {
+  color: var(--text-secondary);
 }
 
 /* Activity filter tabs */
@@ -10518,6 +10578,43 @@ div#sectorBarsList {
   color: #10b981;
   border: 1px solid rgba(16, 185, 129, 0.25);
 }
+
+.wl-tab[draggable="true"] {
+  cursor: grab;
+}
+
+.wl-tab[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.wl-tab.wl-dragging {
+  opacity: 0.35;
+}
+
+.wl-tab.wl-drag-before {
+  border-left: 2px solid var(--accent);
+}
+
+.wl-tab.wl-drag-after {
+  border-right: 2px solid var(--accent);
+}
+
+.wl-tab-del {
+  font-size: 0.75rem;
+  line-height: 1;
+  padding: 1px 3px;
+  margin-left: 2px;
+  opacity: 0.55;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.wl-tab-del:hover {
+  opacity: 1;
+  background: rgba(239, 68, 68, 0.22);
+  color: #ef4444;
+}
+
 
 .watchlist-input {
   background: var(--bg-card);
@@ -10947,6 +11044,8 @@ html[data-theme="dark"] .widget-signals {
 /* ── Drawdown Analysis widget ────────────────────────────────────────────── */
 .drawdown-widget {
   min-height: 0;
+  border: 1px solid var(--border);
+  border-radius: 15px;
 }
 
 .drawdown-chart-wrap {
