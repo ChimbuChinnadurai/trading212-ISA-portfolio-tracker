@@ -543,13 +543,13 @@ function _heatColor(pct) {
     const v = pct ?? 0;
     // Thresholds tuned for daily % change (vs total-return in Position Heatmap)
     if (Math.abs(v) < 0.05) return '#2c2c2a';
-    if (v >= 3) return 'linear-gradient(160deg,#165e30,#22aa45)';
-    if (v >= 1.5) return 'linear-gradient(160deg,#187838,#26b84e)';
-    if (v >= 0.5) return 'linear-gradient(160deg,#178040,#24b24c)';
-    if (v > 0) return 'linear-gradient(160deg,#137870,#1ab8a8)';
-    if (v >= -0.5) return 'linear-gradient(160deg,#8a3c12,#c45018)';
+    if (v >= 3) return 'linear-gradient(160deg,#22aa45,#22aa45)';
+    if (v >= 1.5) return 'linear-gradient(160deg,#26b84e,#26b84e)';
+    if (v >= 0.5) return 'linear-gradient(160deg,#24b24c,#24b24c)';
+    if (v > 0) return 'linear-gradient(160deg,#1ab8a8,#1ab8a8)';
+    if (v >= -0.5) return 'linear-gradient(160deg,#c45018,#c45018)';
     if (v >= -1.5) return 'linear-gradient(160deg,#8c1e1e,#cc2e2e)';
-    return 'linear-gradient(160deg,#6e1616,#a82020)';
+    return 'linear-gradient(160deg,#a82020,#a82020)';
 }
 
 function _computeTreemap(items, W, H) {
@@ -4567,7 +4567,7 @@ async function _wlSaveCategories() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ categories: _wlCategories }),
         });
-    } catch (_) {}
+    } catch (_) { }
 }
 
 function _wlRenderTypeButtons() {

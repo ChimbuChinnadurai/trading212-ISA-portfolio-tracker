@@ -805,12 +805,7 @@ html[data-theme="dark"] .header {
   pointer-events: none;
 }
 
-.s-card:hover .s-card-tape {
-  transform: translateX(-50%) rotate(2deg);
-}
-
 .s-card:hover {
-  transform: translateY(-2px) rotate(0.5deg);
   box-shadow: 8px 8px 0px rgba(42, 42, 42, 0.12);
 }
 
@@ -818,18 +813,6 @@ html[data-theme="dark"] .header {
   font-family: 'PT Serif', serif;
   font-weight: 700;
   font-size: 1.8rem;
-}
-
-.s-card.s-card-blue {
-  border: 1.5px solid var(--border);
-}
-
-div#returnsCard {
-  border: 1.5px solid var(--border);
-}
-
-.s-card.s-card-teal {
-  border: 1.5px solid var(--border);
 }
 
 /* Coloured top accent bars — dark mode only */
@@ -10280,11 +10263,11 @@ html[data-theme="dark"] .nav-group-header.active {
   opacity: 0.4;
 }
 
-.wl-table-row.wl-row-drag-before > td {
+.wl-table-row.wl-row-drag-before>td {
   border-top: 2px solid var(--accent);
 }
 
-.wl-table-row.wl-row-drag-after > td {
+.wl-table-row.wl-row-drag-after>td {
   border-bottom: 2px solid var(--accent);
 }
 
