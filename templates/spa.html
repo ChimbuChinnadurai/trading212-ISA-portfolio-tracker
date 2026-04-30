@@ -1182,6 +1182,29 @@
               </div>
             </div>
 
+            <!-- ── YouTube Videos column ──────────────────────────────── -->
+            <div class="social-feed-col" id="ytFeedCol">
+              <div class="social-feed-header">
+                <div class="social-feed-header-left">
+                  <span class="material-symbols-outlined social-feed-icon">play_circle</span>
+                  <span class="social-feed-title">Videos</span>
+                </div>
+                <div class="social-feed-header-right">
+                  <button class="yt-manage-btn" onclick="openYtChannelsModal()">
+                    <span class="material-symbols-outlined" style="font-size:15px">tune</span>
+                    Channels
+                  </button>
+                </div>
+              </div>
+              <div class="social-feed-scroll" id="ytVideosList">
+                <div class="yt-empty-state">
+                  <span class="material-symbols-outlined" style="font-size:40px;color:var(--text-muted)">subscriptions</span>
+                  <p>No channels configured yet.</p>
+                  <button class="btn-primary-sm" onclick="openYtChannelsModal()">Add a Channel</button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div><!-- /view-news -->
 
@@ -2102,6 +2125,63 @@
       </div>
     </div>
   </div>
+  <!-- ── YouTube Video Sidebar ─────────────────────────────────────────── -->
+  <div class="yt-sidebar-overlay" id="ytSidebarOverlay" onclick="closeYtSidebar()"></div>
+  <div class="yt-sidebar" id="ytSidebar">
+    <div class="ss-header">
+      <div class="ss-header-left">
+        <h2 class="ss-title" id="ytSidebarTitle">Video</h2>
+        <span class="ss-subtitle" id="ytSidebarChannel"></span>
+      </div>
+      <button class="ss-close-btn" onclick="closeYtSidebar()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="yt-sidebar-body" id="ytSidebarBody">
+      <div class="yt-embed-wrap" id="ytEmbedContainer"></div>
+      <div class="yt-analysis-section" id="ytAnalysisSection">
+        <div class="yt-analysis-label">
+          <span class="material-symbols-outlined" style="font-size:16px">auto_awesome</span>
+          Gemini Analysis
+        </div>
+        <div class="yt-analysis-body" id="ytAnalysisBody">
+          <div class="yt-analysis-pending">Analysis pending…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── YouTube Channel Management Modal ──────────────────────────────── -->
+  <div id="ytChannelsModal" class="modal-overlay"
+       style="display:none;align-items:center;justify-content:center"
+       onclick="if(event.target===this)closeYtChannelsModal()">
+    <div class="modal-box yt-channels-box">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="material-symbols-outlined" style="font-size:18px">subscriptions</span>
+          <span class="modal-title">YouTube Channels</span>
+        </div>
+        <button class="modal-close" onclick="closeYtChannelsModal()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div id="ytChannelsList" class="yt-channels-list"></div>
+        <div class="yt-add-channel-form">
+          <div class="yt-form-row">
+            <input id="ytChannelIdInput" class="form-input" placeholder="Channel ID  (e.g. UCxxxxxxxxxxxxxx)" />
+            <input id="ytChannelNameInput" class="form-input" placeholder="Display name  (e.g. CNBC)" />
+          </div>
+          <div id="ytAddError" class="yt-add-error" style="display:none"></div>
+          <button class="btn-primary-sm" id="ytAddBtn" onclick="addYtChannel()">
+            <span class="material-symbols-outlined" style="font-size:15px">add</span>
+            Add Channel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- impeccable-live-start -->
   <!-- <script src="http://localhost:8400/live.js"></script> -->
   <!-- impeccable-live-end -->

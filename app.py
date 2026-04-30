@@ -36,7 +36,7 @@ from cache import (
 )
 from helpers import API_KEYS, fetch_and_cache_portfolio
 from routes import alerts_bp, ai_bp, market_bp, performance_bp, portfolio_bp
-from routes.market import fetch_and_cache_market_indicators, fetch_and_cache_news
+from routes.market import fetch_and_cache_market_indicators, fetch_and_cache_news, yt_refresh_all_channels
 import snowball_dividends as _sdiv
 
 # ── Flask app ─────────────────────────────────────────────────────────────────
@@ -167,15 +167,30 @@ def _background_news_refresh() -> None:
         time.sleep(300)
 
 
+def _background_yt_refresh() -> None:
+    """Daemon thread: fetch new YouTube videos from all channels every 15 min."""
+    _log = logging.getLogger("yt-refresh")
+    time.sleep(60)  # stagger startup
+    while True:
+        try:
+            yt_refresh_all_channels()
+            _log.info("YouTube video cache refreshed")
+        except Exception as exc:
+            _log.error("YouTube refresh failed: %s", exc)
+        time.sleep(900)  # 15 minutes
+
+
 _refresh_thread = threading.Thread(target=_background_refresh,          daemon=True, name="portfolio-refresh")
 _div_thread     = threading.Thread(target=_background_dividend_refresh, daemon=True, name="div-refresh")
 _market_thread  = threading.Thread(target=_background_market_refresh,   daemon=True, name="market-refresh")
 _news_thread    = threading.Thread(target=_background_news_refresh,     daemon=True, name="news-refresh")
+_yt_thread      = threading.Thread(target=_background_yt_refresh,       daemon=True, name="yt-refresh")
 
 _refresh_thread.start()
 _div_thread.start()
 _market_thread.start()
 _news_thread.start()
+_yt_thread.start()
 
 
 # ── One-time startup migration ────────────────────────────────────────────────

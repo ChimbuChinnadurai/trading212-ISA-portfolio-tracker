@@ -4295,6 +4295,10 @@ async function loadNewsView(force = false) {
         const c = document.getElementById('trumpFeedScroll');
         if (c) { const s = document.getElementById('trumpSkel'); if (s) s.remove(); c.innerHTML = '<div class="social-empty">Could not load posts.</div>'; }
     }
+
+    _loadYtVideos();
+    if (window._ytPollTimer) clearInterval(window._ytPollTimer);
+    window._ytPollTimer = setInterval(_loadYtVideos, 15 * 60 * 1000);
 }
 
 /* ── Trump sentiment analysis ── */
@@ -6179,4 +6183,209 @@ function _initYTDChartHover(canvas) {
         const tt = document.getElementById('ytdChartTooltip');
         if (tt) tt.style.display = 'none';
     });
+}
+
+// ── YouTube Videos ─────────────────────────────────────────────────────────
+
+let _ytVideos = [];
+
+function _ytFmtDuration(secs) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function _ytRelDate(iso) {
+    if (!iso) return '';
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 3600)   return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400)  return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function _ytMdToHtml(text) {
+    if (!text) return '<p class="yt-analysis-pending">Analysis pending — check back shortly.</p>';
+    return '<div>' + text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^#{1,3}\s+(.+)$/gm, '<h4 class="yt-analysis-h">$1</h4>')
+        .replace(/^[•\-\*]\s+(.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>[\s\S]*?<\/li>)(\n<li>|$)/g, '$1$2')
+        .replace(/(<li>.*<\/li>\n?)+/g, match => `<ul>${match}</ul>`)
+        .replace(/\n\n+/g, '</p><p class="yt-ap">')
+        .replace(/^(?!<[hup]|$)(.+)/gm, '<p class="yt-ap">$1</p>')
+        + '</div>';
+}
+
+async function _loadYtVideos() {
+    const list = document.getElementById('ytVideosList');
+    if (!list) return;
+
+    try {
+        const res  = await fetch('/api/yt/videos');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        _ytVideos = json.videos || [];
+        _renderYtVideoList(_ytVideos);
+    } catch (e) {
+        list.innerHTML = `<p class="yt-load-err">Could not load videos: ${e.message}</p>`;
+    }
+}
+
+function _renderYtVideoList(videos) {
+    const list = document.getElementById('ytVideosList');
+    if (!list) return;
+
+    if (!videos.length) {
+        list.innerHTML = `
+          <div class="yt-empty-state">
+            <span class="material-symbols-outlined" style="font-size:40px;color:var(--text-muted)">subscriptions</span>
+            <p>No channels configured yet.</p>
+            <button class="btn-primary-sm" onclick="openYtChannelsModal()">Add a Channel</button>
+          </div>`;
+        return;
+    }
+
+    list.innerHTML = videos.map(v => {
+        const esc = s => (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+        const hasAnalysis = v.gemini_analysis && v.gemini_analysis.trim().length > 0;
+        return `
+          <div class="yt-feed-item" onclick="openYtSidebar('${esc(v.video_id)}')">
+            <div class="yt-feed-thumb">
+              ${v.thumbnail
+                ? `<img class="yt-feed-img" src="${esc(v.thumbnail)}" alt="" loading="lazy">`
+                : `<div class="yt-thumb-placeholder"><span class="material-symbols-outlined">play_circle</span></div>`}
+              <span class="yt-duration-badge">${_ytFmtDuration(v.duration_seconds)}</span>
+            </div>
+            <div class="yt-feed-info">
+              <div class="yt-feed-channel">${esc(v.channel_name)}</div>
+              <div class="yt-feed-title">${esc(v.title)}</div>
+              <div class="yt-feed-meta">
+                <span>${_ytRelDate(v.published_at)}</span>
+                ${hasAnalysis ? `<span class="yt-analyzed-badge"><span class="material-symbols-outlined" style="font-size:11px">auto_awesome</span>Analyzed</span>` : ''}
+              </div>
+            </div>
+          </div>`;
+    }).join('');
+}
+
+function openYtSidebar(videoId) {
+    const video = _ytVideos.find(v => v.video_id === videoId);
+    if (!video) return;
+
+    document.getElementById('ytSidebarTitle').textContent   = video.title;
+    document.getElementById('ytSidebarChannel').textContent = video.channel_name;
+
+    // Embed iframe
+    document.getElementById('ytEmbedContainer').innerHTML = `
+      <iframe class="yt-iframe"
+        src="https://www.youtube.com/embed/${video.video_id}?rel=0&modestbranding=1"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen></iframe>`;
+
+    // Analysis
+    document.getElementById('ytAnalysisBody').innerHTML = _ytMdToHtml(video.gemini_analysis);
+
+    document.getElementById('ytSidebar').classList.add('open');
+    document.getElementById('ytSidebarOverlay').classList.add('open');
+}
+
+function closeYtSidebar() {
+    document.getElementById('ytSidebar').classList.remove('open');
+    document.getElementById('ytSidebarOverlay').classList.remove('open');
+    // Stop video playback
+    document.getElementById('ytEmbedContainer').innerHTML = '';
+}
+
+// ── Channel management modal ──────────────────────────────────────────────
+
+function openYtChannelsModal() {
+    document.getElementById('ytChannelsModal').style.display = 'flex';
+    _loadYtChannelsList();
+}
+
+function closeYtChannelsModal() {
+    document.getElementById('ytChannelsModal').style.display = 'none';
+    document.getElementById('ytChannelIdInput').value  = '';
+    document.getElementById('ytChannelNameInput').value = '';
+    document.getElementById('ytAddError').style.display = 'none';
+}
+
+async function _loadYtChannelsList() {
+    const container = document.getElementById('ytChannelsList');
+    container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.8rem">Loading…</p>';
+    try {
+        const res  = await fetch('/api/yt/channels');
+        const json = await res.json();
+        const chs  = json.channels || [];
+        if (!chs.length) {
+            container.innerHTML = '<p class="yt-no-channels">No channels added yet.</p>';
+            return;
+        }
+        const esc = s => (s || '').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+        container.innerHTML = chs.map(ch => `
+          <div class="yt-channel-row">
+            <div class="yt-channel-info">
+              <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">subscriptions</span>
+              <div>
+                <div class="yt-channel-name">${esc(ch.name)}</div>
+                <div class="yt-channel-id">${esc(ch.channel_id)}</div>
+              </div>
+            </div>
+            <button class="yt-del-btn" onclick="deleteYtChannel('${esc(ch.channel_id)}')" title="Remove channel">
+              <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+            </button>
+          </div>`).join('');
+    } catch (e) {
+        container.innerHTML = '<p class="yt-load-err">Failed to load channels.</p>';
+    }
+}
+
+async function addYtChannel() {
+    const channelId = document.getElementById('ytChannelIdInput').value.trim();
+    const name      = document.getElementById('ytChannelNameInput').value.trim();
+    const errEl     = document.getElementById('ytAddError');
+    const btn       = document.getElementById('ytAddBtn');
+
+    errEl.style.display = 'none';
+    if (!channelId || !name) {
+        errEl.textContent    = 'Both Channel ID and name are required.';
+        errEl.style.display  = 'block';
+        return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Adding…';
+    try {
+        const res  = await fetch('/api/yt/channels', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ channel_id: channelId, name }),
+        });
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Error adding channel');
+        document.getElementById('ytChannelIdInput').value  = '';
+        document.getElementById('ytChannelNameInput').value = '';
+        await _loadYtChannelsList();
+        await _loadYtVideos();
+    } catch (e) {
+        errEl.textContent   = e.message;
+        errEl.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px">add</span> Add Channel';
+    }
+}
+
+async function deleteYtChannel(channelId) {
+    if (!confirm('Remove this channel and all its cached videos?')) return;
+    try {
+        await fetch(`/api/yt/channel/${encodeURIComponent(channelId)}`, { method: 'DELETE' });
+        await _loadYtChannelsList();
+        await _loadYtVideos();
+    } catch (e) {
+        alert('Failed to remove channel: ' + e.message);
+    }
 }

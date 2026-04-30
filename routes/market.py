@@ -58,6 +58,9 @@ FINNHUB_TOKEN   = os.environ.get("FINNHUB_TOKEN")
 TTL_EARNINGS    = 86400   # 1 day
 TTL_STOCK_NEWS  = 1800    # 30 min — per-ticker company news
 
+_YT_API_KEY     = os.environ.get("YOUTUBE_API_KEY", "")
+_YT_MIN_SECS    = 121     # filter out videos ≤ 2 min (Shorts + very short clips)
+
 _SECTOR_ETFS = {
     "XLK":  "Technology",        "XLF":  "Financial Services",
     "XLE":  "Energy",            "XLV":  "Healthcare",
@@ -1287,4 +1290,196 @@ def finviz_news():
     data = fvd.get_market_news()
     kv_set(cache_key, data)
     return jsonify({"status": "ok", "data": data, "cached": False})
+
+
+# ── YouTube Videos ────────────────────────────────────────────────────────────
+
+def _parse_iso8601_duration(s: str) -> int:
+    """Convert ISO 8601 duration (e.g. PT15M10S) to total seconds."""
+    m = re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", s or "")
+    if not m:
+        return 0
+    return int(m.group(1) or 0) * 3600 + int(m.group(2) or 0) * 60 + int(m.group(3) or 0)
+
+
+def _yt_fetch_channel_videos(channel_id: str, channel_name: str) -> list:
+    """
+    Fetch the 10 most recent uploads from a channel, filter out Shorts
+    (duration ≤ _YT_MIN_SECS), and return video dicts.
+    """
+    if not _YT_API_KEY:
+        return []
+
+    # Step 1 — find most-recent video IDs
+    search_resp = requests.get(
+        "https://www.googleapis.com/youtube/v3/search",
+        params={
+            "key": _YT_API_KEY,
+            "channelId": channel_id,
+            "type": "video",
+            "order": "date",
+            "maxResults": 15,
+            "part": "id",
+        },
+        timeout=12,
+    )
+    search_resp.raise_for_status()
+    ids = [item["id"]["videoId"] for item in search_resp.json().get("items", [])]
+    if not ids:
+        return []
+
+    # Step 2 — fetch snippet + contentDetails for each ID
+    detail_resp = requests.get(
+        "https://www.googleapis.com/youtube/v3/videos",
+        params={
+            "key": _YT_API_KEY,
+            "id": ",".join(ids),
+            "part": "snippet,contentDetails",
+        },
+        timeout=12,
+    )
+    detail_resp.raise_for_status()
+
+    videos = []
+    for item in detail_resp.json().get("items", []):
+        secs = _parse_iso8601_duration(item["contentDetails"]["duration"])
+        if secs <= _YT_MIN_SECS:
+            continue  # skip Shorts / very short clips
+        snip = item["snippet"]
+        thumb = (
+            snip.get("thumbnails", {}).get("medium", {}).get("url")
+            or snip.get("thumbnails", {}).get("default", {}).get("url", "")
+        )
+        videos.append({
+            "video_id":        item["id"],
+            "channel_id":      channel_id,
+            "channel_name":    channel_name,
+            "title":           snip["title"],
+            "description":     snip.get("description", "")[:3000],
+            "thumbnail":       thumb,
+            "published_at":    snip["publishedAt"],
+            "duration_seconds": secs,
+        })
+    return videos
+
+
+def _yt_analyze_video(video_id: str, title: str, description: str, channel_name: str) -> str:
+    """
+    Send video metadata to Gemini for investment-focused analysis.
+    Returns the analysis string, or "" on any failure.
+    """
+    if not os.environ.get("GEMINI_API_KEY"):
+        return ""
+
+    prompt = (
+        f"Analyze this financial/investment YouTube video and provide a structured summary.\n\n"
+        f"Channel: {channel_name}\n"
+        f"Title: {title}\n"
+        f"Description: {description or '(no description)'}\n\n"
+        "Provide the following sections:\n"
+        "**Key Topics** — 2-3 bullets on what the video covers\n"
+        "**Key Insights** — 2-4 investor takeaways\n"
+        "**Assets Mentioned** — specific tickers, stocks, ETFs, or crypto referenced (or 'None identified')\n"
+        "**Market Sentiment** — Bullish / Bearish / Neutral with a one-line reason\n"
+        "**Watch Worthiness** — one sentence on who should watch this video"
+    )
+
+    try:
+        import gemini_utils
+        return gemini_utils._generate(prompt)
+    except Exception as exc:
+        logger.warning("Gemini analysis failed for %s: %s", video_id, exc)
+        return ""
+
+
+def _yt_analyze_bg(videos: list) -> None:
+    """Run Gemini analysis for a list of new videos in a background thread."""
+    import threading
+    from cache import yt_video_set_analysis
+
+    def _worker():
+        for v in videos:
+            try:
+                analysis = _yt_analyze_video(
+                    v["video_id"], v["title"], v.get("description", ""), v["channel_name"]
+                )
+                if analysis:
+                    yt_video_set_analysis(v["video_id"], analysis)
+            except Exception as exc:
+                logger.warning("BG analysis failed for %s: %s", v["video_id"], exc)
+
+    threading.Thread(target=_worker, daemon=True, name="yt-analyze").start()
+
+
+def yt_refresh_all_channels() -> None:
+    """
+    Fetch new videos from every configured channel and analyze new ones with Gemini.
+    Called every 15 min by the background thread in app.py.
+    """
+    from cache import yt_channels_get, yt_video_upsert, yt_video_set_analysis
+
+    channels = yt_channels_get()
+    if not channels:
+        return
+
+    for ch in channels:
+        try:
+            videos = _yt_fetch_channel_videos(ch["channel_id"], ch["name"])
+            for v in videos:
+                is_new = yt_video_upsert(v)
+                if is_new:
+                    analysis = _yt_analyze_video(
+                        v["video_id"], v["title"], v.get("description", ""), v["channel_name"]
+                    )
+                    if analysis:
+                        yt_video_set_analysis(v["video_id"], analysis)
+        except Exception as exc:
+            logger.error("YT channel refresh failed (%s): %s", ch["channel_id"], exc)
+
+
+# ── YouTube routes ────────────────────────────────────────────────────────────
+
+@market_bp.route("/api/yt/channels", methods=["GET"])
+def api_yt_channels_get():
+    from cache import yt_channels_get
+    return jsonify({"status": "ok", "channels": yt_channels_get()})
+
+
+@market_bp.route("/api/yt/channels", methods=["POST"])
+def api_yt_channels_add():
+    from cache import yt_channel_add, yt_video_upsert
+    body = flask_request.get_json(force=True, silent=True) or {}
+    channel_id = (body.get("channel_id") or "").strip()
+    name = (body.get("name") or "").strip()
+    if not channel_id or not name:
+        return jsonify({"status": "error", "message": "channel_id and name are required"}), 400
+
+    yt_channel_add(channel_id, name)
+
+    # Fetch recent videos immediately; analyze in background
+    try:
+        videos = _yt_fetch_channel_videos(channel_id, name)
+        new_videos = []
+        for v in videos:
+            if yt_video_upsert(v):
+                new_videos.append(v)
+        if new_videos and os.environ.get("GEMINI_API_KEY"):
+            _yt_analyze_bg(new_videos)
+    except Exception as exc:
+        logger.warning("Initial YT fetch failed for channel %s: %s", channel_id, exc)
+
+    return jsonify({"status": "ok"})
+
+
+@market_bp.route("/api/yt/channel/<channel_id>", methods=["DELETE"])
+def api_yt_channel_delete(channel_id):
+    from cache import yt_channel_delete
+    yt_channel_delete(channel_id)
+    return jsonify({"status": "ok"})
+
+
+@market_bp.route("/api/yt/videos", methods=["GET"])
+def api_yt_videos():
+    from cache import yt_videos_get
+    return jsonify({"status": "ok", "videos": yt_videos_get(limit=60)})
 
