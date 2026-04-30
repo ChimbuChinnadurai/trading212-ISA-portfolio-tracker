@@ -2974,14 +2974,14 @@ function _rebalSave() {
 let _phmRects = [];
 
 function _pnlColor(pct) {
-  // Total return % — green = gain, amber = tiny loss, red = loss
-  if (pct >= 30) return 'linear-gradient(135deg,#052e16,#15803d)';
-  if (pct >= 15) return 'linear-gradient(135deg,#14532d,#16a34a)';
-  if (pct >= 5) return 'linear-gradient(135deg,#166534,#22c55e)';
-  if (pct >= 0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
-  if (pct >= -5) return 'linear-gradient(135deg,#78350f,#b45309)';
-  if (pct >= -15) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
-  return 'linear-gradient(135deg,#450a0a,#b91c1c)';
+  // Total return % — colour palette shared with heatmap & watchlist
+  if (pct >= 30) return 'linear-gradient(135deg,#145228,#22aa45)';
+  if (pct >= 15) return 'linear-gradient(135deg,#14532d,#26b84e)';
+  if (pct >= 5) return 'linear-gradient(135deg,#166534,#24b24c)';
+  if (pct >= 0) return 'linear-gradient(135deg,#0f766e,#1ab8a8)';
+  if (pct >= -5) return 'linear-gradient(135deg,#78350f,#c45018)';
+  if (pct >= -15) return 'linear-gradient(135deg,#8c1e1e,#cc2e2e)';
+  return 'linear-gradient(135deg,#450a0a,#a82020)';
 }
 
 function drawPortfolioHeatmap(rows, totalValue) {

@@ -2348,7 +2348,7 @@ th.sort-desc .sort-icon::before {
   border-radius: var(--radius);
   opacity: 0.2;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
 .hm-sector-label {
