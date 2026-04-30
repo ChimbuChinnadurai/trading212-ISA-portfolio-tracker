@@ -4529,8 +4529,12 @@ function closeDigestModal() {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const _WL_STORAGE_KEY = 'wl:tickers:v1';
-let _wlActiveTab = 'stock';
+let _wlActiveTab = '__heatmap__';
 let _wlAddType = 'stock';
+const _wlPriceCache = new Map();
+let _wlLastList = [];
+let _wlHeatmapObserver = null;
+let _wlHeatmapRefreshTimer = null;
 
 const _WL_DEFAULT_CATEGORIES = [
     { id: 'stock', label: 'Stock', tabLabel: 'Stocks', icon: 'trending_up', noCountry: false, placeholder: 'Ticker (e.g. AAPL, NVDA)' },
@@ -4559,7 +4563,7 @@ async function _wlLoadCategories() {
     } catch (_) {
         _wlCategories = [..._WL_DEFAULT_CATEGORIES];
     }
-    if (!_wlCategories.find(c => c.id === _wlActiveTab)) _wlActiveTab = _wlCategories[0]?.id || 'stock';
+    if (_wlActiveTab !== '__heatmap__' && !_wlCategories.find(c => c.id === _wlActiveTab)) _wlActiveTab = _wlCategories[0]?.id || 'stock';
     if (!_wlCategories.find(c => c.id === _wlAddType)) _wlAddType = _wlActiveTab;
 }
 
@@ -4627,7 +4631,8 @@ function _wlRenderTabs() {
             ` ${esc(cat.tabLabel || cat.label)}` +
             `<span class="wl-tab-count" id="wlTabCount-${esc(cat.id)}"></span>` +
             `${delBtn}</button>`;
-    }).join('');
+    }).join('')
+        + `<button class="wl-tab wl-tab-heatmap${_wlActiveTab === '__heatmap__' ? ' active' : ''}" data-wl-tab="__heatmap__" onclick="_wlSwitchTab('__heatmap__')"><span class="material-symbols-outlined" style="font-size:14px;vertical-align:-3px">grid_view</span> Heatmap</button>`;
     _wlInitTabDrag(container);
 }
 
@@ -4673,6 +4678,7 @@ function _wlInitTabDrag(container) {
         _wlDragSrcId = null;
         if (!tab || !srcId || tab.dataset.wlTab === srcId) return;
         const targetId = tab.dataset.wlTab;
+        if (targetId === '__heatmap__' || srcId === '__heatmap__') return;
         const rect = tab.getBoundingClientRect();
         const insertBefore = e.clientX < rect.left + rect.width / 2;
         const srcIdx = _wlCategories.findIndex(c => c.id === srcId);
@@ -4721,9 +4727,27 @@ function _wlSwitchTab(tab) {
     document.querySelectorAll('#wlTabs .wl-tab').forEach(btn =>
         btn.classList.toggle('active', btn.dataset.wlTab === tab)
     );
-    document.querySelectorAll('#watchlistTableBody .wl-table-row').forEach(row => {
-        row.style.display = (row.dataset.type || 'stock') === tab ? '' : 'none';
-    });
+
+    const isHeatmap = tab === '__heatmap__';
+    const tableWrap = document.getElementById('watchlistTableWrap');
+    const hmView = document.getElementById('wlHeatmapView');
+    const emptyEl = document.getElementById('watchlistEmpty');
+
+    if (isHeatmap) {
+        if (tableWrap) tableWrap.style.display = 'none';
+        if (emptyEl) emptyEl.style.display = 'none';
+        if (hmView) hmView.style.display = '';
+        _wlStartHeatmapRefresh();
+    } else {
+        _wlStopHeatmapRefresh();
+        if (hmView) hmView.style.display = 'none';
+        const hasItems = _wlLastList.length > 0;
+        if (tableWrap) tableWrap.style.display = hasItems ? '' : 'none';
+        if (emptyEl) emptyEl.style.display = hasItems ? 'none' : '';
+        document.querySelectorAll('#watchlistTableBody .wl-table-row').forEach(row => {
+            row.style.display = (row.dataset.type || 'stock') === tab ? '' : 'none';
+        });
+    }
 }
 
 async function _wlLoad() {
@@ -4767,6 +4791,7 @@ async function loadWatchlistView() {
     _wlSetAddType(_wlAddType);
     const list = await _wlLoad();
     _renderWatchlistTable(list);
+    if (_wlActiveTab === '__heatmap__') _wlSwitchTab('__heatmap__');
 }
 
 async function addWatchlistTicker() {
@@ -4801,9 +4826,12 @@ async function removeWatchlistTicker(ticker) {
     const row = document.getElementById(`wl-row-${ticker}`);
     if (row) row.remove();
     _wlCheckEmpty(list);
+    _wlPriceCache.delete(ticker);
+    _renderWlHeatmap(list);
 }
 
 function _wlCheckEmpty(list) {
+    if (_wlActiveTab === '__heatmap__') return;
     const emptyEl = document.getElementById('watchlistEmpty');
     const wrapEl = document.getElementById('watchlistTableWrap');
     const empty = !list || list.length === 0;
@@ -4876,6 +4904,159 @@ async function _wlHandleCategoryCreate() {
     await addWatchlistCategory(id, label, noCountry ? noCountry.checked : false);
 }
 
+function _renderWlHeatmap(list) {
+    if (list !== undefined) _wlLastList = list;
+    const container = document.getElementById('wlHeatmapView');
+    if (!container || container.style.display === 'none') return;
+
+    const tickers = _wlLastList;
+    if (!tickers.length) {
+        container.innerHTML = '<div class="wl-heatmap-empty">No tickers in watchlist.</div>';
+        return;
+    }
+
+    const W = container.clientWidth || container.offsetWidth || 800;
+    const H = container.clientHeight || container.offsetHeight || 400;
+    if (!W || !H) { requestAnimationFrame(() => _renderWlHeatmap()); return; }
+
+    const cMap = { USD: '$', GBP: '£', GBp: 'p', GBX: 'p', EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥', CHF: 'Fr' };
+    const items = tickers.map(r => ({ ...r, value: 1, ...(_wlPriceCache.get(r.ticker) || {}) }));
+    const rects = _computeTreemap(items, W, H);
+
+    const html = rects.map(({ item: d, x, y, w, h }) => {
+        const celX = Math.round(x) + 1;
+        const celY = Math.round(y) + 1;
+        const celW = Math.max(0, Math.round(w) - 2);
+        const celH = Math.max(0, Math.round(h) - 2);
+        if (celW < 4 || celH < 4) return '';
+
+        const pct = d.change_pct ?? 0;
+        const bg = _heatColor(pct);
+        const sign = pct > 0 ? '+' : '';
+        const pctStr = `${sign}${pct.toFixed(2)}%`;
+        const ms = d.market_state || 'REGULAR';
+        const extBadge = ms === 'PRE' ? 'PRE' : (ms === 'POST' || ms === 'POSTPOST') ? 'POST' : '';
+        const cur = d.currency || 'USD';
+        const cSym = cMap[cur] || '';
+        const priceStr = d.price != null
+            ? (cur === 'GBp' || cur === 'GBX' ? `p${d.price.toFixed(2)}` : `${cSym}${d.price.toFixed(2)}`)
+            : '';
+        const badgeHtml = extBadge
+            ? `<span class="hm-ext-badge hm-ext-${extBadge.toLowerCase()}">${extBadge}</span>`
+            : '';
+
+        const minDim = Math.min(celW, celH);
+        let content = '';
+        if (minDim >= 50 && celH >= 62) {
+            content = `<span class="hm-t hm-tl">${esc(d.ticker)}</span>`
+                + `<span class="hm-price hm-pricem">${priceStr}</span>`
+                + `<span class="hm-p hm-pm">${pctStr}</span>` + badgeHtml;
+        } else if (minDim >= 50) {
+            content = `<span class="hm-t hm-tl">${esc(d.ticker)}</span><span class="hm-p hm-pm">${pctStr}</span>${badgeHtml}`;
+        } else if (minDim >= 30 && celH >= 48) {
+            content = `<span class="hm-t hm-tm">${esc(d.ticker)}</span>`
+                + `<span class="hm-price hm-prices">${priceStr}</span>`
+                + `<span class="hm-p hm-ps">${pctStr}</span>` + badgeHtml;
+        } else if (minDim >= 30) {
+            content = `<span class="hm-t hm-tm">${esc(d.ticker)}</span><span class="hm-p hm-ps">${pctStr}</span>${badgeHtml}`;
+        } else if (minDim >= 18) {
+            content = `<span class="hm-t hm-ts">${esc(d.ticker)}</span>`;
+        } else if (celW >= 12 && celH >= 8) {
+            content = `<span class="hm-t hm-tx">${esc(d.ticker)}</span>`;
+        }
+
+        const title = `${d.company || d.ticker}\n${d.ticker}  ${priceStr}  ${pctStr}`;
+        return `<div class="hm-cell" data-ticker="${esc(d.ticker)}" title="${title}" `
+            + `style="left:${celX}px;top:${celY}px;width:${celW}px;height:${celH}px;background:${bg};cursor:pointer">`
+            + content + `</div>`;
+    }).join('');
+
+    container.innerHTML = html;
+    container.querySelectorAll('.hm-cell').forEach(el => {
+        const tk = el.dataset.ticker;
+        const item = tickers.find(r => r.ticker === tk);
+        if (item) el.onclick = () => openWatchlistStockPanel(item.ticker, item.country);
+    });
+
+    if (!_wlHeatmapObserver) {
+        let _lastW = 0;
+        _wlHeatmapObserver = new ResizeObserver(entries => {
+            const newW = Math.round(entries[0]?.contentRect.width || 0);
+            if (newW !== _lastW) { _lastW = newW; _renderWlHeatmap(); }
+        });
+        _wlHeatmapObserver.observe(container);
+    }
+}
+
+async function _wlRefreshHeatmapPrices() {
+    if (!_wlLastList.length) return;
+    const container = document.getElementById('wlHeatmapView');
+
+    const changed = {};
+    try {
+        const tickerParam   = _wlLastList.map(r => encodeURIComponent(r.ticker)).join(',');
+        const countryParam  = _wlLastList.map(r => encodeURIComponent(r.country || 'US')).join(',');
+        const res  = await fetch(`/api/watchlist/prices?tickers=${tickerParam}&countries=${countryParam}`);
+        const json = await res.json();
+        if (json.status === 'ok') {
+            for (const [ticker, d] of Object.entries(json.data)) {
+                const prev = _wlPriceCache.get(ticker);
+                if (prev?.change_pct != null && d.change_pct != null && d.change_pct !== prev.change_pct) {
+                    changed[ticker] = d.change_pct > prev.change_pct ? 'up' : 'dn';
+                }
+                _wlPriceCache.set(ticker, {
+                    price: d.price, change_pct: d.change_pct,
+                    company: d.company, currency: d.currency, market_state: d.market_state,
+                });
+            }
+        }
+    } catch (_) {}
+
+    if (!container || container.style.display === 'none') return;
+
+    const cells = container.querySelectorAll('.hm-cell');
+    if (!cells.length) { _renderWlHeatmap(); return; }
+
+    const cMap = { USD: '$', GBP: '£', GBp: 'p', GBX: 'p', EUR: '€', CAD: 'CA$', AUD: 'A$', JPY: '¥', CHF: 'Fr' };
+    cells.forEach(cell => {
+        const d = _wlPriceCache.get(cell.dataset.ticker);
+        if (!d) return;
+        const pct = d.change_pct ?? 0;
+        const sign = pct > 0 ? '+' : '';
+        cell.style.background = _heatColor(pct);
+        const pSpan = cell.querySelector('.hm-p');
+        if (pSpan) pSpan.textContent = `${sign}${pct.toFixed(2)}%`;
+        const priceSpan = cell.querySelector('.hm-price');
+        if (priceSpan && d.price != null) {
+            const cur = d.currency || 'USD';
+            const cSym = cMap[cur] || '';
+            priceSpan.textContent = cur === 'GBp' || cur === 'GBX' ? `p${d.price.toFixed(2)}` : `${cSym}${d.price.toFixed(2)}`;
+        }
+    });
+
+    if (Object.keys(changed).length) {
+        requestAnimationFrame(() => {
+            for (const [ticker, dir] of Object.entries(changed)) {
+                const cell = container.querySelector(`.hm-cell[data-ticker="${ticker}"]`);
+                if (!cell) continue;
+                cell.classList.remove('hm-tick-up', 'hm-tick-down');
+                void cell.offsetWidth;
+                cell.classList.add(dir === 'up' ? 'hm-tick-up' : 'hm-tick-down');
+            }
+        });
+    }
+}
+
+function _wlStartHeatmapRefresh() {
+    _wlStopHeatmapRefresh();
+    _wlRefreshHeatmapPrices();
+    _wlHeatmapRefreshTimer = setInterval(_wlRefreshHeatmapPrices, 5000);
+}
+
+function _wlStopHeatmapRefresh() {
+    if (_wlHeatmapRefreshTimer) { clearInterval(_wlHeatmapRefreshTimer); _wlHeatmapRefreshTimer = null; }
+}
+
 function _renderWatchlistTable(list) {
     _wlCheckEmpty(list);
     if (!list.length) return;
@@ -4935,6 +5116,7 @@ function _renderWatchlistTable(list) {
     // Apply saved column visibility to newly rendered rows
     _applyWlColVis(_loadWlColVis());
     _wlInitRowDrag(tbody);
+    _renderWlHeatmap(list);
 }
 
 function _wlInitRowDrag(tbody) {
@@ -5152,6 +5334,14 @@ async function _loadWatchlistRow(ticker, country) {
             chgEl.textContent = `${sign}${d.change_pct.toFixed(2)}%`;
             chgEl.className = `wl-change ${d.change_pct >= 0 ? 'pos' : 'neg'}`;
         }
+        _wlPriceCache.set(ticker, {
+            price: d.price,
+            change_pct: d.change_pct,
+            company: d.company,
+            currency: d.currency,
+            market_state: d.market_state,
+        });
+        _renderWlHeatmap();
     }
 
     // Sparkline

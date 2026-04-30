@@ -1243,6 +1243,95 @@ def watchlist_price():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+@market_bp.route("/api/watchlist/prices")
+def watchlist_prices_bulk():
+    """Bulk live price for watchlist tickers. Per-ticker cache 5s (matches home heatmap cadence).
+    ?tickers=AAPL,NVDA&countries=US,US"""
+    tickers_raw   = flask_request.args.get("tickers", "").strip()
+    countries_raw = flask_request.args.get("countries", "").strip()
+    if not tickers_raw:
+        return jsonify({"status": "ok", "data": {}})
+
+    tickers   = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()]
+    countries = [c.strip().upper() for c in countries_raw.split(",") if c.strip()]
+    if len(countries) < len(tickers):
+        countries += ["US"] * (len(tickers) - len(countries))
+
+    result_map:  dict = {}
+    needs_fetch: list = []
+    for ticker, country in zip(tickers, countries):
+        cache_key = f"wl:tick:{ticker}:{country}"
+        cached    = kv_get(cache_key, 5)
+        if cached is not None:
+            result_map[ticker] = cached
+        else:
+            needs_fetch.append((ticker, country))
+
+    if needs_fetch:
+        sym_to_key: dict = {}
+        for ticker, country in needs_fetch:
+            clean, yf_sym = _build_yf_symbol(ticker, country)
+            sym_to_key[yf_sym] = (ticker, clean, country)
+
+        quotes: list = []
+        for attempt in range(2):
+            try:
+                crumb, cookies = _yf_crumb()
+                resp = requests.get(
+                    "https://query1.finance.yahoo.com/v7/finance/quote",
+                    params={"symbols": ",".join(sym_to_key.keys()), "crumb": crumb},
+                    headers={"User-Agent": _YF_UA, "Cookie": cookies},
+                    timeout=12,
+                )
+                if resp.status_code == 401 and attempt == 0:
+                    kv_set("yf:crumb:v3", None)
+                    continue
+                resp.raise_for_status()
+                quotes = resp.json().get("quoteResponse", {}).get("result", [])
+                break
+            except Exception as exc:
+                logger.warning("watchlist_prices_bulk failed: %s", exc)
+                break
+
+        for q in quotes:
+            yf_sym = q.get("symbol", "")
+            if yf_sym not in sym_to_key:
+                continue
+            ticker, clean_ticker, country = sym_to_key[yf_sym]
+            market_state = q.get("marketState", "REGULAR")
+
+            price = change_pct = None
+            if market_state == "PRE":
+                price      = q.get("preMarketPrice")
+                change_pct = q.get("preMarketChangePercent")
+            elif market_state in ("POST", "POSTPOST", "PREPRE", "CLOSED"):
+                price = q.get("postMarketPrice")
+                prev  = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
+                if price is not None and prev and prev != 0:
+                    change_pct = ((price - prev) / prev) * 100
+            if price is None:
+                price      = q.get("regularMarketPrice")
+                change_pct = q.get("regularMarketChangePercent")
+            if price is not None and change_pct is None:
+                prev = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
+                if prev and prev != 0:
+                    change_pct = ((price - prev) / prev) * 100
+
+            info = {
+                "ticker":       clean_ticker,
+                "company":      q.get("longName") or q.get("shortName") or clean_ticker,
+                "price":        round(price,      4) if price      is not None else None,
+                "change_pct":   round(change_pct, 4) if change_pct is not None else None,
+                "currency":     q.get("currency", ""),
+                "market_state": market_state,
+            }
+            cache_key = f"wl:tick:{ticker}:{country}"
+            kv_set(cache_key, info)
+            result_map[ticker] = info
+
+    return jsonify({"status": "ok", "data": result_map})
+
+
 @market_bp.route("/api/watchlist/tickers", methods=["GET"])
 def get_watchlist_tickers():
     """Return the persisted watchlist ticker list."""
