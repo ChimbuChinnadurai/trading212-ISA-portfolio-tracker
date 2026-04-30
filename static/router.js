@@ -115,6 +115,8 @@ function _updateBreadcrumb(route) {
             greetEl.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
         }
     } else if (route.startsWith('portfolio/') || route.startsWith('stocks/')) {
+        const pSection = sectionMap[route];
+        if (greetEl && pSection) greetEl.textContent = pSection.label;
         if (iconEl) iconEl.style.display = 'none';
         if (subtitleEl) subtitleEl.style.display = 'none';
     } else {
