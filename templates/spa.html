@@ -140,6 +140,7 @@
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       gap: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
     html[data-theme="dark"] .topbar {
@@ -150,7 +151,20 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 1px;
+      gap: 2px;
+    }
+
+    .topbar-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .topbar-section-icon {
+      font-size: 15px;
+      color: var(--accent);
+      line-height: 1;
+      flex-shrink: 0;
     }
 
     .ov-main-val {
@@ -163,16 +177,17 @@
     }
 
     .topbar-title {
-      font-size: 0.875rem;
-      font-weight: 600;
+      font-size: 0.95rem;
+      font-weight: 700;
       color: var(--text-primary);
       line-height: 1.25;
     }
 
     .topbar-subtitle {
-      font-size: 0.7rem;
+      font-size: 0.69rem;
       color: var(--text-muted);
       line-height: 1.25;
+      letter-spacing: 0.01em;
     }
 
     /* View container — scrolls, flex column so children can fill height */
@@ -422,7 +437,10 @@
             <span class="material-symbols-outlined" style="font-size:20px;line-height:1">menu</span>
           </button>
           <div class="topbar-breadcrumb">
-            <span class="topbar-title" id="greetingText">Good morning, Chimbu 👋</span>
+            <div class="topbar-title-row">
+              <span class="material-symbols-outlined topbar-section-icon" id="topbarSectionIcon" style="display:none">candlestick_chart</span>
+              <span class="topbar-title" id="greetingText">Good morning, Chimbu 👋</span>
+            </div>
             <span class="topbar-subtitle" id="breadcrumbText">Portfolio overview</span>
           </div>
           <!-- Pid switcher — always visible -->
