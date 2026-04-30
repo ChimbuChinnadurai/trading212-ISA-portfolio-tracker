@@ -6,11 +6,12 @@ A full-featured web application that fetches your **Shares ISA** positions from 
 
 ### Home / Overview
 - Three portfolio cards (Portfolio 1, Portfolio 2, Combined) with live values, returns, and 90-day sparklines
-- **Portfolio Heatmap** — real-time price tiles sorted by biggest movers (auto-refreshes every 60s)
+- **Stocks Heatmap** — equal-size live price tiles colour-coded by daily % change, auto-refreshes every 5s from Yahoo Finance
+- **Upcoming Events** — earnings, ex-dividend/pay dates, and macro calendar (FOMC, BoE, ECB, US CPI, UK CPI, NFP, GDP) for the next 60 days
 - **Fear & Greed Index** — gauge + 30-day history
 - Recent combined activity feed
 - Top performers (by total return %)
-- Market News sidebar (CNBC RSS, refreshes every 5 min)
+- Market News sidebar (Finviz + Finnhub, refreshes every 5 min)
 - Market status pills (NASDAQ + LSE open/close)
 
 ### Market View
@@ -32,19 +33,35 @@ A full-featured web application that fetches your **Shares ISA** positions from 
 - Upcoming dividend table
 - Stock side panel (metrics, price chart, news, analyst ratings, activity)
 
+### Performance Analytics
+- Monthly portfolio returns vs SPY benchmark (bar + line chart)
+- Risk metrics: TWR, Beta vs S&P 500, Volatility, Sharpe ratio, Sortino ratio, Weighted P/E
+- Monthly per-ticker performance heatmap (last 12 months)
+- Per-sector return attribution
+- Daily/weekly portfolio value change series
+
 ### Watchlist
 - Add any global ticker with country selection
 - Live price + today's % change
 - Analyst price targets (Min / Avg / Max) and signal badge
-- Fundamentals: Market Cap, Revenue LTM, P/S, P/E (trailing), **Forward P/E**, **5-year avg P/E**
+- Fundamentals: Market Cap, Revenue LTM, P/S, P/E (trailing), Forward P/E, 5-year avg P/E
 - 48h price sparkline
+- **Heatmap tab** (default view) — treemap of all watchlist tickers colour-coded by daily % change, auto-refreshes every 5s with flash animation
+- Category tabs with drag-to-reorder
 - Persistent storage (survives page reload)
 
-### Risk & Analytics
-- Portfolio risk metrics: TWR, Beta vs S&P 500, Volatility, Sharpe, Sortino ratios
-- Weighted portfolio P/E ratio
-- Monthly returns heatmap per ticker (last 12 months)
-- Monthly performance breakdown
+### Price Alerts & Notifications
+- Set price alerts for any ticker (above / below threshold, in any currency)
+- Alerts evaluated after each background portfolio refresh cycle
+- In-app notification inbox with unread count badge
+- `GET /api/alerts` · `POST /api/alerts` · `DELETE /api/alerts/<id>`
+- `GET /api/notifications` · `POST /api/notifications/read`
+
+### YouTube Feed
+- Subscribe to YouTube channels for market/finance content
+- Videos fetched and optionally AI-analysed via Gemini on add
+- Background refresh keeps the feed current
+- `GET/POST /api/yt/channels` · `DELETE /api/yt/channel/<id>` · `GET /api/yt/videos`
 
 ### AI Features (optional, requires `SHOW_AI_FEATURES=1`)
 - AI Trade Signals (TradingView TA + Gemini analysis) with ticker exclusions
@@ -124,8 +141,8 @@ gcloud run deploy portfolio-tracker \
 | `PORTFOLIO_NAME_1` | `Portfolio 1` | Display name for portfolio 1 |
 | `PORTFOLIO_NAME_2` | `Portfolio 2` | Display name for portfolio 2 |
 | `TRADING212_BASE_URL` | `https://live.trading212.com` | API base URL (live or demo) |
-| `FINNHUB_TOKEN` | — | Finnhub API key (stock metrics endpoint) |
-| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | — | Gemini API key (AI features) |
+| `FINNHUB_TOKEN` | — | Finnhub API key (earnings, stock metrics, news) |
+| `GEMINI_API_KEY` / `GOOGLE_API_KEY` | — | Gemini API key (AI features + YouTube analysis) |
 | `SHOW_AI_FEATURES` | `0` | Set to `1` to enable AI tab in the UI |
 | `PORT` | `8080` | HTTP port (Cloud Run sets this automatically) |
 | `DB_PATH` | `portfolio_cache.db` | SQLite database path |
