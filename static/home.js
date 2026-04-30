@@ -627,14 +627,13 @@ function _renderHeatmap(items) {
     const CH = container.offsetHeight;
     const GAP = 3;
 
-    // Group by sector, sized by portfolio holding value (fallback to 1 if missing)
+    // Group by sector, equal cell size (1 per stock) so all holdings are visible
     const sectorMap = {};
     for (const d of valid) {
         const sec = d.sector || 'Other';
-        const val = d.current_value > 0 ? d.current_value : 1;
         if (!sectorMap[sec]) sectorMap[sec] = { name: sec, value: 0, items: [] };
-        sectorMap[sec].value += val;
-        sectorMap[sec].items.push({ ...d, value: val });
+        sectorMap[sec].value += 1;
+        sectorMap[sec].items.push({ ...d, value: 1 });
     }
     const sectors = Object.values(sectorMap);
     if (sectors.length === 0) return;
