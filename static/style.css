@@ -6983,8 +6983,20 @@ html[data-theme="light"] .rating-strong-sell {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 12px;
+  padding: 10px 12px;
   flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  border-radius: 4px;
+  transition: background .14s;
+}
+
+.sidebar-brand:hover {
+  background: var(--bg-hover);
+}
+
+.sidebar-brand .collapse-icon {
+  margin-left: auto;
 }
 
 .sidebar-logo {
@@ -7190,31 +7202,6 @@ html[data-theme="dark"] .nav-group-header.active {
   flex-shrink: 0;
 }
 
-.sidebar-collapse-btn {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 11px 20px;
-  width: calc(100% - 24px);
-  margin: 2px 12px;
-  border: none;
-  background: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  border-radius: 4px;
-  transition: background .14s, color .14s;
-  white-space: nowrap;
-  overflow: hidden;
-  font-family: inherit;
-  letter-spacing: -0.01em;
-}
-
-.sidebar-collapse-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
 
 .collapse-icon {
   flex-shrink: 0;
@@ -7258,21 +7245,50 @@ html[data-theme="dark"] .nav-group-header.active {
 
 .sidebar.collapsed .sidebar-brand {
   justify-content: center;
-  padding: 20px 0;
+  padding: 12px 0;
 }
 
 .sidebar.collapsed .sidebar-footer {
   padding: 6px 4px;
 }
 
-.sidebar.collapsed .sidebar-collapse-btn {
-  padding: 11px 0;
-  justify-content: center;
-  gap: 0;
+.sidebar.collapsed .sidebar-brand .collapse-icon {
+  display: none;
 }
 
 .sidebar.collapsed .collapse-icon {
   transform: rotate(180deg);
+}
+
+/* ── Collapsed sidebar — overflow visible so tooltips can escape ─────────── */
+.sidebar.collapsed .sidebar-nav {
+  overflow: visible;
+}
+
+/* ── Collapsed sidebar icon tooltips ────────────────────────────────────── */
+.sidebar.collapsed .nav-item[data-tooltip],
+.sidebar.collapsed .nav-group-header[data-tooltip] {
+  position: relative;
+}
+
+.sidebar.collapsed .nav-item[data-tooltip]:hover::after,
+.sidebar.collapsed .nav-group-header[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--text-primary);
+  color: var(--bg-card);
+  padding: 5px 12px;
+  border-radius: 5px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 500;
+  letter-spacing: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
 }
 
 /* Mobile scrim */
