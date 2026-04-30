@@ -7143,13 +7143,22 @@ html[data-theme="dark"] .nav-item.active {
   font-weight: 500;
 }
 
+.nav-group-header:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  transform: translateX(2px) rotate(1deg);
+}
+
 .nav-group-header.active {
-  color: var(--accent);
-  background: var(--accent-glow) !important;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 4px 4px 0px rgba(0, 0, 0, 0.1);
 }
 
 html[data-theme="dark"] .nav-group-header.active {
   background: var(--accent-glow) !important;
+  color: var(--accent) !important;
+  box-shadow: none;
 }
 
 .nav-group-header.active .nav-icon.material-symbols-outlined {
