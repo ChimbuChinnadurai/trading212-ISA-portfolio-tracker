@@ -153,6 +153,26 @@ def _init_sqlite() -> None:
                 is_read     INTEGER NOT NULL DEFAULT 0
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS yt_channels (
+                channel_id  TEXT PRIMARY KEY,
+                name        TEXT NOT NULL,
+                added_at    REAL NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS yt_videos (
+                video_id         TEXT PRIMARY KEY,
+                channel_id       TEXT NOT NULL,
+                channel_name     TEXT NOT NULL,
+                title            TEXT NOT NULL,
+                thumbnail        TEXT NOT NULL DEFAULT '',
+                published_at     TEXT NOT NULL DEFAULT '',
+                duration_seconds INTEGER NOT NULL DEFAULT 0,
+                gemini_analysis  TEXT NOT NULL DEFAULT '',
+                analyzed_at      REAL NOT NULL DEFAULT 0
+            )
+        """)
 
 
 def _init_pg() -> None:
@@ -232,6 +252,26 @@ def _init_pg() -> None:
                 data       TEXT,
                 created_at DOUBLE PRECISION NOT NULL,
                 is_read    INTEGER          NOT NULL DEFAULT 0
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS yt_channels (
+                channel_id TEXT PRIMARY KEY,
+                name       TEXT             NOT NULL,
+                added_at   DOUBLE PRECISION NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS yt_videos (
+                video_id         TEXT PRIMARY KEY,
+                channel_id       TEXT             NOT NULL,
+                channel_name     TEXT             NOT NULL,
+                title            TEXT             NOT NULL,
+                thumbnail        TEXT             NOT NULL DEFAULT '',
+                published_at     TEXT             NOT NULL DEFAULT '',
+                duration_seconds INTEGER          NOT NULL DEFAULT 0,
+                gemini_analysis  TEXT             NOT NULL DEFAULT '',
+                analyzed_at      DOUBLE PRECISION NOT NULL DEFAULT 0
             )
         """)
 
@@ -474,3 +514,80 @@ def notifications_unread_count() -> int:
     with _db() as conn:
         row = conn.execute("SELECT COUNT(*) AS cnt FROM notifications WHERE is_read = 0").fetchone()
     return row["cnt"] if row else 0
+
+
+# ── YouTube channels & videos ─────────────────────────────────────────────────
+
+def yt_channels_get() -> list:
+    """Return all configured YouTube channels ordered by add date."""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT channel_id, name, added_at FROM yt_channels ORDER BY added_at"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def yt_channel_add(channel_id: str, name: str) -> None:
+    """Insert or update a YouTube channel."""
+    with _db() as conn:
+        if _USE_PG:
+            conn.execute(
+                "INSERT INTO yt_channels (channel_id, name, added_at) VALUES (?, ?, ?)"
+                " ON CONFLICT (channel_id) DO UPDATE SET name = EXCLUDED.name",
+                (channel_id, name, time.time()),
+            )
+        else:
+            conn.execute(
+                "INSERT OR REPLACE INTO yt_channels (channel_id, name, added_at) VALUES (?, ?, ?)",
+                (channel_id, name, time.time()),
+            )
+
+
+def yt_channel_delete(channel_id: str) -> None:
+    """Remove a channel and all its associated videos."""
+    with _db() as conn:
+        conn.execute("DELETE FROM yt_videos WHERE channel_id = ?", (channel_id,))
+        conn.execute("DELETE FROM yt_channels WHERE channel_id = ?", (channel_id,))
+
+
+def yt_videos_get(limit: int = 60) -> list:
+    """Return recent videos ordered by published date descending."""
+    with _db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM yt_videos ORDER BY published_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def yt_video_upsert(video: dict) -> bool:
+    """Insert a video if it doesn't already exist. Returns True if new."""
+    with _db() as conn:
+        existing = conn.execute(
+            "SELECT video_id FROM yt_videos WHERE video_id = ?", (video["video_id"],)
+        ).fetchone()
+        if existing:
+            return False
+        conn.execute(
+            """INSERT INTO yt_videos
+               (video_id, channel_id, channel_name, title, thumbnail, published_at, duration_seconds)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (
+                video["video_id"],
+                video["channel_id"],
+                video["channel_name"],
+                video["title"],
+                video.get("thumbnail", ""),
+                video.get("published_at", ""),
+                video.get("duration_seconds", 0),
+            ),
+        )
+    return True
+
+
+def yt_video_set_analysis(video_id: str, analysis: str) -> None:
+    """Store Gemini analysis text for a video."""
+    with _db() as conn:
+        conn.execute(
+            "UPDATE yt_videos SET gemini_analysis = ?, analyzed_at = ? WHERE video_id = ?",
+            (analysis, time.time(), video_id),
+        )

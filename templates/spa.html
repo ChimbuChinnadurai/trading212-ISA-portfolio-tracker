@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap"
     rel="stylesheet">
   <link
     href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"
@@ -20,30 +20,39 @@
   <style>
     /* Critical inline CSS — prevents FOUC while style.css loads */
     :root {
-      --bg: #f7f9fb;
-      --bg-card: #ffffff;
-      --bg-sidebar: #f2f4f6;
-      --bg-row-alt: #f2f4f6;
-      --bg-hover: #eceef0;
-      --border: #c2c6d6;
-      --accent: #0058be;
-      --text-primary: #191c1e;
-      --text-secondary: #424754;
-      --radius: 12px;
-      --sidebar-w: 72px;
-      --topbar-h: 54px;
+      --bg: #f5f2eb;
+      --bg-card: #fffefc;
+      --bg-sidebar: #ebe7dd;
+      --bg-row-alt: #ebe7dd;
+      --bg-hover: #e2decb;
+      --border: #2a2a2a;
+      --accent: #7b61ff;
+      --accent-secondary: #4d7cfe;
+      --accent-tertiary: #f3a444;
+      --text-primary: #2a2a2a;
+      --text-secondary: #4a4a4a;
+      --radius: 2px;
+      --sidebar-w: 180px;
+      --sidebar-collapsed-w: 52px;
+      --topbar-h: 64px;
     }
 
     html[data-theme="dark"] {
-      --bg: #080d18;
-      --bg-card: #0f1629;
-      --bg-sidebar: #0b1120;
-      --bg-row-alt: #131d35;
-      --bg-hover: #1a2846;
-      --border: #1e2d4a;
-      --accent: #3b82f6;
-      --text-primary: #e2e8f0;
-      --text-secondary: #7c8fad;
+      --bg: #1c1c1a;
+      --bg-card: #262624;
+      --bg-sidebar: #161614;
+      --bg-row-alt: #161614;
+      --bg-hover: #2a2a28;
+      --border: #dcdcdc;
+      --border-bright: #ffffff;
+      --accent: #9d8aff;
+      --accent-dim: #7b61ff;
+      --accent-glow: rgba(157, 138, 255, .25);
+      --accent-secondary: #6f9fff;
+      --accent-tertiary: #f5b356;
+      --text-primary: #dcdcdc;
+      --text-secondary: #a0a0a0;
+      --text-muted: #888888;
     }
 
     *,
@@ -65,7 +74,8 @@
       html,
       body {
         height: auto;
-        overflow: auto;
+        overflow-y: auto;
+        overflow-x: hidden;
       }
 
       .app-shell {
@@ -81,7 +91,7 @@
     body {
       background: var(--bg);
       color: var(--text-primary);
-      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     /* Shell */
@@ -97,11 +107,15 @@
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
-      background: var(--bg-sidebar);
+      background: var(--bg-card);
       transition: width .22s ease;
       overflow: hidden;
       z-index: 200;
       border-right: 1px solid var(--border);
+    }
+
+    .sidebar.collapsed {
+      overflow: visible;
     }
 
     /* Main */
@@ -110,6 +124,7 @@
       display: flex;
       flex-direction: column;
       min-width: 0;
+      min-height: 0;
       overflow: hidden;
     }
 
@@ -121,10 +136,11 @@
       align-items: center;
       justify-content: space-between;
       padding: 0 16px;
-      background: var(--bg);
+      background: var(--bg-card);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       gap: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
     html[data-theme="dark"] .topbar {
@@ -135,20 +151,43 @@
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 1px;
+      gap: 2px;
+    }
+
+    .topbar-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .topbar-section-icon {
+      font-size: 15px;
+      color: var(--accent);
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .ov-main-val {
+      font-family: 'PT Serif', serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      line-height: 1.1;
     }
 
     .topbar-title {
-      font-size: 0.875rem;
-      font-weight: 600;
+      font-size: 0.95rem;
+      font-weight: 700;
       color: var(--text-primary);
       line-height: 1.25;
     }
 
     .topbar-subtitle {
-      font-size: 0.7rem;
+      font-size: 0.69rem;
       color: var(--text-muted);
       line-height: 1.25;
+      letter-spacing: 0.01em;
     }
 
     /* View container — scrolls, flex column so children can fill height */
@@ -159,36 +198,98 @@
       overflow-y: auto;
       overflow-x: hidden;
       background: var(--bg);
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 88, 190, .06), transparent);
+      position: relative;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
     }
 
     html[data-theme="light"] .view-container {
-      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(0, 88, 190, .04), transparent);
+      background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(123, 97, 255, .04), transparent);
+    }
+
+    .view-container::before {
+      content: '✦';
+      position: fixed;
+      top: 100px;
+      right: 10%;
+      font-size: 40px;
+      color: var(--accent-tertiary);
+      opacity: 0.15;
+      pointer-events: none;
+      filter: blur(1px);
+    }
+
+    .view-container::after {
+      content: '✻';
+      position: fixed;
+      bottom: 100px;
+      left: 5%;
+      font-size: 60px;
+      color: var(--accent);
+      opacity: 0.1;
+      pointer-events: none;
     }
 
     .ov-card,
     .widget-panel {
       background: var(--bg-card);
-      border-radius: var(--radius)
     }
   </style>
 </head>
 
 <body>
+  <div class="paper-texture"></div>
+
+  <!-- SVG Filters for Rough Edges -->
+  <svg style="position: absolute; width: 0; height: 0;" aria-hidden="true" focusable="false">
+    <defs>
+      <filter id="rough-edge">
+        <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="2" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="2" />
+      </filter>
+      <filter id="rough-edge-subtle">
+        <feTurbulence type="fractalNoise" baseFrequency="0.08" numOctaves="1" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" />
+      </filter>
+    </defs>
+  </svg>
+
   <div class="app-shell" id="appRoot">
 
     <!-- ═══ SIDEBAR ═══ -->
     <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-brand" onclick="toggleSidebar()" title="Toggle sidebar">
+        <div class="sidebar-logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+            <rect width="32" height="32" rx="7" fill="#0d1629" />
+            <line x1="8" y1="11" x2="8" y2="14" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
+            <rect x="5.5" y="14" width="5" height="9" rx="1" fill="#10b981" />
+            <line x1="8" y1="23" x2="8" y2="26" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
+            <line x1="16" y1="9" x2="16" y2="12" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" />
+            <rect x="13.5" y="12" width="5" height="7" rx="1" fill="#ef4444" />
+            <line x1="16" y1="19" x2="16" y2="22" stroke="#ef4444" stroke-width="1.5" stroke-linecap="round" />
+            <line x1="24" y1="5" x2="24" y2="8" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
+            <rect x="21.5" y="8" width="5" height="12" rx="1" fill="#10b981" />
+            <line x1="24" y1="20" x2="24" y2="24" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
+            <polyline points="8,19 16,16 24,14" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round"
+              stroke-linejoin="round" opacity="0.85" />
+          </svg>
+        </div>
+        <span class="material-symbols-outlined collapse-icon">chevron_left</span>
+      </div>
+
       <nav class="sidebar-nav">
 
         <!-- Home -->
-        <a class="nav-item" data-route="home" onclick="navigate('home')">
+        <a class="nav-item" data-route="home" data-tooltip="Home" onclick="navigate('home')">
           <span class="material-symbols-outlined nav-icon">home</span>
           <span class="nav-label">Home</span>
         </a>
 
         <div class="nav-group" id="navGroupPortfolio">
-          <a class="nav-group-header" data-route="portfolio/combined" onclick="navigate('portfolio/combined')">
+          <a class="nav-group-header" data-route="portfolio/combined" data-tooltip="Portfolio"
+            onclick="navigate('portfolio/combined')">
             <span class="material-symbols-outlined nav-icon">pie_chart</span>
             <span class="nav-label">Portfolio</span>
           </a>
@@ -196,45 +297,48 @@
 
         <!-- Stocks group -->
         <div class="nav-group" id="navGroupStocks">
-          <a class="nav-group-header" data-route="stocks/combined" onclick="navigate('stocks/combined')">
+          <a class="nav-group-header" data-route="stocks/combined" data-tooltip="Holdings"
+            onclick="navigate('stocks/combined')">
             <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
             <span class="nav-label">Holdings</span>
           </a>
         </div>
 
         <!-- Dividends -->
-        <a class="nav-item" data-route="dividends/combined" onclick="navigate('dividends/combined')">
+        <a class="nav-item" data-route="dividends/combined" data-tooltip="Dividends"
+          onclick="navigate('dividends/combined')">
           <span class="material-symbols-outlined nav-icon">payments</span>
           <span class="nav-label">Dividends</span>
         </a>
 
         <!-- Metrics -->
-        <a class="nav-item" data-route="metrics" onclick="navigate('metrics')">
+        <a class="nav-item" data-route="metrics" data-tooltip="Metrics" onclick="navigate('metrics')">
           <span class="material-symbols-outlined nav-icon">analytics</span>
           <span class="nav-label">Metrics</span>
         </a>
 
         <!-- Market -->
-        <a class="nav-item" data-route="market" onclick="navigate('market')">
+        <a class="nav-item" data-route="market" data-tooltip="Market" onclick="navigate('market')">
           <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
           <span class="nav-label">Market</span>
         </a>
 
         <!-- Watchlist -->
-        <a class="nav-item" data-route="watchlist" onclick="navigate('watchlist')">
+        <a class="nav-item" data-route="watchlist" data-tooltip="Watchlist" onclick="navigate('watchlist')">
           <span class="material-symbols-outlined nav-icon">bookmark</span>
           <span class="nav-label">Watchlist</span>
         </a>
 
         <!-- News -->
-        <a class="nav-item" data-route="news" onclick="navigate('news')">
+        <a class="nav-item" data-route="news" data-tooltip="News" onclick="navigate('news')">
           <span class="material-symbols-outlined nav-icon">newspaper</span>
           <span class="nav-label">News</span>
         </a>
 
         <!-- AI Intelligence -->
         {% if show_ai %}
-        <a class="nav-item" data-route="ai-intelligence" onclick="navigate('ai-intelligence')">
+        <a class="nav-item" data-route="ai-intelligence" data-tooltip="AI Intelligence"
+          onclick="navigate('ai-intelligence')">
           <span class="material-symbols-outlined nav-icon">psychology</span>
           <span class="nav-label">AI Intelligence</span>
         </a>
@@ -244,7 +348,7 @@
 
       <div class="sidebar-footer">
         <a class="nav-item sidebar-t212-link" href="https://app.trading212.com/" target="_blank"
-          rel="noopener noreferrer" title="Open Trading212">
+          rel="noopener noreferrer" data-tooltip="Trading 212">
           <span class="material-symbols-outlined nav-icon">open_in_new</span>
           <span class="nav-label">T212</span>
         </a>
@@ -333,7 +437,10 @@
             <span class="material-symbols-outlined" style="font-size:20px;line-height:1">menu</span>
           </button>
           <div class="topbar-breadcrumb">
-            <span class="topbar-title" id="greetingText">Good morning, Chimbu 👋</span>
+            <div class="topbar-title-row">
+              <span class="material-symbols-outlined topbar-section-icon" id="topbarSectionIcon" style="display:none">candlestick_chart</span>
+              <span class="topbar-title" id="greetingText">Good morning, Chimbu 👋</span>
+            </div>
             <span class="topbar-subtitle" id="breadcrumbText">Portfolio overview</span>
           </div>
           <!-- Pid switcher — always visible -->
@@ -444,41 +551,49 @@
               <div class="home-cards-row">
 
                 <!-- Portfolio 1 -->
-                <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
-                  <div class="ov-header">
-                    <span class="ov-label">{{ names['1'] }}</span>
-                    <span class="ov-link">View Details →</span>
-                  </div>
-                  <div class="ov-body">
-                    <div class="ov-stats">
-                      <div class="ov-main-val skeleton skeleton-text" id="p1-value"></div>
-                      <div class="ov-subline">
-                        <span class="ov-returns skeleton skeleton-text" id="p1-returns"></span>
-                        <span class="ov-pct skeleton skeleton-text" id="p1-pct"></span>
+                <!-- impeccable-variants-start 25017b4f -->
+                <div data-impeccable-variants="25017b4f" data-impeccable-variant-count="3" style="display: contents">
+                  <!-- Original -->
+                  <div data-impeccable-variant="original">
+                    <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
+                      <div class="ov-header">
+                        <span class="ov-label">{{ names['1'] }}</span>
+                        <span class="ov-link">View Details →</span>
                       </div>
-                      <div class="ov-24h" id="p1-24h" style="display:none"></div>
+                      <div class="ov-body">
+                        <div class="ov-stats">
+                          <div class="ov-main-val skeleton skeleton-text" id="p1-value"></div>
+                          <div class="ov-subline">
+                            <span class="ov-returns skeleton skeleton-text" id="p1-returns"></span>
+                            <span class="ov-pct skeleton skeleton-text" id="p1-pct"></span>
+                          </div>
+                          <div class="ov-24h" id="p1-24h" style="display:none"></div>
+                        </div>
+                        <canvas class="ov-spark" id="p1-spark" width="320" height="128"></canvas>
+                      </div>
+                      <div class="ov-mini-stats">
+                        <div class="ov-mini-row">
+                          <span class="ov-mini-label">Invested</span>
+                          <span class="ov-mini-val" id="p1-invested">—</span>
+                        </div>
+                        <div class="ov-mini-row">
+                          <span class="ov-mini-label">Unrealized</span>
+                          <span class="ov-mini-val" id="p1-unrealized">—</span>
+                        </div>
+                        <div class="ov-mini-row">
+                          <span class="ov-mini-label">Realized</span>
+                          <span class="ov-mini-val" id="p1-realized">—</span>
+                        </div>
+                        <div class="ov-mini-row">
+                          <span class="ov-mini-label">Cash</span>
+                          <span class="ov-mini-val" id="p1-cash">—</span>
+                        </div>
+                      </div>
                     </div>
-                    <canvas class="ov-spark" id="p1-spark" width="320" height="128"></canvas>
                   </div>
-                  <div class="ov-mini-stats">
-                    <div class="ov-mini-row">
-                      <span class="ov-mini-label">Invested</span>
-                      <span class="ov-mini-val" id="p1-invested">—</span>
-                    </div>
-                    <div class="ov-mini-row">
-                      <span class="ov-mini-label">Unrealized P&amp;L</span>
-                      <span class="ov-mini-val" id="p1-unrealized">—</span>
-                    </div>
-                    <div class="ov-mini-row">
-                      <span class="ov-mini-label">Realized P&amp;L</span>
-                      <span class="ov-mini-val" id="p1-realized">—</span>
-                    </div>
-                    <div class="ov-mini-row">
-                      <span class="ov-mini-label">Cash Available</span>
-                      <span class="ov-mini-val" id="p1-cash">—</span>
-                    </div>
-                  </div>
+                  <!-- Variants: insert below this line -->
                 </div>
+                <!-- impeccable-variants-end 25017b4f -->
 
                 <!-- Portfolio 2 -->
                 <div class="ov-card" id="ov2" onclick="navigate('portfolio/2')" style="cursor:pointer">
@@ -503,15 +618,15 @@
                       <span class="ov-mini-val" id="p2-invested">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Unrealized P&amp;L</span>
+                      <span class="ov-mini-label">Unrealized</span>
                       <span class="ov-mini-val" id="p2-unrealized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Realized P&amp;L</span>
+                      <span class="ov-mini-label">Realized</span>
                       <span class="ov-mini-val" id="p2-realized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Cash Available</span>
+                      <span class="ov-mini-label">Cash</span>
                       <span class="ov-mini-val" id="p2-cash">—</span>
                     </div>
                   </div>
@@ -540,15 +655,15 @@
                       <span class="ov-mini-val" id="c-invested">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Unrealized P&amp;L</span>
+                      <span class="ov-mini-label">Unrealized</span>
                       <span class="ov-mini-val" id="c-unrealized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Realized P&amp;L</span>
+                      <span class="ov-mini-label">Realized</span>
                       <span class="ov-mini-val" id="c-realized">—</span>
                     </div>
                     <div class="ov-mini-row">
-                      <span class="ov-mini-label">Cash Available</span>
+                      <span class="ov-mini-label">Cash</span>
                       <span class="ov-mini-val" id="c-cash">—</span>
                     </div>
                   </div>
@@ -635,7 +750,7 @@
               <div class="ov-card" id="ov-upcoming-events">
                 <div class="ov-header">
                   <span class="ov-label">Upcoming Events</span>
-                  <span style="font-size:0.72rem;color:var(--text-muted)">Next 30 days</span>
+                  <span style="font-size:0.72rem;color:var(--text-muted)">Next 60 days</span>
                 </div>
                 <div id="upcomingEventsList" class="upcoming-events-body">
                   <div class="skel-item">
@@ -714,6 +829,7 @@
                 <div class="summary-cards">
 
                   <div class="s-card s-card-blue">
+                    <div class="s-card-tape"></div>
                     <div class="s-card-top">
                       <div class="s-card-icon">
                         <span class="material-symbols-outlined">account_balance_wallet</span>
@@ -764,6 +880,7 @@
                   </div>
 
                   <div class="s-card s-card-teal">
+                    <div class="s-card-tape"></div>
                     <div class="s-card-top">
                       <div class="s-card-icon">
                         <span class="material-symbols-outlined">payments</span>
@@ -1085,6 +1202,30 @@
               </div>
             </div>
 
+            <!-- ── YouTube Videos column ──────────────────────────────── -->
+            <div class="social-feed-col" id="ytFeedCol">
+              <div class="social-feed-header">
+                <div class="social-feed-header-left">
+                  <span class="material-symbols-outlined social-feed-icon">play_circle</span>
+                  <span class="social-feed-title">Videos</span>
+                </div>
+                <div class="social-feed-header-right">
+                  <button class="yt-manage-btn" onclick="openYtChannelsModal()">
+                    <span class="material-symbols-outlined" style="font-size:15px">tune</span>
+                    Channels
+                  </button>
+                </div>
+              </div>
+              <div class="social-feed-scroll" id="ytVideosList">
+                <div class="yt-empty-state">
+                  <span class="material-symbols-outlined"
+                    style="font-size:40px;color:var(--text-muted)">subscriptions</span>
+                  <p>No channels configured yet.</p>
+                  <button class="btn-primary-sm" onclick="openYtChannelsModal()">Add a Channel</button>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div><!-- /view-news -->
 
@@ -1110,7 +1251,7 @@
                   <span class="dv-kpi-sub" id="dvYoYLabel">vs last year</span>
                 </div>
               </div>
-              <div class="dv-kpi-card dv-kpi-card--accent">
+              <div class="dv-kpi-card">
                 <span class="dv-kpi-icon material-symbols-outlined">trending_up</span>
                 <div class="dv-kpi-content">
                   <span class="dv-kpi-label">Projected Annual</span>
@@ -1534,12 +1675,8 @@
                   <option value="AU">AU</option>
                   <option value="JP">JP</option>
                 </select>
-                <div class="wl-type-toggle">
-                  <button class="wl-type-btn active" id="wlTypeStock" onclick="_wlSetAddType('stock')">Stock</button>
-                  <button class="wl-type-btn" id="wlTypeEtf" onclick="_wlSetAddType('etf')">ETF</button>
-                  <button class="wl-type-btn" id="wlTypeCrypto" onclick="_wlSetAddType('crypto')">Crypto</button>
-                  <button class="wl-type-btn" id="wlTypeCommodity"
-                    onclick="_wlSetAddType('commodity')">Commodity</button>
+                <div class="wl-type-toggle" id="wlTypeToggle">
+                  <!-- populated by _wlRenderTypeButtons() -->
                 </div>
                 <div class="col-picker-wrap">
                   <button class="btn btn-col-picker" id="wlColPickerBtn" onclick="toggleWlColPicker()">
@@ -1556,29 +1693,8 @@
 
             <div class="watchlist-wrap">
               <!-- Tabs -->
-              <div class="wl-tabs">
-                <button class="wl-tab active" id="wlTabStock" onclick="_wlSwitchTab('stock')">
-                  <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-3px">trending_up</span>
-                  Stocks
-                  <span class="wl-tab-count" id="wlTabStockCount"></span>
-                </button>
-                <button class="wl-tab" id="wlTabEtf" onclick="_wlSwitchTab('etf')">
-                  <span class="material-symbols-outlined"
-                    style="font-size:14px;vertical-align:-3px">account_balance</span>
-                  ETFs
-                  <span class="wl-tab-count" id="wlTabEtfCount"></span>
-                </button>
-                <button class="wl-tab" id="wlTabCrypto" onclick="_wlSwitchTab('crypto')">
-                  <span class="material-symbols-outlined"
-                    style="font-size:14px;vertical-align:-3px">currency_bitcoin</span>
-                  Crypto
-                  <span class="wl-tab-count" id="wlTabCryptoCount"></span>
-                </button>
-                <button class="wl-tab" id="wlTabCommodity" onclick="_wlSwitchTab('commodity')">
-                  <span class="material-symbols-outlined" style="font-size:14px;vertical-align:-3px">diamond</span>
-                  Commodities
-                  <span class="wl-tab-count" id="wlTabCommodityCount"></span>
-                </button>
+              <div class="wl-tabs" id="wlTabs">
+                <!-- populated by _wlRenderTabs() -->
               </div>
 
               <div id="watchlistEmpty" class="watchlist-empty" style="display:none">
@@ -1590,6 +1706,7 @@
                 <table class="watchlist-table">
                   <thead>
                     <tr>
+                      <th class="wl-drag-th"></th>
                       <th data-colid="wl-ticker">Ticker</th>
                       <th data-colid="wl-company">Company</th>
                       <th data-colid="wl-price">Price</th>
@@ -1918,6 +2035,40 @@
     </div>
   </div>
 
+  <!-- ═══ WATCHLIST ADD CATEGORY MODAL ═══ -->
+  <div id="wlAddCategoryModal" class="modal-overlay" style="display:none;align-items:center;justify-content:center"
+    onclick="if(event.target===this)closeAddCategoryModal()">
+    <div
+      style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;width:320px;box-shadow:0 8px 32px rgba(0,0,0,0.24)">
+      <div
+        style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)">
+        <span style="font-weight:600;font-size:0.9rem">Add Category</span>
+        <button onclick="closeAddCategoryModal()"
+          style="background:none;border:none;cursor:pointer;color:var(--text-secondary);display:flex;align-items:center">
+          <span class="material-symbols-outlined" style="font-size:18px">close</span>
+        </button>
+      </div>
+      <div style="padding:16px">
+        <label
+          style="display:block;margin-bottom:6px;font-size:0.78rem;color:var(--text-secondary);font-weight:600">Category
+          Name</label>
+        <input type="text" id="wlCategoryNameInput" class="watchlist-input" style="width:100%;box-sizing:border-box"
+          placeholder="e.g. Tech, Growth, Dividend" maxlength="24"
+          onkeydown="if(event.key==='Enter')_wlHandleCategoryCreate()" />
+        <label
+          style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:0.78rem;cursor:pointer;color:var(--text-secondary)">
+          <input type="checkbox" id="wlCategoryNoCountry" />
+          No country selector (for crypto-style assets)
+        </label>
+        <div id="wlAddCategoryError" style="display:none;color:#ef4444;font-size:0.75rem;margin-top:8px"></div>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn" onclick="closeAddCategoryModal()">Cancel</button>
+        <button class="btn btn-accent" onclick="_wlHandleCategoryCreate()">Add</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ CONFIRM MODAL ═══ -->
   <div class="confirm-modal-overlay" id="confirmModalOverlay"></div>
   <div class="confirm-modal" id="confirmModal" role="dialog" aria-modal="true">
@@ -1995,6 +2146,65 @@
       </div>
     </div>
   </div>
+  <!-- ── YouTube Video Sidebar ─────────────────────────────────────────── -->
+  <div class="yt-sidebar-overlay" id="ytSidebarOverlay" onclick="closeYtSidebar()"></div>
+  <div class="yt-sidebar" id="ytSidebar">
+    <div class="ss-header">
+      <div class="ss-header-left">
+        <h2 class="ss-title" id="ytSidebarTitle">Video</h2>
+        <span class="ss-subtitle" id="ytSidebarChannel"></span>
+      </div>
+      <button class="ss-close-btn" onclick="closeYtSidebar()">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="yt-sidebar-body" id="ytSidebarBody">
+      <div class="yt-embed-wrap" id="ytEmbedContainer"></div>
+      <div class="yt-analysis-section" id="ytAnalysisSection">
+        <div class="yt-analysis-label">
+          <span class="material-symbols-outlined" style="font-size:16px">auto_awesome</span>
+          Gemini Analysis
+        </div>
+        <div class="yt-analysis-body" id="ytAnalysisBody">
+          <div class="yt-analysis-pending">Analysis pending…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── YouTube Channel Management Modal ──────────────────────────────── -->
+  <div id="ytChannelsModal" class="modal-overlay" style="display:none;align-items:center;justify-content:center"
+    onclick="if(event.target===this)closeYtChannelsModal()">
+    <div class="modal-box yt-channels-box">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="material-symbols-outlined" style="font-size:18px">subscriptions</span>
+          <span class="modal-title">YouTube Channels</span>
+        </div>
+        <button class="modal-close" onclick="closeYtChannelsModal()">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="modal-body" style="padding:20px">
+        <div id="ytChannelsList" class="yt-channels-list"></div>
+        <div class="yt-add-channel-form">
+          <div class="yt-form-row">
+            <input id="ytChannelIdInput" class="form-input" placeholder="Channel ID  (e.g. UCxxxxxxxxxxxxxx)" />
+            <input id="ytChannelNameInput" class="form-input" placeholder="Display name  (e.g. CNBC)" />
+          </div>
+          <div id="ytAddError" class="yt-add-error" style="display:none"></div>
+          <button class="btn-primary-sm" id="ytAddBtn" onclick="addYtChannel()">
+            <span class="material-symbols-outlined" style="font-size:15px">add</span>
+            Add Channel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- impeccable-live-start -->
+  <!-- <script src="http://localhost:8400/live.js"></script> -->
+  <!-- impeccable-live-end -->
 </body>
 
 </html>

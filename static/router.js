@@ -82,46 +82,54 @@ function _formatTopbarDate() {
 function _updateBreadcrumb(route) {
     const greetEl = document.getElementById('greetingText');
     const subtitleEl = document.getElementById('breadcrumbText');
+    const iconEl = document.getElementById('topbarSectionIcon');
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
-    const map = {
-        // 'portfolio/1': `${names['1'] || 'Portfolio 1'}`,
-        // 'portfolio/2': `${names['2'] || 'Portfolio 2'}`,
-        // 'portfolio/combined': 'Combined',
-        // 'stocks/1': `Holdings · ${names['1'] || 'Portfolio 1'}`,
-        // 'stocks/2': `Holdings · ${names['2'] || 'Portfolio 2'}`,
-        // 'stocks/combined': 'Holdings · Combined',
-        'portfolio/1': '',
-        'portfolio/2': '',
-        'portfolio/combined': '',
-        'stocks/1': '',
-        'stocks/2': '',
-        'stocks/combined': '',
-        'news': 'Market News',
-        'calendar': 'Market Calendar',
-        'activity': 'Activity & History',
-        'market': 'Market',
-        'metrics': 'Metrics',
-        'watchlist': 'Watchlist',
-        'dividends/combined': 'Dividends & Income',
-        'dividends/1': 'Dividends & Income',
-        'dividends/2': 'Dividends & Income',
+    const sectionMap = {
+        'portfolio/1': { label: '', icon: 'pie_chart' },
+        'portfolio/2': { label: '', icon: 'pie_chart' },
+        'portfolio/combined': { label: '', icon: 'pie_chart' },
+        'stocks/1': { label: '', icon: 'table_chart' },
+        'stocks/2': { label: '', icon: 'table_chart' },
+        'stocks/combined': { label: '', icon: 'table_chart' },
+        'news': { label: 'Market News', icon: 'newspaper' },
+        'calendar': { label: 'Market Calendar', icon: 'event' },
+        'activity': { label: 'Activity', icon: 'history' },
+        'market': { label: 'Market', icon: 'candlestick_chart' },
+        'metrics': { label: 'Metrics', icon: 'analytics' },
+        'watchlist': { label: 'Watchlist', icon: 'bookmark' },
+        'dividends/combined': { label: '', icon: 'payments' },
+        'dividends/1': { label: '', icon: 'payments' },
+        'dividends/2': { label: '', icon: 'payments' },
     };
 
     if (route === 'home') {
-        // Two-line greeting mode
-        if (subtitleEl) subtitleEl.style.display = '';
-        if (subtitleEl) subtitleEl.textContent = _formatTopbarDate() + ' \u00B7 Portfolio overview';
-        // Restore greeting (in case user navigated away and back)
+        if (iconEl) iconEl.style.display = 'none';
+        if (subtitleEl) {
+            subtitleEl.style.display = '';
+            subtitleEl.textContent = _formatTopbarDate() + ' \u00B7 Portfolio overview';
+        }
         if (greetEl) {
             const h = new Date().getHours();
             const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
             const name = (typeof PORTFOLIO_NAMES !== 'undefined' && PORTFOLIO_NAMES['1']) || 'there';
             greetEl.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
         }
-    } else {
-        // Single-line page title mode
+    } else if (route.startsWith('portfolio/') || route.startsWith('stocks/') || route.startsWith('dividends/')) {
+        const pSection = sectionMap[route];
+        if (greetEl && pSection) greetEl.textContent = pSection.label;
+        if (iconEl) iconEl.style.display = 'none';
         if (subtitleEl) subtitleEl.style.display = 'none';
-        if (greetEl) greetEl.textContent = map[route] || '';
+    } else {
+        const section = sectionMap[route] || { label: route, icon: 'chevron_right' };
+        if (greetEl) greetEl.textContent = section.label;
+        if (iconEl) {
+            iconEl.textContent = section.icon;
+            iconEl.style.display = '';
+        }
+        if (subtitleEl) {
+            subtitleEl.textContent = _formatTopbarDate();
+            subtitleEl.style.display = '';
+        }
     }
 
     // Hide breadcrumb value when not on portfolio view
@@ -159,7 +167,7 @@ function switchPid(pid) {
     const route = _currentRoute || '';
     const viewType = route.startsWith('stocks/') ? 'stocks'
         : route.startsWith('dividends/') ? 'dividends'
-        : 'portfolio';
+            : 'portfolio';
     navigate(`${viewType}/${pid}`);
 }
 
@@ -535,7 +543,7 @@ function _activateMetricsView() {
     if (typeof loadMetricsView === 'function') loadMetricsView();
 }
 
-function _deactivateMetricsView() {}
+function _deactivateMetricsView() { }
 
 /* ── Detail view lifecycle ───────────────────────────────────────────────── */
 function _resetDetailView() {

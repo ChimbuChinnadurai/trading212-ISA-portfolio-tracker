@@ -542,14 +542,14 @@ async function loadStockTicker() {
 function _heatColor(pct) {
     const v = pct ?? 0;
     // Thresholds tuned for daily % change (vs total-return in Position Heatmap)
-    if (Math.abs(v) < 0.05) return 'linear-gradient(135deg,#1e293b,#334155)';
-    if (v >= 3) return 'linear-gradient(135deg,#052e16,#15803d)';
-    if (v >= 1.5) return 'linear-gradient(135deg,#14532d,#16a34a)';
-    if (v >= 0.5) return 'linear-gradient(135deg,#166534,#22c55e)';
-    if (v > 0) return 'linear-gradient(135deg,#0f766e,#14b8a6)';
-    if (v >= -0.5) return 'linear-gradient(135deg,#78350f,#b45309)';
-    if (v >= -1.5) return 'linear-gradient(135deg,#7f1d1d,#dc2626)';
-    return 'linear-gradient(135deg,#450a0a,#b91c1c)';
+    if (Math.abs(v) < 0.05) return '#2c2c2a';
+    if (v >= 3) return 'linear-gradient(160deg,#22aa45,#22aa45)';
+    if (v >= 1.5) return 'linear-gradient(160deg,#26b84e,#26b84e)';
+    if (v >= 0.5) return 'linear-gradient(160deg,#24b24c,#24b24c)';
+    if (v > 0) return 'linear-gradient(160deg,#1ab8a8,#1ab8a8)';
+    if (v >= -0.5) return 'linear-gradient(160deg,#c45018,#c45018)';
+    if (v >= -1.5) return 'linear-gradient(160deg,#8c1e1e,#cc2e2e)';
+    return 'linear-gradient(160deg,#a82020,#a82020)';
 }
 
 function _computeTreemap(items, W, H) {
@@ -637,6 +637,7 @@ function _renderHeatmap(items) {
         sectorMap[sec].items.push({ ...d, value: val });
     }
     const sectors = Object.values(sectorMap);
+    if (sectors.length === 0) return;
 
     const secRects = _computeTreemap(sectors, CW, CH);
 
@@ -723,7 +724,9 @@ function _renderHeatmap(items) {
             );
         }
     }
-    container.innerHTML = html.join('');
+    if (html.length > 0) {
+        container.innerHTML = html.join('');
+    }
 
     // Update session label in the heatmap header
     // const sessionLabel = document.getElementById('heatmapSessionLabel');
@@ -737,16 +740,8 @@ function _renderHeatmap(items) {
     // }
 
     // Randomise each cell's phase within the 10s cycle so they pulse out of sync
-    container.querySelectorAll('.hm-cell').forEach(cell => {
-        const delay = (-Math.random() * 10).toFixed(2); // random start point in -10..0s
-        cell.style.setProperty('--hm-delay', `${delay}s`);
-    });
-
-    // Scan-line sweep to signal fresh data
+    // Disable flickering animations/scan-line sweep
     container.classList.remove('hm-scanning');
-    void container.offsetWidth; // force reflow so animation restarts cleanly
-    container.classList.add('hm-scanning');
-    setTimeout(() => container.classList.remove('hm-scanning'), 900);
 
     if (!container._hmClickBound) {
         container._hmClickBound = true;
@@ -3625,7 +3620,7 @@ async function loadUpcomingEvents() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const cutoff = new Date(today);
-    cutoff.setDate(today.getDate() + 30);
+    cutoff.setDate(today.getDate() + 60);
 
     function toYMD(d) {
         return d.toISOString().slice(0, 10);
@@ -3692,8 +3687,8 @@ function _renderUpcomingEvents(events) {
     function fmtRev(v) {
         if (v == null) return null;
         if (v >= 1e12) return `$${(v / 1e12).toFixed(1)}T`;
-        if (v >= 1e9)  return `$${(v / 1e9).toFixed(1)}B`;
-        if (v >= 1e6)  return `$${(v / 1e6).toFixed(0)}M`;
+        if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+        if (v >= 1e6) return `$${(v / 1e6).toFixed(0)}M`;
         return `$${v}`;
     }
 
@@ -4300,6 +4295,10 @@ async function loadNewsView(force = false) {
         const c = document.getElementById('trumpFeedScroll');
         if (c) { const s = document.getElementById('trumpSkel'); if (s) s.remove(); c.innerHTML = '<div class="social-empty">Could not load posts.</div>'; }
     }
+
+    _loadYtVideos();
+    if (window._ytPollTimer) clearInterval(window._ytPollTimer);
+    window._ytPollTimer = setInterval(_loadYtVideos, 15 * 60 * 1000);
 }
 
 /* ── Trump sentiment analysis ── */
@@ -4534,41 +4533,197 @@ const _WL_STORAGE_KEY = 'wl:tickers:v1';
 let _wlActiveTab = 'stock';
 let _wlAddType = 'stock';
 
+const _WL_DEFAULT_CATEGORIES = [
+    { id: 'stock', label: 'Stock', tabLabel: 'Stocks', icon: 'trending_up', noCountry: false, placeholder: 'Ticker (e.g. AAPL, NVDA)' },
+    { id: 'etf', label: 'ETF', tabLabel: 'ETFs', icon: 'account_balance', noCountry: false, placeholder: 'Ticker (e.g. VOO, QQQ)' },
+    { id: 'crypto', label: 'Crypto', tabLabel: 'Crypto', icon: 'currency_bitcoin', noCountry: true, placeholder: 'Ticker (e.g. BTC, ETH, SOL)', autoCryptoSuffix: true },
+    { id: 'commodity', label: 'Commodity', tabLabel: 'Commodities', icon: 'diamond', noCountry: true, placeholder: 'Yahoo symbol (e.g. GC=F Gold, SI=F Silver, CL=F Oil)' },
+];
+let _wlCategories = [..._WL_DEFAULT_CATEGORIES];
+
+const _WL_BADGE_PALETTE = [
+    { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'rgba(239,68,68,0.25)' },
+    { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: 'rgba(59,130,246,0.25)' },
+    { bg: 'rgba(168,85,247,0.12)', color: '#a855f7', border: 'rgba(168,85,247,0.25)' },
+    { bg: 'rgba(20,184,166,0.12)', color: '#14b8a6', border: 'rgba(20,184,166,0.25)' },
+    { bg: 'rgba(249,115,22,0.12)', color: '#f97316', border: 'rgba(249,115,22,0.25)' },
+    { bg: 'rgba(234,179,8,0.12)', color: '#eab308', border: 'rgba(234,179,8,0.25)' },
+];
+
+async function _wlLoadCategories() {
+    try {
+        const resp = await fetch('/api/watchlist/categories');
+        const json = await resp.json();
+        if (json.status === 'ok' && Array.isArray(json.data) && json.data.length > 0) {
+            _wlCategories = json.data;
+        }
+    } catch (_) {
+        _wlCategories = [..._WL_DEFAULT_CATEGORIES];
+    }
+    if (!_wlCategories.find(c => c.id === _wlActiveTab)) _wlActiveTab = _wlCategories[0]?.id || 'stock';
+    if (!_wlCategories.find(c => c.id === _wlAddType)) _wlAddType = _wlActiveTab;
+}
+
+async function _wlSaveCategories() {
+    try {
+        await fetch('/api/watchlist/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ categories: _wlCategories }),
+        });
+    } catch (_) { }
+}
+
+function _wlRenderTypeButtons() {
+    const container = document.getElementById('wlTypeToggle');
+    if (!container) return;
+    const selected = _wlCategories.find(c => c.id === _wlAddType) || _wlCategories[0] || { label: '—' };
+    container.innerHTML =
+        `<div class="wl-type-dropdown" id="wlTypeDropdown">` +
+        `<button class="wl-type-sel-btn" onclick="_wlToggleTypeDropdown(event)">` +
+        `<span id="wlTypeSelLabel">${esc(selected.label)}</span>` +
+        `<span class="material-symbols-outlined" style="font-size:15px;line-height:1">expand_more</span>` +
+        `</button>` +
+        `<div class="wl-type-panel" id="wlTypePanel">` +
+        _wlCategories.map(cat =>
+            `<button class="wl-type-opt${cat.id === _wlAddType ? ' active' : ''}" data-wl-type="${esc(cat.id)}" ` +
+            `onclick="_wlSetAddType('${esc(cat.id)}');_wlCloseTypeDropdown()">${esc(cat.label)}</button>`
+        ).join('') +
+        `<div class="wl-type-panel-sep"></div>` +
+        `<button class="wl-type-opt wl-type-add-cat" onclick="_wlCloseTypeDropdown();openAddCategoryModal()">` +
+        `<span class="material-symbols-outlined" style="font-size:13px;vertical-align:-2px;margin-right:3px">add</span>` +
+        `Add Category</button>` +
+        `</div></div>`;
+    if (!document._wlDropdownListener) {
+        document._wlDropdownListener = true;
+        document.addEventListener('click', e => {
+            const dd = document.getElementById('wlTypeDropdown');
+            if (dd && !dd.contains(e.target)) _wlCloseTypeDropdown();
+        });
+    }
+}
+
+function _wlToggleTypeDropdown(e) {
+    e.stopPropagation();
+    document.getElementById('wlTypePanel')?.classList.toggle('open');
+}
+
+function _wlCloseTypeDropdown() {
+    document.getElementById('wlTypePanel')?.classList.remove('open');
+}
+
+let _wlDragSrcId = null;
+let _wlRowDragSrcId = null;
+
+function _wlRenderTabs() {
+    const container = document.getElementById('wlTabs');
+    if (!container) return;
+    container.innerHTML = _wlCategories.map(cat => {
+        const isActive = cat.id === _wlActiveTab;
+        const delBtn = cat.custom
+            ? `<span class="wl-tab-del" onclick="event.stopPropagation();removeWatchlistCategory('${esc(cat.id)}')" title="Remove category">×</span>`
+            : '';
+        return `<button class="wl-tab${isActive ? ' active' : ''}" draggable="true" data-wl-tab="${esc(cat.id)}" onclick="_wlSwitchTab('${esc(cat.id)}')">` +
+            `<span class="material-symbols-outlined" style="font-size:14px;vertical-align:-3px">${cat.icon || 'folder'}</span>` +
+            ` ${esc(cat.tabLabel || cat.label)}` +
+            `<span class="wl-tab-count" id="wlTabCount-${esc(cat.id)}"></span>` +
+            `${delBtn}</button>`;
+    }).join('');
+    _wlInitTabDrag(container);
+}
+
+function _wlInitTabDrag(container) {
+    if (!container || container._dragInit) return;
+    container._dragInit = true;
+
+    container.addEventListener('dragstart', e => {
+        const tab = e.target.closest('.wl-tab');
+        if (!tab) return;
+        _wlDragSrcId = tab.dataset.wlTab;
+        tab.classList.add('wl-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    container.addEventListener('dragend', () => {
+        container.querySelectorAll('.wl-tab').forEach(t =>
+            t.classList.remove('wl-dragging', 'wl-drag-before', 'wl-drag-after')
+        );
+        _wlDragSrcId = null;
+    });
+
+    container.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const tab = e.target.closest('.wl-tab');
+        container.querySelectorAll('.wl-tab').forEach(t => t.classList.remove('wl-drag-before', 'wl-drag-after'));
+        if (!tab || tab.dataset.wlTab === _wlDragSrcId) return;
+        const rect = tab.getBoundingClientRect();
+        tab.classList.add(e.clientX < rect.left + rect.width / 2 ? 'wl-drag-before' : 'wl-drag-after');
+    });
+
+    container.addEventListener('dragleave', e => {
+        if (!container.contains(e.relatedTarget)) {
+            container.querySelectorAll('.wl-tab').forEach(t => t.classList.remove('wl-drag-before', 'wl-drag-after'));
+        }
+    });
+
+    container.addEventListener('drop', async e => {
+        e.preventDefault();
+        const tab = e.target.closest('.wl-tab');
+        const srcId = _wlDragSrcId;
+        _wlDragSrcId = null;
+        if (!tab || !srcId || tab.dataset.wlTab === srcId) return;
+        const targetId = tab.dataset.wlTab;
+        const rect = tab.getBoundingClientRect();
+        const insertBefore = e.clientX < rect.left + rect.width / 2;
+        const srcIdx = _wlCategories.findIndex(c => c.id === srcId);
+        if (srcIdx === -1) return;
+        const [moved] = _wlCategories.splice(srcIdx, 1);
+        const newTgtIdx = _wlCategories.findIndex(c => c.id === targetId);
+        if (newTgtIdx === -1) { _wlCategories.push(moved); } else {
+            _wlCategories.splice(insertBefore ? newTgtIdx : newTgtIdx + 1, 0, moved);
+        }
+        await _wlSaveCategories();
+        _wlRenderTypeButtons();
+        _wlRenderTabs();
+    });
+}
+
+function _wlTypeBadge(type) {
+    const builtinCls = { stock: 'wl-type-stock', etf: 'wl-type-etf', crypto: 'wl-type-crypto', commodity: 'wl-type-commodity' };
+    const cat = _wlCategories.find(c => c.id === type);
+    const label = cat ? (cat.label || type) : type;
+    if (builtinCls[type]) return `<span class="wl-type-badge ${builtinCls[type]}">${esc(label)}</span>`;
+    const customCats = _wlCategories.filter(c => c.custom);
+    const idx = customCats.findIndex(c => c.id === type);
+    const p = _WL_BADGE_PALETTE[Math.max(idx, 0) % _WL_BADGE_PALETTE.length];
+    return `<span class="wl-type-badge" style="background:${p.bg};color:${p.color};border:1px solid ${p.border}">${esc(label)}</span>`;
+}
+
 function _wlSetAddType(type) {
     _wlAddType = type;
-    document.getElementById('wlTypeStock').classList.toggle('active', type === 'stock');
-    document.getElementById('wlTypeEtf').classList.toggle('active', type === 'etf');
-    document.getElementById('wlTypeCrypto').classList.toggle('active', type === 'crypto');
-    document.getElementById('wlTypeCommodity').classList.toggle('active', type === 'commodity');
-    // Hide country select for crypto and commodity
+    const cat = _wlCategories.find(c => c.id === type) || {};
+    const labelEl = document.getElementById('wlTypeSelLabel');
+    if (labelEl) labelEl.textContent = cat.label || type;
+    document.querySelectorAll('#wlTypePanel .wl-type-opt').forEach(btn =>
+        btn.classList.toggle('active', btn.dataset.wlType === type)
+    );
     const countryEl = document.getElementById('watchlistCountrySelect');
-    if (countryEl) countryEl.style.display = (type === 'crypto' || type === 'commodity') ? 'none' : '';
+    if (countryEl) countryEl.style.display = cat.noCountry ? 'none' : '';
     const input = document.getElementById('watchlistTickerInput');
     if (input) {
-        if (type === 'crypto') {
-            input.placeholder = 'Ticker (e.g. BTC, ETH, SOL)';
-        } else if (type === 'commodity') {
-            input.placeholder = 'Yahoo symbol (e.g. GC=F Gold, SI=F Silver, CL=F Oil)';
-        } else if (type === 'etf') {
-            input.placeholder = 'Ticker (e.g. VOO, QQQ)';
-        } else {
-            input.placeholder = 'Ticker (e.g. AAPL, NVDA)';
-        }
+        input.placeholder = cat.placeholder || 'Ticker';
         input.maxLength = 20;
     }
 }
 
 function _wlSwitchTab(tab) {
     _wlActiveTab = tab;
-    ['stock', 'etf', 'crypto', 'commodity'].forEach(t => {
-        const key = t.charAt(0).toUpperCase() + t.slice(1);
-        const btn = document.getElementById('wlTab' + key);
-        if (btn) btn.classList.toggle('active', t === tab);
-    });
-    // Show/hide rows based on type
+    document.querySelectorAll('#wlTabs .wl-tab').forEach(btn =>
+        btn.classList.toggle('active', btn.dataset.wlTab === tab)
+    );
     document.querySelectorAll('#watchlistTableBody .wl-table-row').forEach(row => {
-        const rtype = row.dataset.type || 'stock';
-        row.style.display = rtype === tab ? '' : 'none';
+        row.style.display = (row.dataset.type || 'stock') === tab ? '' : 'none';
     });
 }
 
@@ -4607,6 +4762,10 @@ async function _wlSave(list) {
 }
 
 async function loadWatchlistView() {
+    await _wlLoadCategories();
+    _wlRenderTypeButtons();
+    _wlRenderTabs();
+    _wlSetAddType(_wlAddType);
     const list = await _wlLoad();
     _renderWatchlistTable(list);
 }
@@ -4617,12 +4776,12 @@ async function addWatchlistTicker() {
     if (!input) return;
 
     let ticker = input.value.trim().toUpperCase();
-    const country = (_wlAddType === 'crypto' || _wlAddType === 'commodity') ? 'US' : (select ? select.value : 'US');
+    const cat = _wlCategories.find(c => c.id === _wlAddType) || {};
+    const country = cat.noCountry ? 'US' : (select ? select.value : 'US');
     if (!ticker) return;
 
-    // Normalise crypto: BTC → BTC-USD, ETH-USD stays as-is
-    if (_wlAddType === 'crypto' && !ticker.includes('-')) ticker = ticker + '-USD';
-    // Commodity tickers use Yahoo Finance futures format (e.g. GC=F); keep as-is if already has =
+    // Normalise crypto-style: BTC → BTC-USD, ETH-USD stays as-is
+    if (cat.autoCryptoSuffix && !ticker.includes('-')) ticker = ticker + '-USD';
 
     const list = await _wlLoad();
     if (list.some(r => r.ticker === ticker)) {
@@ -4653,6 +4812,71 @@ function _wlCheckEmpty(list) {
     if (wrapEl) wrapEl.style.display = empty ? 'none' : '';
 }
 
+async function addWatchlistCategory(id, label, noCountry = false) {
+    if (!id || !label) return;
+    if (_wlCategories.some(c => c.id === id)) return;
+    _wlCategories.push({ id, label, tabLabel: label, icon: 'folder', noCountry, placeholder: 'Ticker', custom: true });
+    await _wlSaveCategories();
+    _wlRenderTypeButtons();
+    _wlRenderTabs();
+    _wlSetAddType(id);
+    _wlSwitchTab(id);
+}
+
+async function removeWatchlistCategory(id) {
+    const list = await _wlLoad();
+    if (list.some(r => (r.type || 'stock') === id)) {
+        const cat = _wlCategories.find(c => c.id === id);
+        alert(`Move or remove all tickers from "${cat?.label || id}" before deleting this category.`);
+        return;
+    }
+    _wlCategories = _wlCategories.filter(c => c.id !== id);
+    await _wlSaveCategories();
+    if (_wlActiveTab === id || _wlAddType === id) {
+        _wlActiveTab = _wlCategories[0]?.id || 'stock';
+        _wlAddType = _wlActiveTab;
+    }
+    _wlRenderTypeButtons();
+    _wlRenderTabs();
+    _wlSetAddType(_wlAddType);
+}
+
+function openAddCategoryModal() {
+    const modal = document.getElementById('wlAddCategoryModal');
+    if (!modal) return;
+    const nameInput = document.getElementById('wlCategoryNameInput');
+    const noCountry = document.getElementById('wlCategoryNoCountry');
+    const errEl = document.getElementById('wlAddCategoryError');
+    if (nameInput) nameInput.value = '';
+    if (noCountry) noCountry.checked = false;
+    if (errEl) errEl.style.display = 'none';
+    modal.style.display = 'flex';
+    setTimeout(() => nameInput && nameInput.focus(), 50);
+}
+
+function closeAddCategoryModal() {
+    const modal = document.getElementById('wlAddCategoryModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function _wlHandleCategoryCreate() {
+    const nameInput = document.getElementById('wlCategoryNameInput');
+    const noCountry = document.getElementById('wlCategoryNoCountry');
+    const errEl = document.getElementById('wlAddCategoryError');
+    const label = nameInput ? nameInput.value.trim() : '';
+    if (!label) {
+        if (errEl) { errEl.textContent = 'Enter a category name.'; errEl.style.display = ''; }
+        return;
+    }
+    const id = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+    if (_wlCategories.some(c => c.id === id)) {
+        if (errEl) { errEl.textContent = 'A category with this name already exists.'; errEl.style.display = ''; }
+        return;
+    }
+    closeAddCategoryModal();
+    await addWatchlistCategory(id, label, noCountry ? noCountry.checked : false);
+}
+
 function _renderWatchlistTable(list) {
     _wlCheckEmpty(list);
     if (!list.length) return;
@@ -4662,18 +4886,11 @@ function _renderWatchlistTable(list) {
     tbody.innerHTML = '';
 
     // Update tab counts
-    const stockCount = list.filter(r => (r.type || 'stock') === 'stock').length;
-    const etfCount = list.filter(r => (r.type || 'stock') === 'etf').length;
-    const cryptoCount = list.filter(r => (r.type || 'stock') === 'crypto').length;
-    const commodityCount = list.filter(r => (r.type || 'stock') === 'commodity').length;
-    const scEl = document.getElementById('wlTabStockCount');
-    const ecEl = document.getElementById('wlTabEtfCount');
-    const ccEl = document.getElementById('wlTabCryptoCount');
-    const cmEl = document.getElementById('wlTabCommodityCount');
-    if (scEl) scEl.textContent = stockCount || '';
-    if (ecEl) ecEl.textContent = etfCount || '';
-    if (ccEl) ccEl.textContent = cryptoCount || '';
-    if (cmEl) cmEl.textContent = commodityCount || '';
+    _wlCategories.forEach(cat => {
+        const count = list.filter(r => (r.type || 'stock') === cat.id).length;
+        const el = document.getElementById(`wlTabCount-${cat.id}`);
+        if (el) el.textContent = count || '';
+    });
 
     list.forEach(({ ticker, country, type }) => {
         const itemType = type || 'stock';
@@ -4684,18 +4901,13 @@ function _renderWatchlistTable(list) {
         // Apply active tab filter immediately
         if (itemType !== _wlActiveTab) row.style.display = 'none';
 
-        const typeBadge = itemType === 'etf'
-            ? `<span class="wl-type-badge wl-type-etf">ETF</span>`
-            : itemType === 'crypto'
-                ? `<span class="wl-type-badge wl-type-crypto">Crypto</span>`
-                : itemType === 'commodity'
-                    ? `<span class="wl-type-badge wl-type-commodity">Cmdty</span>`
-                    : `<span class="wl-type-badge wl-type-stock">Stock</span>`;
+        const typeBadge = _wlTypeBadge(itemType);
 
         const _s = 'skeleton skeleton-text wl-cell-skel';
         row.innerHTML = `
+            <td class="wl-drag-handle" draggable="true" onclick="event.stopPropagation()"><span class="material-symbols-outlined">drag_indicator</span></td>
             <td data-colid="wl-ticker"><div class="wl-ticker-cell"><span class="wl-ticker-chip">${esc(ticker)}</span></div></td>
-            <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}"><span class="${_s}"></span></td>
+            <td data-colid="wl-company" class="wl-company" id="wl-co-${ticker}">${typeBadge} <span class="${_s}"></span></td>
             <td data-colid="wl-price" class="wl-price" id="wl-price-${ticker}"><span class="${_s}"></span></td>
             <td data-colid="wl-change" class="wl-change" id="wl-chg-${ticker}"><span class="${_s}"></span></td>
             <td data-colid="wl-min" class="wl-target-col wl-target-min" id="wl-min-${ticker}"><span class="${_s}"></span></td>
@@ -4723,6 +4935,74 @@ function _renderWatchlistTable(list) {
     });
     // Apply saved column visibility to newly rendered rows
     _applyWlColVis(_loadWlColVis());
+    _wlInitRowDrag(tbody);
+}
+
+function _wlInitRowDrag(tbody) {
+    if (!tbody || tbody._dragInit) return;
+    tbody._dragInit = true;
+
+    tbody.addEventListener('dragstart', e => {
+        const handle = e.target.closest('.wl-drag-handle');
+        if (!handle) { e.preventDefault(); return; }
+        const row = handle.closest('.wl-table-row');
+        if (!row) return;
+        _wlRowDragSrcId = row.id;
+        row.classList.add('wl-row-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    tbody.addEventListener('dragend', () => {
+        tbody.querySelectorAll('.wl-table-row').forEach(r =>
+            r.classList.remove('wl-row-dragging', 'wl-row-drag-before', 'wl-row-drag-after')
+        );
+        _wlRowDragSrcId = null;
+    });
+
+    tbody.addEventListener('dragover', e => {
+        e.preventDefault();
+        const row = e.target.closest('.wl-table-row');
+        tbody.querySelectorAll('.wl-table-row').forEach(r =>
+            r.classList.remove('wl-row-drag-before', 'wl-row-drag-after')
+        );
+        if (!row || row.id === _wlRowDragSrcId || row.style.display === 'none') return;
+        const rect = row.getBoundingClientRect();
+        row.classList.add(e.clientY < rect.top + rect.height / 2 ? 'wl-row-drag-before' : 'wl-row-drag-after');
+    });
+
+    tbody.addEventListener('dragleave', e => {
+        if (!tbody.contains(e.relatedTarget)) {
+            tbody.querySelectorAll('.wl-table-row').forEach(r =>
+                r.classList.remove('wl-row-drag-before', 'wl-row-drag-after')
+            );
+        }
+    });
+
+    tbody.addEventListener('drop', async e => {
+        e.preventDefault();
+        const row = e.target.closest('.wl-table-row');
+        const srcId = _wlRowDragSrcId;
+        _wlRowDragSrcId = null;
+        if (!row || !srcId || row.id === srcId) return;
+
+        const srcTicker = srcId.replace('wl-row-', '');
+        const targetTicker = row.id.replace('wl-row-', '');
+        const rect = row.getBoundingClientRect();
+        const insertBefore = e.clientY < rect.top + rect.height / 2;
+
+        const list = await _wlLoad();
+        const srcIdx = list.findIndex(r => r.ticker === srcTicker);
+        if (srcIdx === -1) return;
+        const [moved] = list.splice(srcIdx, 1);
+        const newTgtIdx = list.findIndex(r => r.ticker === targetTicker);
+        if (newTgtIdx === -1) { list.push(moved); } else {
+            list.splice(insertBefore ? newTgtIdx : newTgtIdx + 1, 0, moved);
+        }
+        await _wlSave(list);
+
+        const srcRow = document.getElementById(srcId);
+        if (srcRow) insertBefore ? row.before(srcRow) : row.after(srcRow);
+    });
 }
 
 // ── Watchlist column picker ───────────────────────────────────────────────────
@@ -5903,4 +6183,209 @@ function _initYTDChartHover(canvas) {
         const tt = document.getElementById('ytdChartTooltip');
         if (tt) tt.style.display = 'none';
     });
+}
+
+// ── YouTube Videos ─────────────────────────────────────────────────────────
+
+let _ytVideos = [];
+
+function _ytFmtDuration(secs) {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function _ytRelDate(iso) {
+    if (!iso) return '';
+    const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function _ytMdToHtml(text) {
+    if (!text) return '<p class="yt-analysis-pending">Analysis pending — check back shortly.</p>';
+    return '<div>' + text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^#{1,3}\s+(.+)$/gm, '<h4 class="yt-analysis-h">$1</h4>')
+        .replace(/^[•\-\*]\s+(.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>[\s\S]*?<\/li>)(\n<li>|$)/g, '$1$2')
+        .replace(/(<li>.*<\/li>\n?)+/g, match => `<ul>${match}</ul>`)
+        .replace(/\n\n+/g, '</p><p class="yt-ap">')
+        .replace(/^(?!<[hup]|$)(.+)/gm, '<p class="yt-ap">$1</p>')
+        + '</div>';
+}
+
+async function _loadYtVideos() {
+    const list = document.getElementById('ytVideosList');
+    if (!list) return;
+
+    try {
+        const res = await fetch('/api/yt/videos');
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Failed');
+        _ytVideos = json.videos || [];
+        _renderYtVideoList(_ytVideos);
+    } catch (e) {
+        list.innerHTML = `<p class="yt-load-err">Could not load videos: ${e.message}</p>`;
+    }
+}
+
+function _renderYtVideoList(videos) {
+    const list = document.getElementById('ytVideosList');
+    if (!list) return;
+
+    if (!videos.length) {
+        list.innerHTML = `
+          <div class="yt-empty-state">
+            <span class="material-symbols-outlined" style="font-size:40px;color:var(--text-muted)">subscriptions</span>
+            <p>No channels configured yet.</p>
+            <button class="btn-primary-sm" onclick="openYtChannelsModal()">Add a Channel</button>
+          </div>`;
+        return;
+    }
+
+    list.innerHTML = videos.map(v => {
+        const esc = s => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        const hasAnalysis = v.gemini_analysis && v.gemini_analysis.trim().length > 0;
+        return `
+          <div class="yt-feed-item" onclick="openYtSidebar('${esc(v.video_id)}')">
+            <div class="yt-feed-thumb">
+              ${v.thumbnail
+                ? `<img class="yt-feed-img" src="${esc(v.thumbnail)}" alt="" loading="lazy">`
+                : `<div class="yt-thumb-placeholder"><span class="material-symbols-outlined">play_circle</span></div>`}
+              <span class="yt-duration-badge">${_ytFmtDuration(v.duration_seconds)}</span>
+            </div>
+            <div class="yt-feed-info">
+              <div class="yt-feed-channel">${esc(v.channel_name)}</div>
+              <div class="yt-feed-title">${esc(v.title)}</div>
+              <div class="yt-feed-meta">
+                <span>${_ytRelDate(v.published_at)}</span>
+                ${hasAnalysis ? `<span class="yt-analyzed-badge"><span class="material-symbols-outlined" style="font-size:11px">auto_awesome</span>Analyzed</span>` : ''}
+              </div>
+            </div>
+          </div>`;
+    }).join('');
+}
+
+function openYtSidebar(videoId) {
+    const video = _ytVideos.find(v => v.video_id === videoId);
+    if (!video) return;
+
+    document.getElementById('ytSidebarTitle').textContent = video.title;
+    document.getElementById('ytSidebarChannel').textContent = video.channel_name;
+
+    // Embed iframe
+    document.getElementById('ytEmbedContainer').innerHTML = `
+      <iframe class="yt-iframe"
+        src="https://www.youtube.com/embed/${video.video_id}?rel=0&modestbranding=1"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowfullscreen></iframe>`;
+
+    // Analysis
+    document.getElementById('ytAnalysisBody').innerHTML = _ytMdToHtml(video.gemini_analysis);
+
+    document.getElementById('ytSidebar').classList.add('open');
+    document.getElementById('ytSidebarOverlay').classList.add('open');
+}
+
+function closeYtSidebar() {
+    document.getElementById('ytSidebar').classList.remove('open');
+    document.getElementById('ytSidebarOverlay').classList.remove('open');
+    // Stop video playback
+    document.getElementById('ytEmbedContainer').innerHTML = '';
+}
+
+// ── Channel management modal ──────────────────────────────────────────────
+
+function openYtChannelsModal() {
+    document.getElementById('ytChannelsModal').style.display = 'flex';
+    _loadYtChannelsList();
+}
+
+function closeYtChannelsModal() {
+    document.getElementById('ytChannelsModal').style.display = 'none';
+    document.getElementById('ytChannelIdInput').value = '';
+    document.getElementById('ytChannelNameInput').value = '';
+    document.getElementById('ytAddError').style.display = 'none';
+}
+
+async function _loadYtChannelsList() {
+    const container = document.getElementById('ytChannelsList');
+    container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.8rem">Loading…</p>';
+    try {
+        const res = await fetch('/api/yt/channels');
+        const json = await res.json();
+        const chs = json.channels || [];
+        if (!chs.length) {
+            container.innerHTML = '<p class="yt-no-channels">No channels added yet.</p>';
+            return;
+        }
+        const esc = s => (s || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        container.innerHTML = chs.map(ch => `
+          <div class="yt-channel-row">
+            <div class="yt-channel-info">
+              <span class="material-symbols-outlined" style="font-size:16px;color:var(--accent)">subscriptions</span>
+              <div>
+                <div class="yt-channel-name">${esc(ch.name)}</div>
+                <div class="yt-channel-id">${esc(ch.channel_id)}</div>
+              </div>
+            </div>
+            <button class="yt-del-btn" onclick="deleteYtChannel('${esc(ch.channel_id)}')" title="Remove channel">
+              <span class="material-symbols-outlined" style="font-size:16px">delete</span>
+            </button>
+          </div>`).join('');
+    } catch (e) {
+        container.innerHTML = '<p class="yt-load-err">Failed to load channels.</p>';
+    }
+}
+
+async function addYtChannel() {
+    const channelId = document.getElementById('ytChannelIdInput').value.trim();
+    const name = document.getElementById('ytChannelNameInput').value.trim();
+    const errEl = document.getElementById('ytAddError');
+    const btn = document.getElementById('ytAddBtn');
+
+    errEl.style.display = 'none';
+    if (!channelId || !name) {
+        errEl.textContent = 'Both Channel ID and name are required.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    try {
+        const res = await fetch('/api/yt/channels', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ channel_id: channelId, name }),
+        });
+        const json = await res.json();
+        if (json.status !== 'ok') throw new Error(json.message || 'Error adding channel');
+        document.getElementById('ytChannelIdInput').value = '';
+        document.getElementById('ytChannelNameInput').value = '';
+        await _loadYtChannelsList();
+        await _loadYtVideos();
+    } catch (e) {
+        errEl.textContent = e.message;
+        errEl.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:15px">add</span> Add Channel';
+    }
+}
+
+async function deleteYtChannel(channelId) {
+    if (!confirm('Remove this channel and all its cached videos?')) return;
+    try {
+        await fetch(`/api/yt/channel/${encodeURIComponent(channelId)}`, { method: 'DELETE' });
+        await _loadYtChannelsList();
+        await _loadYtVideos();
+    } catch (e) {
+        alert('Failed to remove channel: ' + e.message);
+    }
 }
