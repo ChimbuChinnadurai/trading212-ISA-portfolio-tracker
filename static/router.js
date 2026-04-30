@@ -114,6 +114,9 @@ function _updateBreadcrumb(route) {
             const name = (typeof PORTFOLIO_NAMES !== 'undefined' && PORTFOLIO_NAMES['1']) || 'there';
             greetEl.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
         }
+    } else if (route.startsWith('portfolio/') || route.startsWith('stocks/')) {
+        if (iconEl) iconEl.style.display = 'none';
+        if (subtitleEl) subtitleEl.style.display = 'none';
     } else {
         const section = sectionMap[route] || { label: route, icon: 'chevron_right' };
         if (greetEl) greetEl.textContent = section.label;
