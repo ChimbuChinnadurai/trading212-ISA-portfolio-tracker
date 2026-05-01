@@ -7051,7 +7051,7 @@ html[data-theme="light"] .rating-strong-sell {
 }
 
 .portfolio-heatmap-card {
-  background: var(--bg-card);
+  f background: var(--bg-card);
   border: 1.5px solid var(--border);
   border-radius: 15px;
   box-shadow: var(--shadow);
@@ -9547,9 +9547,8 @@ html[data-theme="dark"] .nav-group-header.active {
 
 .risk-metrics-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
   gap: 14px;
-  padding: 2px;
 }
 
 .risk-metric-skeleton {
