@@ -2348,7 +2348,7 @@ th.sort-desc .sort-icon::before {
   border-radius: var(--radius);
   opacity: 0.2;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
 
 .hm-sector-label {
@@ -7051,7 +7051,7 @@ html[data-theme="light"] .rating-strong-sell {
 }
 
 .portfolio-heatmap-card {
-  background: var(--bg-card);
+  f background: var(--bg-card);
   border: 1.5px solid var(--border);
   border-radius: 15px;
   box-shadow: var(--shadow);
@@ -9281,6 +9281,54 @@ html[data-theme="dark"] .nav-group-header.active {
   color: #10b981;
 }
 
+.ue-badge-fomc {
+  background: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+}
+
+.ue-badge-boe {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.ue-badge-ecb {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+
+.ue-badge-cpi {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.ue-badge-nfp {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.ue-badge-gdp {
+  background: rgba(251, 146, 60, 0.15);
+  color: #fb923c;
+}
+
+.ue-row-macro {
+  opacity: 0.88;
+}
+
+.ue-macro-inst {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.78rem;
+}
+
+.ue-macro-code {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
 .ue-ticker-link {
   color: var(--text-primary);
   text-decoration: none;
@@ -9499,9 +9547,8 @@ html[data-theme="dark"] .nav-group-header.active {
 
 .risk-metrics-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
   gap: 14px;
-  padding: 2px;
 }
 
 .risk-metric-skeleton {
@@ -12645,7 +12692,7 @@ thead .mph-ticker-col {
 /* ── Bottom Row ─────────────────────────────────────────────── */
 .dv-bottom-row {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 12px;
   min-height: 320px;
 }
@@ -12901,9 +12948,7 @@ thead .mph-ticker-col {
 }
 
 /* ── Dividend History ───────────────────────────────────────── */
-.dv-history-card {
-  max-height: 280px;
-}
+.dv-history-card {}
 
 .dv-history-list {
   flex: 1;
@@ -12911,9 +12956,9 @@ thead .mph-ticker-col {
 }
 
 .dv-history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
   gap: 8px;
+  flex-direction: column;
 }
 
 .dv-hist-item {
@@ -12934,18 +12979,25 @@ thead .mph-ticker-col {
 }
 
 .dv-hist-month {
-  font-size: 0.6rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--green);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .dv-hist-day {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1;
+}
+
+.dv-hist-year {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .dv-hist-info {
@@ -14029,4 +14081,26 @@ thead .mph-ticker-col {
   font-size: 0.78rem;
   color: #ef4444;
   padding: 6px 0;
+}
+
+/* ── Watchlist Heatmap Tab View ──────────────────────────────────────────── */
+.wl-heatmap-view {
+  position: relative;
+  width: 100%;
+  height: clamp(320px, 55vh, 640px);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.wl-heatmap-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.wl-tab-heatmap {
+  margin-left: auto;
 }

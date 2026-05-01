@@ -459,6 +459,140 @@ def market_digest():
     return jsonify({"status": "ok", "provider": provider, "digest": text, "cached": False})
 
 
+# ── Macro economic calendar ───────────────────────────────────────────────────
+
+# Hardcoded schedule — central banks publish dates ~1 year in advance.
+# Update this list each January when institutions release their annual schedule.
+_MACRO_CALENDAR = [
+    # ── FOMC (US Federal Reserve) ────────────────────────────────────────────
+    {"date": "2025-01-29", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2025-03-19", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2025-05-07", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2025-06-18", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2025-07-30", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2025-09-17", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2025-10-29", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2025-12-10", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-01-28", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-03-18", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-04-29", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-06-17", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-07-29", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-09-16", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-10-28", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    {"date": "2026-12-09", "category": "fomc", "label": "Fed Rate Decision", "country": "US", "description": "Federal Open Market Committee interest rate decision"},
+    # ── BoE (Bank of England) ────────────────────────────────────────────────
+    {"date": "2025-02-06", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2025-03-20", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2025-05-08", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2025-06-19", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2025-08-07", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2025-09-18", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2025-11-06", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2025-12-18", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-02-05", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-03-19", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-05-07", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-06-18", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-08-06", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-09-17", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-11-05", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    {"date": "2026-12-17", "category": "boe", "label": "BoE Rate Decision", "country": "UK", "description": "Bank of England Monetary Policy Committee rate decision"},
+    # ── ECB (European Central Bank) ──────────────────────────────────────────
+    {"date": "2025-01-30", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2025-03-06", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2025-04-17", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2025-06-05", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2025-07-24", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2025-09-11", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2025-10-30", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2025-12-18", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-01-22", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-03-05", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-04-23", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-06-04", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-07-23", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-09-10", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-10-29", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    {"date": "2026-12-17", "category": "ecb", "label": "ECB Rate Decision", "country": "EU", "description": "European Central Bank Governing Council interest rate decision"},
+    # ── US CPI (BLS Consumer Price Index release) ────────────────────────────
+    {"date": "2025-02-12", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Jan 2025"},
+    {"date": "2025-03-12", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Feb 2025"},
+    {"date": "2025-04-10", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Mar 2025"},
+    {"date": "2025-05-13", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Apr 2025"},
+    {"date": "2025-06-11", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — May 2025"},
+    {"date": "2025-07-15", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Jun 2025"},
+    {"date": "2025-08-12", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Jul 2025"},
+    {"date": "2025-09-10", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Aug 2025"},
+    {"date": "2025-10-15", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Sep 2025"},
+    {"date": "2025-11-12", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Oct 2025"},
+    {"date": "2025-12-10", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Nov 2025"},
+    {"date": "2026-01-14", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Dec 2025"},
+    {"date": "2026-02-11", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Jan 2026"},
+    {"date": "2026-03-11", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Feb 2026"},
+    {"date": "2026-04-09", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Mar 2026"},
+    {"date": "2026-05-13", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Apr 2026"},
+    {"date": "2026-06-10", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — May 2026"},
+    {"date": "2026-07-15", "category": "cpi", "label": "US CPI", "country": "US", "description": "Bureau of Labor Statistics Consumer Price Index — Jun 2026"},
+    # ── US NFP (BLS Non-Farm Payrolls / Jobs Report) ─────────────────────────
+    {"date": "2025-02-07", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Jan 2025"},
+    {"date": "2025-03-07", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Feb 2025"},
+    {"date": "2025-04-04", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Mar 2025"},
+    {"date": "2025-05-02", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Apr 2025"},
+    {"date": "2025-06-06", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — May 2025"},
+    {"date": "2025-07-03", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Jun 2025"},
+    {"date": "2025-08-01", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Jul 2025"},
+    {"date": "2025-09-05", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Aug 2025"},
+    {"date": "2025-10-03", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Sep 2025"},
+    {"date": "2025-11-07", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Oct 2025"},
+    {"date": "2025-12-05", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Nov 2025"},
+    {"date": "2026-01-09", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Dec 2025"},
+    {"date": "2026-02-06", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Jan 2026"},
+    {"date": "2026-03-06", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Feb 2026"},
+    {"date": "2026-04-03", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Mar 2026"},
+    {"date": "2026-05-01", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Apr 2026"},
+    {"date": "2026-06-05", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — May 2026"},
+    {"date": "2026-07-02", "category": "nfp", "label": "US Jobs Report", "country": "US", "description": "Bureau of Labor Statistics Non-Farm Payrolls — Jun 2026"},
+    # ── US GDP Advance Estimate (BEA, ~4 weeks after quarter end) ────────────
+    {"date": "2025-04-30", "category": "gdp", "label": "US GDP (Advance)", "country": "US", "description": "Bureau of Economic Analysis advance GDP estimate — Q1 2025"},
+    {"date": "2025-07-30", "category": "gdp", "label": "US GDP (Advance)", "country": "US", "description": "Bureau of Economic Analysis advance GDP estimate — Q2 2025"},
+    {"date": "2025-10-29", "category": "gdp", "label": "US GDP (Advance)", "country": "US", "description": "Bureau of Economic Analysis advance GDP estimate — Q3 2025"},
+    {"date": "2026-01-28", "category": "gdp", "label": "US GDP (Advance)", "country": "US", "description": "Bureau of Economic Analysis advance GDP estimate — Q4 2025"},
+    {"date": "2026-04-29", "category": "gdp", "label": "US GDP (Advance)", "country": "US", "description": "Bureau of Economic Analysis advance GDP estimate — Q1 2026"},
+    {"date": "2026-07-29", "category": "gdp", "label": "US GDP (Advance)", "country": "US", "description": "Bureau of Economic Analysis advance GDP estimate — Q2 2026"},
+    # ── UK CPI (ONS Consumer Price Index) ────────────────────────────────────
+    {"date": "2025-02-19", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Jan 2025"},
+    {"date": "2025-03-26", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Feb 2025"},
+    {"date": "2025-04-16", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Mar 2025"},
+    {"date": "2025-05-21", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Apr 2025"},
+    {"date": "2025-06-18", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — May 2025"},
+    {"date": "2025-07-16", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Jun 2025"},
+    {"date": "2025-08-20", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Jul 2025"},
+    {"date": "2025-09-17", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Aug 2025"},
+    {"date": "2025-10-15", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Sep 2025"},
+    {"date": "2025-11-19", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Oct 2025"},
+    {"date": "2025-12-17", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Nov 2025"},
+    {"date": "2026-01-21", "category": "cpi", "label": "UK CPI", "country": "UK", "description": "ONS Consumer Price Index — Dec 2025"},
+]
+
+
+@market_bp.route("/api/macro-events")
+def macro_events():
+    """Hardcoded macro economic calendar filtered to next 60 days. Cached 24h."""
+    cache_key = "macro:calendar:v1"
+    cached = kv_get(cache_key, 86400)
+    if cached:
+        return jsonify({"status": "ok", "data": cached})
+
+    today = date.today().isoformat()
+    cutoff = (date.today() + timedelta(days=60)).isoformat()
+    filtered = [e for e in _MACRO_CALENDAR if today <= e["date"] <= cutoff]
+    filtered.sort(key=lambda x: x["date"])
+
+    kv_set(cache_key, filtered)
+    return jsonify({"status": "ok", "data": filtered})
+
+
 # ── Earnings & stock data ──────────────────────────────────────────────────────
 
 @market_bp.route("/api/earnings")
@@ -1241,6 +1375,95 @@ def watchlist_price():
         return jsonify({"status": "ok", "data": result})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@market_bp.route("/api/watchlist/prices")
+def watchlist_prices_bulk():
+    """Bulk live price for watchlist tickers. Per-ticker cache 5s (matches home heatmap cadence).
+    ?tickers=AAPL,NVDA&countries=US,US"""
+    tickers_raw   = flask_request.args.get("tickers", "").strip()
+    countries_raw = flask_request.args.get("countries", "").strip()
+    if not tickers_raw:
+        return jsonify({"status": "ok", "data": {}})
+
+    tickers   = [t.strip().upper() for t in tickers_raw.split(",") if t.strip()]
+    countries = [c.strip().upper() for c in countries_raw.split(",") if c.strip()]
+    if len(countries) < len(tickers):
+        countries += ["US"] * (len(tickers) - len(countries))
+
+    result_map:  dict = {}
+    needs_fetch: list = []
+    for ticker, country in zip(tickers, countries):
+        cache_key = f"wl:tick:{ticker}:{country}"
+        cached    = kv_get(cache_key, 5)
+        if cached is not None:
+            result_map[ticker] = cached
+        else:
+            needs_fetch.append((ticker, country))
+
+    if needs_fetch:
+        sym_to_key: dict = {}
+        for ticker, country in needs_fetch:
+            clean, yf_sym = _build_yf_symbol(ticker, country)
+            sym_to_key[yf_sym] = (ticker, clean, country)
+
+        quotes: list = []
+        for attempt in range(2):
+            try:
+                crumb, cookies = _yf_crumb()
+                resp = requests.get(
+                    "https://query1.finance.yahoo.com/v7/finance/quote",
+                    params={"symbols": ",".join(sym_to_key.keys()), "crumb": crumb},
+                    headers={"User-Agent": _YF_UA, "Cookie": cookies},
+                    timeout=12,
+                )
+                if resp.status_code == 401 and attempt == 0:
+                    kv_set("yf:crumb:v3", None)
+                    continue
+                resp.raise_for_status()
+                quotes = resp.json().get("quoteResponse", {}).get("result", [])
+                break
+            except Exception as exc:
+                logger.warning("watchlist_prices_bulk failed: %s", exc)
+                break
+
+        for q in quotes:
+            yf_sym = q.get("symbol", "")
+            if yf_sym not in sym_to_key:
+                continue
+            ticker, clean_ticker, country = sym_to_key[yf_sym]
+            market_state = q.get("marketState", "REGULAR")
+
+            price = change_pct = None
+            if market_state == "PRE":
+                price      = q.get("preMarketPrice")
+                change_pct = q.get("preMarketChangePercent")
+            elif market_state in ("POST", "POSTPOST", "PREPRE", "CLOSED"):
+                price = q.get("postMarketPrice")
+                prev  = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
+                if price is not None and prev and prev != 0:
+                    change_pct = ((price - prev) / prev) * 100
+            if price is None:
+                price      = q.get("regularMarketPrice")
+                change_pct = q.get("regularMarketChangePercent")
+            if price is not None and change_pct is None:
+                prev = q.get("regularMarketPreviousClose") or q.get("chartPreviousClose")
+                if prev and prev != 0:
+                    change_pct = ((price - prev) / prev) * 100
+
+            info = {
+                "ticker":       clean_ticker,
+                "company":      q.get("longName") or q.get("shortName") or clean_ticker,
+                "price":        round(price,      4) if price      is not None else None,
+                "change_pct":   round(change_pct, 4) if change_pct is not None else None,
+                "currency":     q.get("currency", ""),
+                "market_state": market_state,
+            }
+            cache_key = f"wl:tick:{ticker}:{country}"
+            kv_set(cache_key, info)
+            result_map[ticker] = info
+
+    return jsonify({"status": "ok", "data": result_map})
 
 
 @market_bp.route("/api/watchlist/tickers", methods=["GET"])

@@ -67,6 +67,24 @@ Rate-limited and frequently breaks. Use bulk downloads over individual requests.
 ### UK stocks need fallbacks
 LSE-listed stock logos and data sources differ from US. Always test with UK ticker symbols (e.g. BARC, VWRL) and implement fallback sources when primary sources fail.
 
+### Heatmap cell sizing — always use value: 1 for equal cells
+Both the home-page stocks heatmap (`_renderHeatmap` in `home.js`) and the watchlist heatmap (`_renderWlHeatmap`) pass `value: 1` to `_computeTreemap` so every cell gets equal area. Never pass holdings size or market cap — the heatmap is for monitoring daily price moves, not for visualising position sizes.
+
+### Heatmap z-index — `.hm-sector-bg` must stay at z-index: 0
+The sector background overlay uses `opacity: 0.2`. If its z-index is raised above 0 it renders over the cells and washes out their colours. Keep `.hm-sector-bg { z-index: 0 }` in `style.css`.
+
+### Watchlist heatmap tab — `__heatmap__` sentinel
+The watchlist Heatmap tab uses the string `'__heatmap__'` as a special tab ID (not a real category). Guards for this sentinel exist in `_wlLoadCategories`, `_wlSwitchTab`, `_wlCheckEmpty`, and the drag-reorder drop handler in `home.js`. Do not replace it with a numeric id or add it to `_wlCategories`.
+
+### Watchlist live price refresh — `_wlPriceCache` + 5-second interval
+`_wlPriceCache` (a `Map`) stores `{price, change_pct, company, currency, market_state}` per ticker. When the Heatmap tab is active, `_wlStartHeatmapRefresh()` fires `_wlRefreshHeatmapPrices()` every 5 seconds via `setInterval`. The backend `/api/watchlist/prices` endpoint has a 5s per-ticker cache TTL — do not lengthen it or the animation will appear stale.
+
+### Macro events calendar — update annually
+`_MACRO_CALENDAR` in `routes/market.py` is a hardcoded list of FOMC, BoE, ECB, US CPI, UK CPI, NFP, and GDP dates. Central banks publish their meeting schedule ~1 year in advance. Update the list each January when new schedules are released. The `/api/macro-events` endpoint filters this list to the next 60 days and caches the result for 24 hours.
+
+### Price alerts are triggered in the background thread
+`routes/alerts.py` defines the CRUD endpoints but alert evaluation happens in `app.py` — `_check_price_alerts()` is called after each portfolio refresh cycle. When debugging missed alerts, check the background thread logs in `app.py`, not the alerts route.
+
 ---
 
 ## Hard constraints (do not change)
@@ -86,3 +104,4 @@ LSE-listed stock logos and data sources differ from US. Always test with UK tick
 - SQLite resets on Cloud Run redeploy — use `DATABASE_URL` (PostgreSQL) for persistence
 - Cache does not auto-purge stale rows
 - Drawdown chart does not auto-redraw on theme toggle (redraws on next range-tab click)
+- `_MACRO_CALENDAR` in `market.py` needs manual update each January

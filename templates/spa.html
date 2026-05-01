@@ -438,7 +438,8 @@
           </button>
           <div class="topbar-breadcrumb">
             <div class="topbar-title-row">
-              <span class="material-symbols-outlined topbar-section-icon" id="topbarSectionIcon" style="display:none">candlestick_chart</span>
+              <span class="material-symbols-outlined topbar-section-icon" id="topbarSectionIcon"
+                style="display:none">candlestick_chart</span>
               <span class="topbar-title" id="greetingText">Good morning, Chimbu 👋</span>
             </div>
             <span class="topbar-subtitle" id="breadcrumbText">Portfolio overview</span>
@@ -1333,18 +1334,17 @@
                 </div>
               </div>
 
-            </div><!-- /dv-bottom-row -->
+              <div class="dv-history-card">
+                <div class="dv-section-header">
+                  <h3 class="dv-section-title">Recent Payments</h3>
+                  <span class="dv-section-badge" id="dvHistoryBadge">—</span>
+                </div>
+                <div id="dvHistoryList" class="dv-history-list">
+                  <div class="dv-loading">Loading…</div>
+                </div>
+              </div>
 
-            <!-- Dividend History -->
-            <div class="dv-history-card">
-              <div class="dv-section-header">
-                <h3 class="dv-section-title">Recent Payments</h3>
-                <span class="dv-section-badge" id="dvHistoryBadge">—</span>
-              </div>
-              <div id="dvHistoryList" class="dv-history-list">
-                <div class="dv-loading">Loading…</div>
-              </div>
-            </div>
+            </div><!-- /dv-bottom-row -->
 
           </div><!-- /dv-body -->
         </div><!-- /view-dividends -->
@@ -1696,6 +1696,8 @@
               <div class="wl-tabs" id="wlTabs">
                 <!-- populated by _wlRenderTabs() -->
               </div>
+
+              <div id="wlHeatmapView" class="wl-heatmap-view" style="display:none"></div>
 
               <div id="watchlistEmpty" class="watchlist-empty" style="display:none">
                 <span class="material-symbols-outlined"

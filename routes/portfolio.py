@@ -439,6 +439,12 @@ def top_performers_combined():
 def recent_dividends_combined():
     """Recent dividend payments from all portfolios, newest first."""
     try:
+        # Fetch instruments once (globally cached) to enrich records with company names
+        instruments = {}
+        first_key = next((k for k in API_KEYS.values() if k), None)
+        if first_key:
+            instruments = get_instruments(first_key)
+
         all_divs: list = []
         for pid, key in API_KEYS.items():
             if not key:
@@ -447,6 +453,11 @@ def recent_dividends_combined():
             for d in divs:
                 d["_pid"] = pid
                 raw_ticker = d.get("ticker", "")
+                
+                # Enrich with company name
+                inst = instruments.get(raw_ticker, {})
+                d["company_name"] = inst.get("name") or inst.get("shortname") or raw_ticker.split("_")[0]
+
                 base = raw_ticker.split("_")[0]
                 if base in TICKER_MAPPING:
                     d["ticker"] = TICKER_MAPPING[base] + (raw_ticker[len(base):] if "_" in raw_ticker else "")
@@ -592,9 +603,15 @@ def recent_dividends(pid):
         return jsonify({"status": "error"}), 404
     try:
         items = get_recent_dividends(api_key, pid, n=10)
+        instruments = get_instruments(api_key)
         for d in items:
             raw_ticker = d.get("ticker", "")
-            base       = raw_ticker.split("_")[0]
+            
+            # Enrich with company name
+            inst = instruments.get(raw_ticker, {})
+            d["company_name"] = inst.get("name") or inst.get("shortname") or raw_ticker.split("_")[0]
+
+            base = raw_ticker.split("_")[0]
             if base in TICKER_MAPPING:
                 d["ticker"] = TICKER_MAPPING[base] + (raw_ticker[len(base):] if "_" in raw_ticker else "")
         return jsonify({"status": "ok", "data": items})
