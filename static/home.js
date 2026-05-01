@@ -3422,6 +3422,7 @@ function _renderHomeDividends(data) {
     }
     listEl.innerHTML = data.map(div => {
         const ticker = (div.ticker || '').split('_')[0];
+        const company = div.company_name || ticker || 'Unknown stock';
         const amount = fmt.currency(div.amount || 0);
         const date = div.paidOn || div.date || '—';
         const pid = div._pid || '1';
@@ -3432,7 +3433,8 @@ function _renderHomeDividends(data) {
                 <div class="activity-dot activity-dot-div"></div>
                 <div class="activity-content">
                     <span class="ov-card-pid-tag ov-tag-p${pid}">${ownerName}</span>
-                    <span class="activity-ticker">${esc(ticker)}</span>
+                    <span class="activity-company">${esc(company)}</span>
+                    <span class="activity-ticker activity-ticker-sm">${esc(ticker)}</span>
                     <div class="activity-desc">Dividend paid</div>
                     <div class="activity-time">${esc(date)}</div>
                 </div>
@@ -5015,9 +5017,9 @@ async function _wlRefreshHeatmapPrices() {
 
     const changed = {};
     try {
-        const tickerParam   = _wlLastList.map(r => encodeURIComponent(r.ticker)).join(',');
-        const countryParam  = _wlLastList.map(r => encodeURIComponent(r.country || 'US')).join(',');
-        const res  = await fetch(`/api/watchlist/prices?tickers=${tickerParam}&countries=${countryParam}`);
+        const tickerParam = _wlLastList.map(r => encodeURIComponent(r.ticker)).join(',');
+        const countryParam = _wlLastList.map(r => encodeURIComponent(r.country || 'US')).join(',');
+        const res = await fetch(`/api/watchlist/prices?tickers=${tickerParam}&countries=${countryParam}`);
         const json = await res.json();
         if (json.status === 'ok') {
             for (const [ticker, d] of Object.entries(json.data)) {
@@ -5031,7 +5033,7 @@ async function _wlRefreshHeatmapPrices() {
                 });
             }
         }
-    } catch (_) {}
+    } catch (_) { }
 
     if (!container || container.style.display === 'none') return;
 
@@ -6001,41 +6003,71 @@ function _dvRenderHistory(data) {
     const el = document.getElementById('dvHistoryList');
     const badge = document.getElementById('dvHistoryBadge');
     if (!el) return;
-    if (badge) badge.textContent = `${data.length} payments`;
 
     if (!data.length) {
+        if (badge) badge.textContent = `0 payments`;
         el.innerHTML = '<div class="dv-empty">No dividend history.</div>';
         return;
     }
 
-    el.innerHTML = `<div class="dv-history-grid">${data.map(d => {
-        const rawDate = d.paidOn || d.date || '';
-        let dayStr = '—', monthStr = '—', timeStr = '';
-        if (rawDate) {
-            const dt = new Date(rawDate + (rawDate.includes('T') ? '' : 'T00:00:00'));
+    // 1. Group and Sum
+    const groupedData = data.reduce((acc, curr) => {
+        const ticker = (curr.ticker || '').split('_')[0];
+        const rawDate = curr.paidOn || curr.date || '';
+        const dateOnly = rawDate ? rawDate.split('T')[0] : 'no-date';
+
+        // Composite key: Ticker + Date
+        const compositeKey = `${ticker}_${dateOnly}`;
+
+        if (!acc[compositeKey]) {
+            acc[compositeKey] = {
+                ticker: ticker,
+                company_name: curr.company_name || ticker, // Save company name here
+                dateKey: dateOnly,
+                amount: 0
+            };
+        }
+
+        acc[compositeKey].amount += Number(curr.amount || 0);
+        return acc;
+    }, {});
+
+    // 2. Convert to array and sort by date descending
+    const consolidated = Object.values(groupedData).sort((a, b) => {
+        return new Date(b.dateKey) - new Date(a.dateKey);
+    });
+
+    if (badge) badge.textContent = `${consolidated.length} payments`;
+
+    // 3. Render
+    el.innerHTML = `<div class="dv-history-grid">${consolidated.map(d => {
+        let dayStr = '—', monthStr = '—', yearStr = '—';
+
+        if (d.dateKey !== 'no-date') {
+            const dt = new Date(d.dateKey + 'T00:00:00');
             dayStr = dt.getDate();
             monthStr = dt.toLocaleString('en-GB', { month: 'short' }).toUpperCase();
-            timeStr = dt.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            yearStr = dt.getFullYear();
         }
-        const ticker = (d.ticker || '').split('_')[0];
-        const company = d.company_name || ticker;
-        const amount = d.amount > 0 ? `+£${Number(d.amount).toFixed(2)}` : '—';
+
+        const totalAmount = d.amount > 0 ? `£${d.amount.toFixed(2)}` : '—';
 
         return `<div class="dv-hist-item">
             <div class="dv-hist-date">
                 <span class="dv-hist-month">${monthStr}</span>
                 <span class="dv-hist-day">${dayStr}</span>
+                <span class="dv-hist-year">${yearStr}</span>
             </div>
             <div class="dv-hist-info">
-                <span class="dv-hist-ticker">${esc(ticker)}</span>
-                <span class="dv-hist-company">${esc(company)}</span>
-                <span class="dv-hist-time">${timeStr}</span>
+                <div>
+                <span class="dv-hist-ticker">${esc(d.ticker)}</span>
+                <span class="dv-hist-company">${esc(d.company_name)}</span>
+                </div>
             </div>
-            <span class="dv-hist-amount">${esc(amount)}</span>
+            <span class="dv-hist-amount">${esc(totalAmount)}</span>
         </div>`;
     }).join('')}</div>`;
 }
-
 
 /* ─── S&P 500 Insights Charts ────────────────────────────────────────────── */
 

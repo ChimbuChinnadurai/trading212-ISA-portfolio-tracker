@@ -12692,7 +12692,7 @@ thead .mph-ticker-col {
 /* ── Bottom Row ─────────────────────────────────────────────── */
 .dv-bottom-row {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 12px;
   min-height: 320px;
 }
@@ -12948,9 +12948,7 @@ thead .mph-ticker-col {
 }
 
 /* ── Dividend History ───────────────────────────────────────── */
-.dv-history-card {
-  max-height: 280px;
-}
+.dv-history-card {}
 
 .dv-history-list {
   flex: 1;
@@ -12958,9 +12956,9 @@ thead .mph-ticker-col {
 }
 
 .dv-history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  display: flex;
   gap: 8px;
+  flex-direction: column;
 }
 
 .dv-hist-item {
@@ -12981,18 +12979,25 @@ thead .mph-ticker-col {
 }
 
 .dv-hist-month {
-  font-size: 0.6rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  color: var(--text-muted);
+  color: var(--green);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .dv-hist-day {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
-  line-height: 1;
+}
+
+.dv-hist-year {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .dv-hist-info {
