@@ -1,5 +1,7 @@
 # Trading212 Portfolio Tracker
 
+![Dashboard Screenshot](static/screenshots/dashboard.png)
+
 A full-featured web application that fetches your **Shares ISA** positions from the Trading212 API and displays them in a rich, interactive dashboard. Supports **two named portfolios** simultaneously plus an aggregated **Combined** view.
 
 ## Features
