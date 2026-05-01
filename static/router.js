@@ -602,6 +602,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     _restoreSidebar();
     _router();
+
+    // Privacy initialization
+    const savedPrivacy = localStorage.getItem('privacyMode') === '1';
+    if (savedPrivacy) {
+        document.body.classList.add('privacy-mode');
+        _updatePrivacyIcon(true);
+    }
+
     // Seed notification badge count on load
     setTimeout(() => { if (typeof loadNotifications === 'function') loadNotifications(); }, 500);
 });
@@ -625,6 +633,19 @@ function _updateThemeIcon(theme) {
     const icon = document.getElementById('themeIcon');
     if (!icon) return;
     icon.textContent = theme === 'light' ? 'dark_mode' : 'light_mode';
+}
+
+/* ── Privacy Mode ────────────────────────────────────────────────────────── */
+function togglePrivacy() {
+    const active = document.body.classList.toggle('privacy-mode');
+    localStorage.setItem('privacyMode', active ? '1' : '0');
+    _updatePrivacyIcon(active);
+}
+
+function _updatePrivacyIcon(active) {
+    const icon = document.getElementById('privacyIcon');
+    if (!icon) return;
+    icon.textContent = active ? 'visibility_off' : 'visibility';
 }
 
 window.addEventListener('hashchange', _router);
@@ -664,5 +685,6 @@ window.toggleSidebar = toggleSidebar;
 window.toggleNavGroup = toggleNavGroup;
 window.switchPid = switchPid;
 window.toggleTheme = toggleTheme;
+window.togglePrivacy = togglePrivacy;
 window.openMobileSheet = openMobileSheet;
 window.closeMobileSheet = closeMobileSheet;

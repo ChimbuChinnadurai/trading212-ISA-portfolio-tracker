@@ -14104,3 +14104,47 @@ thead .mph-ticker-col {
 .wl-tab-heatmap {
   margin-left: auto;
 }
+
+/* ─── Privacy Mode ────────────────────────────────────────────────────────── */
+body.privacy-mode .ov-main-val,
+body.privacy-mode .ov-mini-val,
+body.privacy-mode .ov-returns,
+body.privacy-mode .ov-pct,
+body.privacy-mode .ov-24h,
+body.privacy-mode .s-card-value,
+body.privacy-mode .s-card-pct,
+body.privacy-mode .s-card-sub,
+body.privacy-mode .table-val,
+body.privacy-mode .table-pct,
+body.privacy-mode .alloc-pct,
+body.privacy-mode .dv-val-green,
+body.privacy-mode .dv-val-red,
+body.privacy-mode .dv-cal-payout,
+body.privacy-mode .dv-hist-amount,
+body.privacy-mode .activity-amount,
+body.privacy-mode .mkt-tt-price,
+body.privacy-mode .cdiv-val,
+body.privacy-mode .cdiv-pct,
+body.privacy-mode .ts-price-val,
+body.privacy-mode .ts-exp-ret,
+body.privacy-mode .ue-estimates {
+    filter: blur(14px) !important;
+    pointer-events: none !important;
+    user-select: none !important;
+    transition: filter 0.3s ease;
+}
+
+.btn-privacy {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.btn-privacy:hover {
+    background: var(--bg-hover);
+    color: var(--accent);
+}
+
+body.privacy-mode .btn-privacy {
+    color: var(--accent);
+    background: var(--accent-glow);
+}
