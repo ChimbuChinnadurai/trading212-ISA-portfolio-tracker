@@ -14127,7 +14127,16 @@ body.privacy-mode .cdiv-val,
 body.privacy-mode .cdiv-pct,
 body.privacy-mode .ts-price-val,
 body.privacy-mode .ts-exp-ret,
-body.privacy-mode .ue-estimates {
+body.privacy-mode .ue-estimates,
+body.privacy-mode .cell-num,
+body.privacy-mode .pnl-amount,
+body.privacy-mode .be-profit,
+body.privacy-mode .be-loss,
+body.privacy-mode .be-needed-tag,
+body.privacy-mode .sp-metric-value,
+body.privacy-mode .weight-val,
+body.privacy-mode .pct-badge,
+body.privacy-mode .pct-badge-small {
     filter: blur(14px) !important;
     pointer-events: none !important;
     user-select: none !important;
