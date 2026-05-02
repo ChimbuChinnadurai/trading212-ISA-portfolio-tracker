@@ -560,13 +560,13 @@ def yt_videos_get(limit: int = 60) -> list:
 
 
 def yt_video_upsert(video: dict) -> bool:
-    """Insert a video if it doesn't already exist. Returns True if new."""
+    """Insert a video if it doesn't already exist. Returns True if the video needs Gemini analysis (new or existing without analysis)."""
     with _db() as conn:
         existing = conn.execute(
-            "SELECT video_id FROM yt_videos WHERE video_id = ?", (video["video_id"],)
+            "SELECT gemini_analysis FROM yt_videos WHERE video_id = ?", (video["video_id"],)
         ).fetchone()
         if existing:
-            return False
+            return not existing["gemini_analysis"]  # True if analysis is missing
         conn.execute(
             """INSERT INTO yt_videos
                (video_id, channel_id, channel_name, title, thumbnail, published_at, duration_seconds)
