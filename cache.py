@@ -274,6 +274,17 @@ def _init_pg() -> None:
                 analyzed_at      DOUBLE PRECISION NOT NULL DEFAULT 0
             )
         """)
+        conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='yt_videos' AND column_name='gemini_analysis') THEN
+                    ALTER TABLE yt_videos ADD COLUMN gemini_analysis TEXT NOT NULL DEFAULT '';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='yt_videos' AND column_name='analyzed_at') THEN
+                    ALTER TABLE yt_videos ADD COLUMN analyzed_at DOUBLE PRECISION NOT NULL DEFAULT 0;
+                END IF;
+            END $$;
+        """)
 
 
 # ── Computed portfolio rows ────────────────────────────────────────────────────

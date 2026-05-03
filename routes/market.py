@@ -1653,7 +1653,7 @@ def yt_refresh_all_channels() -> None:
             for v in videos:
                 if yt_video_upsert(v):
                     new_videos.append(v)
-            if new_videos and os.environ.get("GEMINI_API_KEY"):
+            if new_videos and (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
                 _yt_analyze_bg(new_videos)
         except Exception as exc:
             logger.error("YT channel refresh failed (%s): %s", ch["channel_id"], exc)
@@ -1685,7 +1685,7 @@ def api_yt_channels_add():
         for v in videos:
             if yt_video_upsert(v):
                 new_videos.append(v)
-        if new_videos and os.environ.get("GEMINI_API_KEY"):
+        if new_videos and (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
             _yt_analyze_bg(new_videos)
     except Exception as exc:
         logger.warning("Initial YT fetch failed for channel %s: %s", channel_id, exc)
