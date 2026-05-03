@@ -3050,7 +3050,6 @@ function _renderMarketStatus(data) {
     nasdaqEl.innerHTML =
         `<span class="mkt-dot"></span>` +
         `<span class="mkt-exch">NASDAQ</span>` +
-        `<span class="mkt-sess">${SESSION_LABEL[nasdaqSession]}</span>` +
         `<span class="mkt-time">${etStr}</span>`;
     nasdaqEl.dataset.mktMeta = JSON.stringify({
         name: 'NASDAQ', session: nasdaqSession,
@@ -3062,7 +3061,6 @@ function _renderMarketStatus(data) {
     lseEl.innerHTML =
         `<span class="mkt-dot"></span>` +
         `<span class="mkt-exch">LSE</span>` +
-        `<span class="mkt-sess">${SESSION_LABEL[lseSession]}</span>` +
         `<span class="mkt-time">${gmtStr}</span>`;
     lseEl.dataset.mktMeta = JSON.stringify({
         name: 'LSE', session: lseSession,
