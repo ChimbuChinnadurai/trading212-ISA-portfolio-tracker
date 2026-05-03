@@ -22,7 +22,7 @@ if not api_key:
 _DEFAULT_MODEL = "gemini-2.5-flash"
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0  # seconds; doubles each attempt
-_REQUEST_TIMEOUT = 30    # seconds per generate_content call
+_REQUEST_TIMEOUT = 30_000    # milliseconds (HttpOptions.timeout unit)
 
 _singleton_client: genai.Client | None = None
 
