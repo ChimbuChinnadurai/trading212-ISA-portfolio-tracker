@@ -274,6 +274,17 @@ def _init_pg() -> None:
                 analyzed_at      DOUBLE PRECISION NOT NULL DEFAULT 0
             )
         """)
+        conn.execute("""
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='yt_videos' AND column_name='gemini_analysis') THEN
+                    ALTER TABLE yt_videos ADD COLUMN gemini_analysis TEXT NOT NULL DEFAULT '';
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='yt_videos' AND column_name='analyzed_at') THEN
+                    ALTER TABLE yt_videos ADD COLUMN analyzed_at DOUBLE PRECISION NOT NULL DEFAULT 0;
+                END IF;
+            END $$;
+        """)
 
 
 # ── Computed portfolio rows ────────────────────────────────────────────────────
@@ -560,13 +571,13 @@ def yt_videos_get(limit: int = 60) -> list:
 
 
 def yt_video_upsert(video: dict) -> bool:
-    """Insert a video if it doesn't already exist. Returns True if new."""
+    """Insert a video if it doesn't already exist. Returns True if the video needs Gemini analysis (new or existing without analysis)."""
     with _db() as conn:
         existing = conn.execute(
-            "SELECT video_id FROM yt_videos WHERE video_id = ?", (video["video_id"],)
+            "SELECT gemini_analysis FROM yt_videos WHERE video_id = ?", (video["video_id"],)
         ).fetchone()
         if existing:
-            return False
+            return not existing["gemini_analysis"]  # True if analysis is missing
         conn.execute(
             """INSERT INTO yt_videos
                (video_id, channel_id, channel_name, title, thumbnail, published_at, duration_seconds)

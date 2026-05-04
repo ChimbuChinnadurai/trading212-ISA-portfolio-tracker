@@ -1527,27 +1527,28 @@ def _parse_iso8601_duration(s: str) -> int:
 
 def _yt_fetch_channel_videos(channel_id: str, channel_name: str) -> list:
     """
-    Fetch the 10 most recent uploads from a channel, filter out Shorts
+    Fetch the 15 most recent uploads from a channel, filter out Shorts
     (duration ≤ _YT_MIN_SECS), and return video dicts.
     """
     if not _YT_API_KEY:
         return []
 
-    # Step 1 — find most-recent video IDs
-    search_resp = requests.get(
-        "https://www.googleapis.com/youtube/v3/search",
+    # Use the channel's uploads playlist instead of the search API:
+    # - search costs 100 quota units per call; playlistItems costs 1
+    # - search has a multi-hour indexing delay for new videos; playlist is immediate
+    uploads_playlist_id = "UU" + channel_id[2:]
+    playlist_resp = requests.get(
+        "https://www.googleapis.com/youtube/v3/playlistItems",
         params={
             "key": _YT_API_KEY,
-            "channelId": channel_id,
-            "type": "video",
-            "order": "date",
+            "playlistId": uploads_playlist_id,
+            "part": "contentDetails",
             "maxResults": 15,
-            "part": "id",
         },
         timeout=12,
     )
-    search_resp.raise_for_status()
-    ids = [item["id"]["videoId"] for item in search_resp.json().get("items", [])]
+    playlist_resp.raise_for_status()
+    ids = [item["contentDetails"]["videoId"] for item in playlist_resp.json().get("items", [])]
     if not ids:
         return []
 
@@ -1639,7 +1640,7 @@ def yt_refresh_all_channels() -> None:
     Fetch new videos from every configured channel and analyze new ones with Gemini.
     Called every 15 min by the background thread in app.py.
     """
-    from cache import yt_channels_get, yt_video_upsert, yt_video_set_analysis
+    from cache import yt_channels_get, yt_video_upsert
 
     channels = yt_channels_get()
     if not channels:
@@ -1648,14 +1649,12 @@ def yt_refresh_all_channels() -> None:
     for ch in channels:
         try:
             videos = _yt_fetch_channel_videos(ch["channel_id"], ch["name"])
+            new_videos = []
             for v in videos:
-                is_new = yt_video_upsert(v)
-                if is_new:
-                    analysis = _yt_analyze_video(
-                        v["video_id"], v["title"], v.get("description", ""), v["channel_name"]
-                    )
-                    if analysis:
-                        yt_video_set_analysis(v["video_id"], analysis)
+                if yt_video_upsert(v):
+                    new_videos.append(v)
+            if new_videos and (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
+                _yt_analyze_bg(new_videos)
         except Exception as exc:
             logger.error("YT channel refresh failed (%s): %s", ch["channel_id"], exc)
 
@@ -1686,7 +1685,7 @@ def api_yt_channels_add():
         for v in videos:
             if yt_video_upsert(v):
                 new_videos.append(v)
-        if new_videos and os.environ.get("GEMINI_API_KEY"):
+        if new_videos and (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
             _yt_analyze_bg(new_videos)
     except Exception as exc:
         logger.warning("Initial YT fetch failed for channel %s: %s", channel_id, exc)
