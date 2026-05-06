@@ -155,7 +155,7 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="light"] .sidebar-logo .logo-bg {
-  fill: var(--accent);
+  fill: #fffefc;
 }
 
 .sidebar-logo .logo-accent-blue {
@@ -13762,16 +13762,45 @@ thead .mph-ticker-col {
   animation: news-entry 0.45s cubic-bezier(0.23, 1, 0.32, 1) forwards;
 }
 
-.yt-feed-item:nth-child(1)  { animation-delay: .04s; }
-.yt-feed-item:nth-child(2)  { animation-delay: .09s; }
-.yt-feed-item:nth-child(3)  { animation-delay: .14s; }
-.yt-feed-item:nth-child(4)  { animation-delay: .19s; }
-.yt-feed-item:nth-child(5)  { animation-delay: .24s; }
-.yt-feed-item:nth-child(6)  { animation-delay: .29s; }
-.yt-feed-item:nth-child(7)  { animation-delay: .34s; }
-.yt-feed-item:nth-child(8)  { animation-delay: .38s; }
-.yt-feed-item:nth-child(9)  { animation-delay: .42s; }
-.yt-feed-item:nth-child(n+10) { animation-delay: .46s; }
+.yt-feed-item:nth-child(1) {
+  animation-delay: .04s;
+}
+
+.yt-feed-item:nth-child(2) {
+  animation-delay: .09s;
+}
+
+.yt-feed-item:nth-child(3) {
+  animation-delay: .14s;
+}
+
+.yt-feed-item:nth-child(4) {
+  animation-delay: .19s;
+}
+
+.yt-feed-item:nth-child(5) {
+  animation-delay: .24s;
+}
+
+.yt-feed-item:nth-child(6) {
+  animation-delay: .29s;
+}
+
+.yt-feed-item:nth-child(7) {
+  animation-delay: .34s;
+}
+
+.yt-feed-item:nth-child(8) {
+  animation-delay: .38s;
+}
+
+.yt-feed-item:nth-child(9) {
+  animation-delay: .42s;
+}
+
+.yt-feed-item:nth-child(n+10) {
+  animation-delay: .46s;
+}
 
 .yt-feed-item:hover {
   background: var(--bg-hover);
@@ -13858,8 +13887,15 @@ thead .mph-ticker-col {
 }
 
 @keyframes yt-badge-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(123, 97, 255, 0); }
-  50%       { box-shadow: 0 0 7px 2px rgba(123, 97, 255, .35); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(123, 97, 255, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 7px 2px rgba(123, 97, 255, .35);
+  }
 }
 
 .yt-analyzed-badge {
@@ -14183,23 +14219,23 @@ body.privacy-mode .sp-metric-value,
 body.privacy-mode .weight-val,
 body.privacy-mode .pct-badge,
 body.privacy-mode .pct-badge-small {
-    filter: blur(14px) !important;
-    pointer-events: none !important;
-    user-select: none !important;
-    transition: filter 0.3s ease;
+  filter: blur(14px) !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  transition: filter 0.3s ease;
 }
 
 .btn-privacy {
-    position: relative;
-    transition: all 0.2s ease;
+  position: relative;
+  transition: all 0.2s ease;
 }
 
 .btn-privacy:hover {
-    background: var(--bg-hover);
-    color: var(--accent);
+  background: var(--bg-hover);
+  color: var(--accent);
 }
 
 body.privacy-mode .btn-privacy {
-    color: var(--accent);
-    background: var(--accent-glow);
+  color: var(--accent);
+  background: var(--accent-glow);
 }
