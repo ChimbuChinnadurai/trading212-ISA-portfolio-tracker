@@ -75,24 +75,26 @@ A full-featured web application that fetches your **Shares ISA** positions from 
 ## Local Development
 
 ```bash
+# 0. Install uv (once, if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # 1. One-time setup: creates .venv, installs deps, copies .env.example → .env
 make setup
-source .venv/bin/activate
 
 # 2. Edit .env — set TRADING212_API_KEY_1 and any optional keys
 
 # 3. Run
-make run        # or: python app.py
+make run        # or: uv run python app.py
 ```
 
 Open http://localhost:8080
 
 > **Manual setup (without Make):**
 > ```bash
-> python -m venv .venv && source .venv/bin/activate
-> pip install -r requirements.txt
+> uv sync
 > cp .env.example .env
-> python app.py
+> uv run python app.py
+> # or: source .venv/bin/activate && python app.py
 > ```
 
 ---

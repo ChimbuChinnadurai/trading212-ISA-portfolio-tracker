@@ -1,17 +1,20 @@
-# ── Build stage ──────────────────────────────────────────────────────────────
 # Target amd64 explicitly — Cloud Run runs linux/amd64; building on Apple Silicon
 # without this flag produces an arm64 image that won't run on Cloud Run.
 FROM --platform=linux/amd64 python:3.12-slim AS base
 
-# Prevent .pyc files and enable unbuffered stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
 
 WORKDIR /app
 
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
 # Install deps first (layer cache)
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy application code
 COPY . .
@@ -28,7 +31,7 @@ EXPOSE 8080
 
 # Single worker + 8 threads: keeps exactly one background-refresh thread alive.
 # Cloud Run handles concurrency at the instance level so one worker is sufficient.
-CMD exec gunicorn \
+CMD exec .venv/bin/gunicorn \
       --bind "0.0.0.0:${PORT}" \
       --workers 1 \
       --threads 8 \

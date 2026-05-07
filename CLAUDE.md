@@ -23,10 +23,11 @@ When asked to explore or suggest, give a concise answer first, then offer to div
 ## Commands
 
 ```bash
-make setup          # one-time: creates .venv, installs deps, copies .env.example → .env
-source .venv/bin/activate
-make run            # python app.py — serves on http://localhost:8080
-make freeze         # pip freeze > requirements.txt (after adding a package)
+make setup          # one-time: uv sync, copies .env.example → .env
+make run            # uv run python app.py — serves on http://localhost:8080
+make lock           # uv lock — update uv.lock after changing pyproject.toml deps
+uv add <pkg>        # add a package (updates pyproject.toml + uv.lock automatically)
+uv sync             # install/sync all deps from uv.lock
 make release        # commit → docker build → Cloud Run deploy → cleanup
 make release ARGS="--no-commit --dry-run"   # flag passthrough
 # git push is still manual after release.sh
