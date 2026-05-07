@@ -563,7 +563,7 @@ _MACRO_CALENDAR = [
 @market_bp.route("/api/macro-events")
 def macro_events():
     """Hardcoded macro economic calendar filtered to next 60 days. Cached 24h."""
-    cache_key = "macro:calendar:v1"
+    cache_key = "macro:calendar:v2"
     cached = kv_get(cache_key, 86400)
     if cached:
         return jsonify({"status": "ok", "data": cached})
