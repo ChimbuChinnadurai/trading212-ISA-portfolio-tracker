@@ -12,8 +12,8 @@ dependencies = [
     "google-genai>=1.0.0",
 ]
 
-[project.optional-dependencies]
-dev = [
+[tool.uv]
+dev-dependencies = [
     "python-dotenv",
 ]
 

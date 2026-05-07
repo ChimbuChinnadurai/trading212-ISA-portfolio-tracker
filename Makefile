@@ -1,25 +1,16 @@
-VENV   := .venv
-PYTHON := $(VENV)/bin/python
-PIP    := $(VENV)/bin/pip
-
-.PHONY: setup run clean freeze docker docker-run release
+.PHONY: setup run clean lock docker docker-run release
 
 setup:
 	@bash scripts/setup.sh
 
-run: $(VENV)/bin/activate
-	$(PYTHON) app.py
+run:
+	uv run python app.py
 
-$(VENV)/bin/activate: requirements.txt
-	python3 -m venv $(VENV)
-	$(PIP) install --upgrade pip --quiet
-	$(PIP) install -r requirements.txt --quiet
-
-freeze:
-	$(PIP) freeze > requirements.txt
+lock:
+	uv lock
 
 clean:
-	rm -rf $(VENV) __pycache__ **/__pycache__
+	rm -rf .venv __pycache__ **/__pycache__
 
 docker:
 	docker build --platform=linux/amd64 -t tracker .

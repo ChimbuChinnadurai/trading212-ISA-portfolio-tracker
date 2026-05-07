@@ -140,12 +140,37 @@ html[data-theme="dark"] {
   height: 40px;
   cursor: pointer;
   background: var(--bg-card);
-  border-radius: 4px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--border);
-  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.1);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow);
+  transition: all 0.2s ease;
+}
+
+.sidebar-logo .logo-bg {
+  fill: #0d1629;
+  transition: fill 0.3s ease;
+}
+
+html[data-theme="light"] .sidebar-logo .logo-bg {
+  fill: #fffefc;
+}
+
+.sidebar-logo .logo-accent-blue {
+  stroke: #3b82f6;
+  transition: stroke 0.3s ease;
+}
+
+html[data-theme="light"] .sidebar-logo .logo-accent-blue {
+  stroke: #ffffff;
+}
+
+.sidebar-logo:hover {
+  transform: translateY(-1px);
+  box-shadow: 6px 6px 0px var(--accent-glow);
+  border-color: var(--accent);
 }
 
 /* #2 — Per-portfolio identity: left border + gradient tint */
@@ -6995,23 +7020,9 @@ html[data-theme="light"] .rating-strong-sell {
   background: var(--bg-hover);
 }
 
+
 .sidebar-brand .collapse-icon {
   margin-left: auto;
-}
-
-.sidebar-logo {
-  width: 32px;
-  height: 32px;
-  flex-shrink: 0;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 0 12px var(--accent-glow);
-}
-
-.sidebar-logo svg {
-  width: 100%;
-  height: 100%;
-  display: block;
 }
 
 .sidebar-brand-text {
@@ -13746,6 +13757,49 @@ thead .mph-ticker-col {
   cursor: pointer;
   border-bottom: 1px solid var(--border);
   transition: background .12s;
+  opacity: 0;
+  transform: translateY(12px);
+  animation: news-entry 0.45s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+}
+
+.yt-feed-item:nth-child(1) {
+  animation-delay: .04s;
+}
+
+.yt-feed-item:nth-child(2) {
+  animation-delay: .09s;
+}
+
+.yt-feed-item:nth-child(3) {
+  animation-delay: .14s;
+}
+
+.yt-feed-item:nth-child(4) {
+  animation-delay: .19s;
+}
+
+.yt-feed-item:nth-child(5) {
+  animation-delay: .24s;
+}
+
+.yt-feed-item:nth-child(6) {
+  animation-delay: .29s;
+}
+
+.yt-feed-item:nth-child(7) {
+  animation-delay: .34s;
+}
+
+.yt-feed-item:nth-child(8) {
+  animation-delay: .38s;
+}
+
+.yt-feed-item:nth-child(9) {
+  animation-delay: .42s;
+}
+
+.yt-feed-item:nth-child(n+10) {
+  animation-delay: .46s;
 }
 
 .yt-feed-item:hover {
@@ -13832,6 +13886,18 @@ thead .mph-ticker-col {
   gap: 6px;
 }
 
+@keyframes yt-badge-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(123, 97, 255, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 7px 2px rgba(123, 97, 255, .35);
+  }
+}
+
 .yt-analyzed-badge {
   display: inline-flex;
   align-items: center;
@@ -13840,8 +13906,24 @@ thead .mph-ticker-col {
   font-weight: 700;
   color: var(--accent);
   background: var(--accent-glow, rgba(123, 97, 255, .15));
+  border: 1px solid rgba(123, 97, 255, .35);
   padding: 1px 5px;
   border-radius: 10px;
+  animation: yt-badge-glow 2.4s ease-in-out infinite;
+}
+
+.yt-not-analyzed-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(128, 128, 128, .08);
+  border: 1px solid rgba(128, 128, 128, .18);
+  padding: 1px 5px;
+  border-radius: 10px;
+  opacity: .7;
 }
 
 /* ── Empty / loading / error states ─────────────────────────────────────── */
@@ -14137,23 +14219,23 @@ body.privacy-mode .sp-metric-value,
 body.privacy-mode .weight-val,
 body.privacy-mode .pct-badge,
 body.privacy-mode .pct-badge-small {
-    filter: blur(14px) !important;
-    pointer-events: none !important;
-    user-select: none !important;
-    transition: filter 0.3s ease;
+  filter: blur(14px) !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  transition: filter 0.3s ease;
 }
 
 .btn-privacy {
-    position: relative;
-    transition: all 0.2s ease;
+  position: relative;
+  transition: all 0.2s ease;
 }
 
 .btn-privacy:hover {
-    background: var(--bg-hover);
-    color: var(--accent);
+  background: var(--bg-hover);
+  color: var(--accent);
 }
 
 body.privacy-mode .btn-privacy {
-    color: var(--accent);
-    background: var(--accent-glow);
+  color: var(--accent);
+  background: var(--accent-glow);
 }

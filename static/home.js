@@ -6504,7 +6504,9 @@ function _renderYtVideoList(videos) {
               <div class="yt-feed-title">${esc(v.title)}</div>
               <div class="yt-feed-meta">
                 <span>${_ytRelDate(v.published_at)}</span>
-                ${hasAnalysis ? `<span class="yt-analyzed-badge"><span class="material-symbols-outlined" style="font-size:11px">auto_awesome</span>Analyzed</span>` : ''}
+                ${hasAnalysis
+                  ? `<span class="yt-analyzed-badge"><span class="material-symbols-outlined" style="font-size:11px">auto_awesome</span>Analyzed</span>`
+                  : `<span class="yt-not-analyzed-badge"><span class="material-symbols-outlined" style="font-size:11px">pending</span>Not analyzed</span>`}
               </div>
             </div>
           </div>`;
