@@ -1744,11 +1744,11 @@ window.openStockPanel = function (r) {
   _spChartTicker = r.ticker;
   _spChartCountry = r.country || 'US';
   _spChartPeriod = '1w';
-  _spChartType = 'candle';
+  _spChartType = 'line';
   _spChartData = null;
   document.querySelectorAll('.sp-range-tab').forEach(b => b.classList.toggle('active', b.dataset.period === '1w'));
-  document.getElementById('spChartTypeCandle').classList.add('active');
-  document.getElementById('spChartTypeLine').classList.remove('active');
+  document.getElementById('spChartTypeCandle').classList.remove('active');
+  document.getElementById('spChartTypeLine').classList.add('active');
   _spLoadChart();
 
   // Load activity, news, and fundamentals
@@ -2012,7 +2012,7 @@ function _spRenderLivePrice() {
 let _spChartTicker = null;
 let _spChartCountry = 'US';
 let _spChartPeriod = '1w';
-let _spChartType = 'candle';
+let _spChartType = 'line';
 let _spChartData = null;
 
 function _spSetPeriod(period) {
