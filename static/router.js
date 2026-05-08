@@ -259,7 +259,8 @@ function _restoreSidebar() {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar || window.innerWidth <= 768) return;
     // On tablet (≤1100px) the CSS forces icon-only via CSS vars — no JS needed
-    if (window.innerWidth > 1100 && localStorage.getItem('sidebarCollapsed') === '1') {
+    // Default: collapsed. Only expand when the user has explicitly stored '0'.
+    if (window.innerWidth > 1100 && localStorage.getItem('sidebarCollapsed') === '0') {
         sidebar.classList.add('collapsed');
     }
 }
