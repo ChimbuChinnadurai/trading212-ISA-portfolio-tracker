@@ -579,7 +579,7 @@
                   <div data-impeccable-variant="original">
                     <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
                       <div class="ov-header">
-                        <span class="ov-label">{{ names['1'] }}</span>
+                        <span class="ov-label"><span class="section-emoji emoji-float" id="p1-emoji">👨‍💼</span>{{ names['1'] }}</span>
                         <span class="ov-link">View Details →</span>
                       </div>
                       <div class="ov-body">
@@ -620,7 +620,7 @@
                 <!-- Portfolio 2 -->
                 <div class="ov-card" id="ov2" onclick="navigate('portfolio/2')" style="cursor:pointer">
                   <div class="ov-header">
-                    <span class="ov-label">{{ names['2'] }}</span>
+                    <span class="ov-label"><span class="section-emoji emoji-float" id="p2-emoji">👩‍💼</span>{{ names['2'] }}</span>
                     <span class="ov-link">View Details →</span>
                   </div>
                   <div class="ov-body" id="p2-body" style="filter: grayscale(1); opacity: 0.6;">
@@ -657,7 +657,7 @@
                 <!-- Combined -->
                 <div class="ov-card ov-card-combined" onclick="navigate('portfolio/combined')" style="cursor:pointer">
                   <div class="ov-header">
-                    <span class="ov-label">Combined</span>
+                    <span class="ov-label"><span class="section-emoji emoji-pulse" id="pc-emoji">👫</span>Combined</span>
                     <span class="ov-link">View Consolidated →</span>
                   </div>
                   <div class="ov-body">
@@ -696,7 +696,7 @@
               <!-- Row 2: Stocks Heatmap -->
               <div class="ov-card home-heatmap-card">
                 <div class="ov-header">
-                  <span class="ov-label">Stocks Heatmap</span>
+                  <span class="ov-label"><span class="section-emoji emoji-shake">🌡️</span>Stocks Heatmap</span>
                   <span class="rc-label-wrap"></span>
                 </div>
                 <div id="heatmapContainer" class="heatmap-container">
@@ -708,9 +708,8 @@
               <div class="ov-card home-activity-card">
                 <div class="ov-header" style="justify-content:space-between;border-bottom:none">
                   <div style="display:flex; align-items:center; gap:8px">
-                    <span class="material-symbols-outlined" style="color:var(--text-muted)">analytics</span>
+                    <span class="section-emoji emoji-pulse">📡</span>
                     <h2 class="activity-title">Latest Trade Signals</h2>
-
                   </div>
                   <div>
                     <a href="#" class="view-all-link"
@@ -754,7 +753,7 @@
               <!-- Fear & Greed -->
               <div class="ov-card ov-card-fg" id="ov-fg" onclick="openFGPanel()" style="cursor:pointer">
                 <div class="ov-header">
-                  <span class="ov-label">Fear &amp; Greed Index</span>
+                  <span class="ov-label"><span class="section-emoji emoji-float">⚖️</span>Fear &amp; Greed Index</span>
                   <span class="rc-label-wrap">
                     <span class="fg-meta">CNN · <span id="fg-updated">—</span></span>
                   </span>
@@ -771,7 +770,7 @@
               <!-- Upcoming Events -->
               <div class="ov-card" id="ov-upcoming-events">
                 <div class="ov-header">
-                  <span class="ov-label">Upcoming Events</span>
+                  <span class="ov-label"><span class="section-emoji emoji-bounce">📅</span>Upcoming Events</span>
                   <span style="font-size:0.72rem;color:var(--text-muted)">Next 60 days</span>
                 </div>
                 <div id="upcomingEventsList" class="upcoming-events-body">
@@ -797,7 +796,7 @@
               <!-- Contributors to Returns -->
               <div class="ov-card contributors-card" id="ov-contributors">
                 <div class="ov-header">
-                  <span class="ov-label">Contributors to Returns</span>
+                  <span class="ov-label"><span class="section-emoji emoji-bounce">🏆</span>Contributors to Returns</span>
                 </div>
                 <div class="contributors-body">
                   <div id="homeContributors" class="cdiv-chart"></div>
@@ -1321,7 +1320,7 @@
               <!-- Top Payers -->
               <div class="dv-payers-card">
                 <div class="dv-section-header">
-                  <h3 class="dv-section-title">Top Dividend Payers</h3>
+                  <h3 class="dv-section-title"><span class="section-emoji emoji-bounce">💸</span>Top Dividend Payers</h3>
                   <span class="dv-section-badge" id="dvPayersBadge">—</span>
                 </div>
                 <div class="dv-payers-wrap">
@@ -1347,7 +1346,7 @@
               <!-- Upcoming Calendar -->
               <div class="dv-calendar-card">
                 <div class="dv-section-header">
-                  <h3 class="dv-section-title">Upcoming Dividends</h3>
+                  <h3 class="dv-section-title"><span class="section-emoji emoji-float">💰</span>Upcoming Dividends</h3>
                   <span class="dv-section-badge" id="dvCalBadge">—</span>
                 </div>
                 <div id="dvCalendarList" class="dv-calendar-list">
@@ -1357,7 +1356,7 @@
 
               <div class="dv-history-card">
                 <div class="dv-section-header">
-                  <h3 class="dv-section-title">Recent Payments</h3>
+                  <h3 class="dv-section-title"><span class="section-emoji emoji-pulse">🤑</span>Recent Payments</h3>
                   <span class="dv-section-badge" id="dvHistoryBadge">—</span>
                 </div>
                 <div id="dvHistoryList" class="dv-history-list">
@@ -1382,7 +1381,7 @@
                 <!-- Row 1, Col 1: Sector Performance -->
                 <section class="widget-panel widget-sectors">
                   <div class="panel-header">
-                    <h3 class="panel-title">Sectors</h3>
+                    <h3 class="panel-title"><span class="section-emoji emoji-shake">📊</span>Sectors</h3>
                     <a href="https://finviz.com/map.ashx" target="_blank" rel="noopener noreferrer"
                       style="font-size:0.7rem;color:var(--text-muted);text-decoration:none;"
                       title="View S&P 500 heatmap on Finviz">Today ↗</a>
@@ -1396,7 +1395,7 @@
                 <section class="widget-panel widget-index-chart">
                   <div class="panel-header">
                     <div class="mkt-chart-title-group">
-                      <h3 class="panel-title">S&amp;P 500</h3>
+                      <h3 class="panel-title"><span class="section-emoji emoji-float">🌐</span>S&amp;P 500</h3>
                       <span id="mktSpPrice" class="mkt-sp-price">—</span>
                       <span id="mktSpChange" class="mkt-sp-change">—</span>
                     </div>
@@ -1473,7 +1472,7 @@
                 <!-- Annual % Change Card -->
                 <section class="widget-panel insight-card">
                   <div class="panel-header">
-                    <h3 class="panel-title">S&amp;P 500 Annual % Change</h3>
+                    <h3 class="panel-title"><span class="section-emoji emoji-pulse">🧐</span>S&amp;P 500 Annual % Change</h3>
                   </div>
                   <div class="insight-chart-wrap" style="height: 220px; position: relative;">
                     <canvas id="annualChangeChart"></canvas>
@@ -1540,7 +1539,7 @@
               <div class="market-chart-card widget-panel">
                 <div class="panel-header">
                   <div class="mkt-chart-title-group">
-                    <h3 class="panel-title">Portfolio vs S&amp;P 500</h3>
+                    <h3 class="panel-title"><span class="section-emoji emoji-bounce">🎯</span>Portfolio vs S&amp;P 500</h3>
                     <div style="display:flex;align-items:center;gap:8px;margin-left:10px">
                       <button id="pvsLegSP" class="pvs-leg-check" data-series="sp"
                         style="background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;gap:5px">
@@ -1681,7 +1680,7 @@
 
             <div class="cal-view-header watchlist-header">
               <div class="cal-view-title-block">
-                <p class="cal-view-subtitle">Track any stock — price, analyst targets and 48h movement</p>
+                <p class="cal-view-subtitle"><span class="section-emoji emoji-pulse">👁️</span>Track any stock — price, analyst targets and 48h movement</p>
               </div>
               <div class="watchlist-add-bar">
                 <input id="watchlistTickerInput" class="watchlist-input" type="text"
@@ -1768,7 +1767,7 @@
               <div class="ai-col">
                 <div class="card ai-card">
                   <div class="ai-card-header">
-                    <span class="material-symbols-outlined">newspaper</span>
+                    <span class="section-emoji emoji-pulse">🤖</span>
                     <h3>Market Digest</h3>
                     <button class="ai-refresh-btn" id="aiRefreshDigest" onclick="loadAiDigest(true)">
                       <span class="material-symbols-outlined">refresh</span>
@@ -1784,7 +1783,7 @@
               <div class="ai-col">
                 <div class="card ai-card">
                   <div class="ai-card-header">
-                    <span class="material-symbols-outlined">trending_up</span>
+                    <span class="section-emoji emoji-pulse">📡</span>
                     <h3>Trade Signals</h3>
                     <button class="ai-refresh-btn" id="aiRefreshSignals" onclick="loadAiSignals(true)">
                       <span class="material-symbols-outlined">refresh</span>
@@ -1800,7 +1799,7 @@
               <div class="ai-col">
                 <div class="card ai-card ai-chat-card">
                   <div class="ai-card-header">
-                    <span class="material-symbols-outlined">forum</span>
+                    <span class="section-emoji emoji-pulse">🧠</span>
                     <h3>AI Assistant</h3>
                   </div>
                   <div class="ai-chat-content" id="aiChatContent">

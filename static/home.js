@@ -318,6 +318,31 @@ function updateCard(prefix, stats) {
     // Main value — count-up animation (from 0 on first load, from prev on refresh)
     _animateValue(valEl, stats.value, v => fmt.currency(v));
 
+    // Update dynamic emoji based on performance
+    const emojiEl = document.getElementById(`${prefix}-emoji`);
+    if (emojiEl) {
+        const isPos = stats.returns >= 0;
+        const gain = stats.returns_pct || 0;
+        if (prefix === 'c') { // Combined (Note: prefix is 'c' in code, but pc-emoji in ID. Let's fix that)
+            const pcEmoji = document.getElementById('pc-emoji');
+            if (pcEmoji) {
+                if (gain > 5) pcEmoji.textContent = '👨‍👩‍👧‍👦';
+                else if (gain > 1) pcEmoji.textContent = '👫';
+                else if (gain < -1) pcEmoji.textContent = '🧑‍🤝‍🧑';
+                else if (isPos) pcEmoji.textContent = '🏠';
+                else pcEmoji.textContent = '💍';
+            }
+        } else if (prefix === 'p1') { // Male
+            if (gain > 10) emojiEl.textContent = '🤴';
+            else if (isPos) emojiEl.textContent = '👨‍💼';
+            else emojiEl.textContent = '🧔';
+        } else if (prefix === 'p2') { // Female
+            if (gain > 10) emojiEl.textContent = '👸';
+            else if (isPos) emojiEl.textContent = '👩‍💼';
+            else emojiEl.textContent = '👩';
+        }
+    }
+
     if (retEl) {
         const isPos = stats.returns >= 0;
         retEl.className = `ov-returns ${isPos ? 'pos' : 'neg'}`;

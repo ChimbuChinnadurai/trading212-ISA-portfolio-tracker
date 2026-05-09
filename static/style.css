@@ -3800,6 +3800,54 @@ html[data-theme="dark"] .ov-card:hover {
   cursor: crosshair;
 }
 
+/* ─── Animated Emojis ────────────────────────────────────────────────────── */
+.section-emoji {
+  display: inline-block;
+  margin-right: 10px;
+  font-size: 1.3rem;
+  line-height: 1;
+  vertical-align: middle;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.emoji-float {
+  animation: emoji-float 3s ease-in-out infinite;
+}
+
+@keyframes emoji-float {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  50% { transform: translateY(-5px) rotate(5deg); }
+}
+
+.emoji-pulse {
+  animation: emoji-pulse 2s ease-in-out infinite;
+}
+
+@keyframes emoji-pulse {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(1.2); filter: brightness(1.2); }
+}
+
+.emoji-bounce {
+  animation: emoji-bounce 1.5s ease-in-out infinite;
+}
+
+@keyframes emoji-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.emoji-shake {
+  animation: emoji-shake 0.5s ease-in-out infinite;
+}
+
+@keyframes emoji-shake {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+
 /* Sparkline hover tooltip */
 .spark-tip {
   position: absolute;
