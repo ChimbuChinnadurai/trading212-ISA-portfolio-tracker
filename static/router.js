@@ -277,7 +277,7 @@ function _router() {
 
     // Deactivate previous view
     if (prev === 'home') _deactivateHomeView();
-    else if (prev?.startsWith('portfolio/')) _deactivateDetailView();
+    else if (prev?.startsWith('portfolio/') || prev?.startsWith('stocks/')) _deactivateDetailView();
     else if (prev === 'market') _deactivateMarketView();
     else if (prev === 'metrics') _deactivateMetricsView();
     else if (prev === 'news') _stopNewsTimers();

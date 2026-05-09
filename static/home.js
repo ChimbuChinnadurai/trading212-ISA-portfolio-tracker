@@ -5563,6 +5563,22 @@ async function openWatchlistStockPanel(ticker, country) {
 
     // News — always
     if (typeof window['loadStockNews'] === 'function') window['loadStockNews'](ticker);
+
+    // Price chart
+    if (typeof _spLoadChart === 'function') {
+        /* eslint-disable no-undef */
+        _spChartTicker = ticker;
+        _spChartCountry = country;
+        _spChartPeriod = '1w';
+        _spChartType = 'line';
+        _spChartData = null;
+        document.querySelectorAll('.sp-range-tab').forEach(b => b.classList.toggle('active', b.dataset.period === '1w'));
+        const candleBtn = document.getElementById('spChartTypeCandle');
+        const lineBtn = document.getElementById('spChartTypeLine');
+        if (candleBtn) candleBtn.classList.remove('active');
+        if (lineBtn) lineBtn.classList.add('active');
+        _spLoadChart();
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
