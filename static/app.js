@@ -3750,34 +3750,58 @@ function _initDynamicsRangeTabs() {
     const pt = m.data[idx];
     if (!pt) return;
 
-    _drawDynamicsChart();
+    if (m.isDailyView) _drawDailyChart(_dailyReturnsData, _dailyRange);
+    else if (m.isAttributionView) _drawAttributionChart();
+    else _drawDynamicsChart();
     const ctx = canvas.getContext('2d');
-    const dpr = window.devicePixelRatio || 1;
-    ctx.scale(dpr, dpr);
 
     // Column highlight
-    const pos = pt.pct >= 0;
+    const mv = m.isAttributionView ? (m.attribution[pt.month] || {}) : null;
+    const total = mv ? m.sectors.reduce((s, sec) => s + (mv[sec] || 0), 0) : (pt.pct || 0);
+    const pos = total >= 0;
     ctx.fillStyle = pos ? 'rgba(74,222,128,0.12)' : 'rgba(248,113,113,0.12)';
     ctx.fillRect(m.xOf(idx) - m.barStep / 2, m.PAD.top, m.barStep, m.H - m.PAD.top - m.PAD.bottom);
 
     const tooltip = document.getElementById('dynamicsTooltip');
     if (!tooltip) return;
-    const [yr, mo] = pt.month.split('-');
-    const monthStr = new Date(+yr, +mo - 1, 1)
-      .toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-    const sign = pt.pct >= 0 ? '+' : '';
+
+    let dateStr;
+    if (m.isDailyView) {
+      dateStr = new Date(pt.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    } else {
+      const [yr, mo] = pt.month.split('-');
+      dateStr = new Date(+yr, +mo - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    }
+
+    const sign = total >= 0 ? '+' : '';
     const fmtVal = v => '£' + v.toLocaleString('en-GB', { maximumFractionDigits: 0 });
-    tooltip.innerHTML = `
-      <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:2px">${monthStr}</div>
-      <div style="font-size:0.85rem;font-weight:700;color:${pos ? '#4ade80' : '#f87171'}">${sign}${pt.pct.toFixed(2)}%</div>
-      <div style="font-size:0.7rem;color:var(--text-muted)">Value: ${fmtVal(pt.value)}</div>`;
-    const tx = Math.min(m.xOf(idx) + 10, m.W - 120);
+
+    if (m.isAttributionView) {
+      const topSectors = m.sectors
+        .filter(s => mv[s])
+        .sort((a, b) => Math.abs(mv[b]) - Math.abs(mv[a]))
+        .slice(0, 4);
+      tooltip.innerHTML = `
+        <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:2px">${dateStr}</div>
+        <div style="font-size:0.85rem;font-weight:700;color:${pos ? '#4ade80' : '#f87171'}">${sign}${total.toFixed(2)}%</div>
+        ${topSectors.map(s => `<div style="font-size:0.65rem;color:var(--text-muted)">${s}: ${mv[s] >= 0 ? '+' : ''}${mv[s].toFixed(1)}%</div>`).join('')}`;
+    } else {
+      tooltip.innerHTML = `
+        <div style="font-size:0.7rem;color:var(--text-secondary);margin-bottom:2px">${dateStr}</div>
+        <div style="font-size:0.85rem;font-weight:700;color:${pos ? '#4ade80' : '#f87171'}">${sign}${total.toFixed(2)}%</div>
+        ${pt.value != null ? `<div style="font-size:0.7rem;color:var(--text-muted)">Value: ${fmtVal(pt.value)}</div>` : ''}`;
+    }
+
+    const tx = Math.min(m.xOf(idx) + 14, m.W - 116);
     const ty = Math.max(m.PAD.top + 4, m.y0 - 60);
     tooltip.style.cssText = `display:flex;flex-direction:column;gap:2px;left:${tx}px;top:${ty}px`;
   });
 
   canvas.addEventListener('mouseleave', () => {
-    _drawDynamicsChart();
+    const m = canvas._dynMeta;
+    if (m && m.isDailyView) _drawDailyChart(_dailyReturnsData, _dailyRange);
+    else if (m && m.isAttributionView) _drawAttributionChart();
+    else _drawDynamicsChart();
     const tooltip = document.getElementById('dynamicsTooltip');
     if (tooltip) tooltip.style.display = 'none';
   });
@@ -4039,6 +4063,15 @@ function _drawAttributionChart() {
     ctx.fillText(lbl, xOf(i), H - PAD.bottom + 6);
   });
 
+  canvas._dynMeta = {
+    data: months.map(m => ({ month: m })),
+    xOf, yOf, y0, barW, barStep, PAD, W, H,
+    isAttributionView: true,
+    attribution: d.attribution,
+    sectors,
+    colorMap
+  };
+
   // Legend
   const legEl = document.getElementById('dynamicsLegend');
   if (legEl) {
@@ -4147,6 +4180,8 @@ function _drawDailyChart(data, range) {
     const lbl = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
     ctx.fillText(lbl, xOf(i), H - PAD.bottom + 6);
   });
+
+  canvas._dynMeta = { data, xOf, yOf, y0, barW, barStep, PAD, W, H, isDailyView: true };
 
   // Reset legend when in daily view
   const legEl = document.getElementById('dynamicsLegend');

@@ -135,12 +135,25 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 16px;
+      padding: 0 20px 0 16px;
       background: var(--bg-card);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
       gap: 12px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1.5px solid var(--border);
+      position: relative;
+    }
+
+    .topbar::after {
+      content: '';
+      position: absolute;
+      bottom: -1.5px;
+      left: 0;
+      width: 38%;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 1;
     }
 
     html[data-theme="dark"] .topbar {
@@ -152,6 +165,9 @@
       flex-direction: column;
       justify-content: center;
       gap: 2px;
+      border-left: 2.5px solid var(--accent);
+      padding-left: 10px;
+      margin-left: 4px;
     }
 
     .topbar-title-row {
@@ -177,17 +193,17 @@
     }
 
     .topbar-title {
-      font-size: 0.95rem;
-      font-weight: 700;
+      font-size: 1rem;
+      font-weight: 800;
       color: var(--text-primary);
       line-height: 1.25;
     }
 
     .topbar-subtitle {
-      font-size: 0.69rem;
+      font-size: 0.67rem;
       color: var(--text-muted);
       line-height: 1.25;
-      letter-spacing: 0.01em;
+      letter-spacing: 0.02em;
     }
 
     /* View container — scrolls, flex column so children can fill height */
@@ -485,16 +501,19 @@
               <div class="alerts-list" id="alertsList"></div>
             </div>
           </div>
-          <button class="btn btn-privacy" id="privacyToggle" onclick="togglePrivacy()" title="Toggle Privacy Mode">
-            <span class="material-symbols-outlined" id="privacyIcon"
-              style="font-size:18px;line-height:1">visibility</span>
-          </button>
-          <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
-            <span class="material-symbols-outlined" id="themeIcon" style="font-size:17px;line-height:1">dark_mode</span>
-          </button>
-          <button class="btn btn-digest" id="digestBtn" onclick="openDigestSidebar()" title="AI Market Digest">
-            <span class="material-symbols-outlined btn-icon">newspaper</span>
-          </button>
+          <span class="topbar-sep"></span>
+          <div class="topbar-icon-group">
+            <button class="btn btn-privacy" id="privacyToggle" onclick="togglePrivacy()" title="Toggle Privacy Mode">
+              <span class="material-symbols-outlined" id="privacyIcon"
+                style="font-size:18px;line-height:1">visibility</span>
+            </button>
+            <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
+              <span class="material-symbols-outlined" id="themeIcon" style="font-size:17px;line-height:1">dark_mode</span>
+            </button>
+            <button class="btn btn-digest" id="digestBtn" onclick="openDigestSidebar()" title="AI Market Digest">
+              <span class="material-symbols-outlined" style="font-size:17px;line-height:1">newspaper</span>
+            </button>
+          </div>
           <button class="btn btn-refresh" id="refreshBtn" onclick="loadHomeData(true)">
             <span class="material-symbols-outlined btn-icon">refresh</span>
           </button>
