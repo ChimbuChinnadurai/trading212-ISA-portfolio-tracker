@@ -1099,7 +1099,7 @@ html[data-theme="light"] .s-card::before {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 15px;
   box-shadow: var(--shadow-card);
   transition: box-shadow .2s, transform .2s;
 }
@@ -4496,6 +4496,7 @@ html[data-theme="dark"] .ticker-chip {
   position: relative;
   box-shadow: var(--shadow-card);
   transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+  border: 1px solid var(--border);
 }
 
 /* On the dashboard (fixed-layout), panels fill the available grid space */
@@ -7379,7 +7380,7 @@ html[data-theme="dark"] .nav-group-header.active {
   transition: background .15s, color .15s;
 }
 
-.topbar-icon-group .btn + .btn {
+.topbar-icon-group .btn+.btn {
   border-left: 1.5px solid var(--border);
 }
 
