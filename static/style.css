@@ -69,12 +69,12 @@ pre,
 
 /* ─── Dark mode overrides (Dark Paper) ────────────────────────────────── */
 html[data-theme="dark"] {
-  --bg: #1c1c1a;
-  --bg-card: #262624;
-  --bg-table: #262624;
-  --bg-row-alt: #161614;
-  --bg-hover: #2a2a28;
-  --bg-sidebar: #161614;
+  --bg: rgba(8, 13, 24, 0.82);
+  --bg-card: rgba(8, 13, 24, 0.82);
+  --bg-table: rgba(8, 13, 24, 0.82);
+  --bg-row-alt: rgba(8, 13, 24, 0.82);
+  --bg-hover: rgba(8, 13, 24, 0.82);
+  --bg-sidebar: rgba(8, 13, 24, 0.82);
   --border: #dcdcdc;
   --border-bright: #ffffff;
 
@@ -3794,7 +3794,7 @@ html[data-theme="dark"] .ov-card:hover {
   font-size: 1.3rem;
   line-height: 1;
   vertical-align: middle;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
 
 .emoji-float {
@@ -3802,8 +3802,15 @@ html[data-theme="dark"] .ov-card:hover {
 }
 
 @keyframes emoji-float {
-  0%, 100% { transform: translateY(0) rotate(-5deg); }
-  50% { transform: translateY(-5px) rotate(5deg); }
+
+  0%,
+  100% {
+    transform: translateY(0) rotate(-5deg);
+  }
+
+  50% {
+    transform: translateY(-5px) rotate(5deg);
+  }
 }
 
 .emoji-pulse {
@@ -3811,8 +3818,17 @@ html[data-theme="dark"] .ov-card:hover {
 }
 
 @keyframes emoji-pulse {
-  0%, 100% { transform: scale(1); filter: brightness(1); }
-  50% { transform: scale(1.2); filter: brightness(1.2); }
+
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+
+  50% {
+    transform: scale(1.2);
+    filter: brightness(1.2);
+  }
 }
 
 .emoji-bounce {
@@ -3820,8 +3836,15 @@ html[data-theme="dark"] .ov-card:hover {
 }
 
 @keyframes emoji-bounce {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .emoji-shake {
@@ -3829,9 +3852,19 @@ html[data-theme="dark"] .ov-card:hover {
 }
 
 @keyframes emoji-shake {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-10deg); }
-  75% { transform: rotate(10deg); }
+
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+
+  25% {
+    transform: rotate(-10deg);
+  }
+
+  75% {
+    transform: rotate(10deg);
+  }
 }
 
 
