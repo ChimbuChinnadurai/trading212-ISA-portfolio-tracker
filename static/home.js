@@ -6469,6 +6469,7 @@ function _initYTDChartHover(canvas) {
 // ── YouTube Videos ─────────────────────────────────────────────────────────
 
 let _ytVideos = [];
+let _ytActiveChannelFilter = null;
 
 function _ytFmtDuration(secs) {
     const h = Math.floor(secs / 3600);
@@ -6509,10 +6510,43 @@ async function _loadYtVideos() {
         const json = await res.json();
         if (json.status !== 'ok') throw new Error(json.message || 'Failed');
         _ytVideos = json.videos || [];
+        _ytActiveChannelFilter = null;
+        _renderYtChannelFilter(_ytVideos);
         _renderYtVideoList(_ytVideos);
     } catch (e) {
         list.innerHTML = `<p class="yt-load-err">Could not load videos: ${e.message}</p>`;
     }
+}
+
+function _renderYtChannelFilter(videos) {
+    const bar = document.getElementById('ytChannelFilter');
+    if (!bar) return;
+    const channels = [];
+    const seen = new Set();
+    for (const v of videos) {
+        if (v.channel_id && !seen.has(v.channel_id)) {
+            seen.add(v.channel_id);
+            channels.push({ id: v.channel_id, name: v.channel_name });
+        }
+    }
+    if (channels.length <= 1) {
+        bar.style.display = 'none';
+        return;
+    }
+    const esc = s => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    bar.style.display = 'flex';
+    bar.innerHTML = [
+        `<button class="yt-filter-pill${!_ytActiveChannelFilter ? ' active' : ''}" onclick="_ytSetChannelFilter(null)">All</button>`,
+        ...channels.map(ch =>
+            `<button class="yt-filter-pill${_ytActiveChannelFilter === ch.id ? ' active' : ''}" onclick="_ytSetChannelFilter('${esc(ch.id)}')">${esc(ch.name)}</button>`)
+    ].join('');
+}
+
+function _ytSetChannelFilter(channelId) {
+    _ytActiveChannelFilter = channelId;
+    _renderYtChannelFilter(_ytVideos);
+    const filtered = channelId ? _ytVideos.filter(v => v.channel_id === channelId) : _ytVideos;
+    _renderYtVideoList(filtered);
 }
 
 function _renderYtVideoList(videos) {

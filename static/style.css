@@ -13861,6 +13861,48 @@ thead .mph-ticker-col {
   color: var(--text-primary);
 }
 
+/* ── Channel filter bar ─────────────────────────────────────────────────── */
+
+.yt-channel-filter {
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  scrollbar-width: none;
+}
+
+.yt-channel-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.yt-filter-pill {
+  flex-shrink: 0;
+  padding: 4px 11px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: none;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background .13s, color .13s, border-color .13s;
+  white-space: nowrap;
+}
+
+.yt-filter-pill:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.yt-filter-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ── Video feed items (inside social-feed-scroll) ───────────────────────── */
 
 .yt-feed-item {
