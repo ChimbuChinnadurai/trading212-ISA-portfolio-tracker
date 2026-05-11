@@ -9,6 +9,7 @@ let sortDir = 'desc';
 let activeCountry = null;
 let _recommendations = {};
 let _lastTotalDividends = null;
+let _lastPAI = null;
 let _activityData = null;
 let _dividendData = null;
 let _monthlyData = null;
