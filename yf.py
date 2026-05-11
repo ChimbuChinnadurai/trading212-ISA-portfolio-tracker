@@ -171,7 +171,7 @@ def _fetch_hist_returns_one(ticker: str, country: str) -> tuple:
             if not candidates:
                 res[key] = None
                 continue
-            best_i   = min(candidates, key=lambda i: abs(ts_arr[i] - target))
+            best_i   = min(candidates, key=lambda i, t=target: abs(ts_arr[i] - t))
             min_dist = abs(ts_arr[best_i] - target)
             best_p   = price_arr[best_i]
             res[key] = (
