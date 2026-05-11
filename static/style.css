@@ -7982,19 +7982,6 @@ body.privacy-mode .topbar-icon-group .btn-privacy {
   position: relative;
 }
 
-.portfolio-panel::before {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: 30px;
-  width: 35px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(2px);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  transform: rotate(3deg);
-  z-index: 10;
-}
 
 .portfolio-panel .panel-header {
   padding: 14px 16px 10px;
