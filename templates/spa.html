@@ -38,11 +38,11 @@
     }
 
     html[data-theme="dark"] {
-      --bg: #1c1c1a;
-      --bg-card: #262624;
-      --bg-sidebar: #161614;
-      --bg-row-alt: #161614;
-      --bg-hover: #2a2a28;
+      --bg: rgba(8, 13, 24, 0.82);
+      --bg-card: rgba(8, 13, 24, 0.82);
+      --bg-sidebar: rgba(8, 13, 24, 0.82);
+      --bg-row-alt: rgba(8, 13, 24, 0.82);
+      --bg-hover: rgba(8, 13, 24, 0.82);
       --border: #dcdcdc;
       --border-bright: #ffffff;
       --accent: #9d8aff;
@@ -288,8 +288,8 @@
             <line x1="24" y1="5" x2="24" y2="8" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
             <rect x="21.5" y="8" width="5" height="12" rx="1" fill="#10b981" />
             <line x1="24" y1="20" x2="24" y2="24" stroke="#10b981" stroke-width="1.5" stroke-linecap="round" />
-            <polyline class="logo-accent-blue" points="8,19 16,16 24,14" fill="none" stroke="#3b82f6" stroke-width="1.5" stroke-linecap="round"
-              stroke-linejoin="round" opacity="0.85" />
+            <polyline class="logo-accent-blue" points="8,19 16,16 24,14" fill="none" stroke="#3b82f6" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
           </svg>
         </div>
         <span class="material-symbols-outlined collapse-icon">chevron_left</span>
@@ -508,7 +508,8 @@
                 style="font-size:18px;line-height:1">visibility</span>
             </button>
             <button class="btn btn-theme" id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode">
-              <span class="material-symbols-outlined" id="themeIcon" style="font-size:17px;line-height:1">dark_mode</span>
+              <span class="material-symbols-outlined" id="themeIcon"
+                style="font-size:17px;line-height:1">dark_mode</span>
             </button>
             <button class="btn btn-digest" id="digestBtn" onclick="openDigestSidebar()" title="AI Market Digest">
               <span class="material-symbols-outlined" style="font-size:17px;line-height:1">newspaper</span>
@@ -579,7 +580,8 @@
                   <div data-impeccable-variant="original">
                     <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
                       <div class="ov-header">
-                        <span class="ov-label"><span class="section-emoji emoji-float" id="p1-emoji">👨‍💼</span>{{ names['1'] }}</span>
+                        <span class="ov-label"><span class="section-emoji emoji-float" id="p1-emoji">👨‍💼</span>{{
+                          names['1'] }}</span>
                         <span class="ov-link">View Details →</span>
                       </div>
                       <div class="ov-body">
@@ -620,7 +622,8 @@
                 <!-- Portfolio 2 -->
                 <div class="ov-card" id="ov2" onclick="navigate('portfolio/2')" style="cursor:pointer">
                   <div class="ov-header">
-                    <span class="ov-label"><span class="section-emoji emoji-float" id="p2-emoji">👩‍💼</span>{{ names['2'] }}</span>
+                    <span class="ov-label"><span class="section-emoji emoji-float" id="p2-emoji">👩‍💼</span>{{
+                      names['2'] }}</span>
                     <span class="ov-link">View Details →</span>
                   </div>
                   <div class="ov-body" id="p2-body" style="filter: grayscale(1); opacity: 0.6;">
@@ -657,7 +660,8 @@
                 <!-- Combined -->
                 <div class="ov-card ov-card-combined" onclick="navigate('portfolio/combined')" style="cursor:pointer">
                   <div class="ov-header">
-                    <span class="ov-label"><span class="section-emoji emoji-pulse" id="pc-emoji">👫</span>Combined</span>
+                    <span class="ov-label"><span class="section-emoji emoji-pulse"
+                        id="pc-emoji">👫</span>Combined</span>
                     <span class="ov-link">View Consolidated →</span>
                   </div>
                   <div class="ov-body">
@@ -796,7 +800,8 @@
               <!-- Contributors to Returns -->
               <div class="ov-card contributors-card" id="ov-contributors">
                 <div class="ov-header">
-                  <span class="ov-label"><span class="section-emoji emoji-bounce">🏆</span>Contributors to Returns</span>
+                  <span class="ov-label"><span class="section-emoji emoji-bounce">🏆</span>Contributors to
+                    Returns</span>
                 </div>
                 <div class="contributors-body">
                   <div id="homeContributors" class="cdiv-chart"></div>
@@ -1319,7 +1324,8 @@
               <!-- Top Payers -->
               <div class="dv-payers-card">
                 <div class="dv-section-header">
-                  <h3 class="dv-section-title"><span class="section-emoji emoji-bounce">💸</span>Top Dividend Payers</h3>
+                  <h3 class="dv-section-title"><span class="section-emoji emoji-bounce">💸</span>Top Dividend Payers
+                  </h3>
                   <span class="dv-section-badge" id="dvPayersBadge">—</span>
                 </div>
                 <div class="dv-payers-wrap">
@@ -1471,7 +1477,8 @@
                 <!-- Annual % Change Card -->
                 <section class="widget-panel insight-card">
                   <div class="panel-header">
-                    <h3 class="panel-title"><span class="section-emoji emoji-pulse">🧐</span>S&amp;P 500 Annual % Change</h3>
+                    <h3 class="panel-title"><span class="section-emoji emoji-pulse">🧐</span>S&amp;P 500 Annual % Change
+                    </h3>
                   </div>
                   <div class="insight-chart-wrap" style="height: 220px; position: relative;">
                     <canvas id="annualChangeChart"></canvas>
@@ -1538,7 +1545,8 @@
               <div class="market-chart-card widget-panel">
                 <div class="panel-header">
                   <div class="mkt-chart-title-group">
-                    <h3 class="panel-title"><span class="section-emoji emoji-bounce">🎯</span>Portfolio vs S&amp;P 500</h3>
+                    <h3 class="panel-title"><span class="section-emoji emoji-bounce">🎯</span>Portfolio vs S&amp;P 500
+                    </h3>
                     <div style="display:flex;align-items:center;gap:8px;margin-left:10px">
                       <button id="pvsLegSP" class="pvs-leg-check" data-series="sp"
                         style="background:none;border:none;padding:0;cursor:pointer;display:flex;align-items:center;gap:5px">
@@ -1679,7 +1687,8 @@
 
             <div class="cal-view-header watchlist-header">
               <div class="cal-view-title-block">
-                <p class="cal-view-subtitle"><span class="section-emoji emoji-pulse">👁️</span>Track any stock — price, analyst targets and 48h movement</p>
+                <p class="cal-view-subtitle"><span class="section-emoji emoji-pulse">👁️</span>Track any stock — price,
+                  analyst targets and 48h movement</p>
               </div>
               <div class="watchlist-add-bar">
                 <input id="watchlistTickerInput" class="watchlist-input" type="text"
