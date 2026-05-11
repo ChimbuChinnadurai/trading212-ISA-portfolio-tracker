@@ -1269,8 +1269,7 @@ function onCurrencyChange() {
   if (allRows.length === 0) return;
   renderSummary(allRows, _lastTotalDividends, _lastPAI);
   renderTable(allRows);
-  if (_activityData) _renderActivity(_activityData);
-  if (_dividendData) _renderDividends(_dividendData);
+  if (_activityData || _dividendData) _renderActivity(_activityData || [], _dividendData || []);
   if (_monthlyData) _renderMonthly(_monthlyData);
   // Re-render live price in stock panel if it's open
   if (_spLivePriceData) _spRenderLivePrice();
