@@ -74,24 +74,37 @@ def get_market_digest() -> dict:
             raise RuntimeError("Failed to fetch finviz homepage")
 
         # The digest is embedded as JSON in a <script> tag
+        def _clean(s: str) -> str:
+            return re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', s)
+
+        def _extract_json_object(text: str, start: int) -> dict:
+            """Walk the string from `start` to find a balanced JSON object."""
+            depth, i = 0, start
+            for i, ch in enumerate(text[start:], start):
+                if ch == '{':
+                    depth += 1
+                elif ch == '}':
+                    depth -= 1
+                    if depth == 0:
+                        return json.loads(text[start:i + 1])
+            return {}
+
         for script in soup.find_all("script"):
             text = script.string or ""
             if "whyMoving" not in text:
                 continue
-            m = re.search(r'\{"whyMoving":.+\}', text)
+            m = re.search(r'\{[^<]*"whyMoving"\s*:', text, re.DOTALL)
             if not m:
                 continue
-            data = json.loads(m.group(0))
-            wm = data.get("whyMoving", {})
-
-            # Strip markdown links [TEXT](url) → TEXT, keep ticker chips
-            def _clean(s: str) -> str:
-                # [LABEL](url) → LABEL
-                return re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', s)
-
-            bullets = [_clean(b) for b in wm.get("bulletPointsList", []) if b]
+            data = _extract_json_object(text, m.start())
+            if not data:
+                continue
+            wm = data.get("whyMoving") or {}
+            raw_bullets = wm.get("bulletPointsList") or []
+            bullets = [_clean(b) for b in raw_bullets if b]
             result = {
                 "headline":  wm.get("headline", ""),
+                "summary":   _clean(wm.get("summary", "") or ""),
                 "bullets":   bullets,
                 "datetime":  wm.get("dateTime", ""),
                 "sentiment": wm.get("sentiment", ""),
