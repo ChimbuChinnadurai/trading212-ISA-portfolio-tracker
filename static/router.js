@@ -281,6 +281,7 @@ function _router() {
     else if (prev === 'market') _deactivateMarketView();
     else if (prev === 'metrics') _deactivateMetricsView();
     else if (prev === 'news') _stopNewsTimers();
+    else if (prev === 'watchlist') { if (typeof _wlStopHeatmapRefresh === 'function') _wlStopHeatmapRefresh(); }
 
     // Update shared UI
     _updateBreadcrumb(hash);
