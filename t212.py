@@ -213,7 +213,7 @@ def get_all_orders_history(api_key: str, pid: str, tickers: list | None = None) 
         return cached
 
     if tickers is None:
-        # Tickers are no longer cached globally in a reliable way, 
+        # Tickers are no longer cached globally in a reliable way,
         # but build_rows usually provides them or we can grab them from living portfolio.
         # For full history, we typically fetch it once during intensive indexing.
         return []

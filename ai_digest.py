@@ -19,9 +19,13 @@ def _generate_finviz(_user_msg: str) -> str:
         raise RuntimeError("Finviz digest unavailable — homepage may have changed")
 
     headline = data["headline"]
-    bullets  = data.get("bullets", [])
+    bullets  = data.get("bullets") or []
+    summary  = data.get("summary", "")
     lines    = [f"**{headline}**", ""]
-    lines   += [f"• {b}" for b in bullets]
+    if bullets:
+        lines += [f"• {b}" for b in bullets]
+    elif summary:
+        lines += [summary]
     return "\n".join(lines)
 
 

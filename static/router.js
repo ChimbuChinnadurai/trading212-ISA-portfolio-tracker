@@ -258,10 +258,7 @@ function toggleSidebar() {
 function _restoreSidebar() {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar || window.innerWidth <= 768) return;
-    // On tablet (≤1100px) the CSS forces icon-only via CSS vars — no JS needed
-    if (window.innerWidth > 1100 && localStorage.getItem('sidebarCollapsed') === '1') {
-        sidebar.classList.add('collapsed');
-    }
+    sidebar.classList.add('collapsed');
 }
 
 /* ── Navigate (public API) ───────────────────────────────────────────────── */
@@ -280,10 +277,11 @@ function _router() {
 
     // Deactivate previous view
     if (prev === 'home') _deactivateHomeView();
-    else if (prev?.startsWith('portfolio/')) _deactivateDetailView();
+    else if (prev?.startsWith('portfolio/') || prev?.startsWith('stocks/')) _deactivateDetailView();
     else if (prev === 'market') _deactivateMarketView();
     else if (prev === 'metrics') _deactivateMetricsView();
     else if (prev === 'news') _stopNewsTimers();
+    else if (prev === 'watchlist') { if (typeof _wlStopHeatmapRefresh === 'function') _wlStopHeatmapRefresh(); }
 
     // Update shared UI
     _updateBreadcrumb(hash);

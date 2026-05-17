@@ -31,17 +31,17 @@ def build_rows(positions: list, instruments: dict, dividends: defaultdict, gbpus
         raw_ticker        = pos.get("ticker", "")
         base_ticker       = raw_ticker.split("_")[0]
         mapped_base       = TICKER_MAPPING.get(base_ticker, base_ticker)
-        
+
         quantity          = float(pos.get("quantity",      0))
         avg_price_raw     = float(pos.get("averagePrice",  0))
         current_price_raw = float(pos.get("currentPrice",  0))
         ppl               = float(pos.get("ppl",           0))
         raw_fx_ppl        = pos.get("fxPpl")
- 
+
         instrument    = instruments.get(raw_ticker, {})
         company_name  = instrument.get("name") or instrument.get("shortname") or raw_ticker
         short_symbol  = mapped_base
-        
+
         country       = get_country(instrument, raw_ticker)
         sector_raw    = instrument.get("sector") or instrument.get("industry")
         sector        = get_sector(short_symbol, company_name) if not sector_raw else sector_raw
@@ -50,18 +50,18 @@ def build_rows(positions: list, instruments: dict, dividends: defaultdict, gbpus
                          if raw_currency else
                          ("GBP" if country in PENCE_COUNTRIES else
                           "USD" if country in USD_COUNTRIES else "GBP"))
- 
+
         avg_price     = convert_price(avg_price_raw,     country, gbpusd)
         current_price = convert_price(current_price_raw, country, gbpusd)
- 
+
         current_value = quantity * current_price
         invested      = quantity * avg_price
         returns_pct   = (ppl / invested * 100) if invested else 0
-        
+
         native_currency = (raw_currency.upper() if raw_currency else
                            ("GBX" if country in PENCE_COUNTRIES else
                             "USD" if country in USD_COUNTRIES else "GBP"))
- 
+
         # FX impact is only meaningful for non-UK holdings
         fx_impact = None if country == "UK" else (
             round(float(raw_fx_ppl), 2) if raw_fx_ppl is not None else None
@@ -70,7 +70,7 @@ def build_rows(positions: list, instruments: dict, dividends: defaultdict, gbpus
             "company_name":  company_name,
             "ticker":        short_symbol, # This is now the mapped base
             "country":       country,
-            "quantity":      round(quantity, 6), 
+            "quantity":      round(quantity, 6),
             "avg_price":     round(avg_price, 4),
             "current_price": round(current_price, 4),
             "native_price":  round(current_price_raw, 4),

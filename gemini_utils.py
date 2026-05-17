@@ -24,7 +24,7 @@ _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 2.0  # seconds; doubles each attempt
 _REQUEST_TIMEOUT = 30_000    # milliseconds (HttpOptions.timeout unit)
 
-_singleton_client: genai.Client | None = None
+_singleton_client: genai.Client | None = None  # pylint: disable=invalid-name
 
 
 def _client() -> genai.Client:
@@ -61,6 +61,7 @@ def _generate(prompt: str, model: str = _DEFAULT_MODEL) -> str:
                 logger.error("gemini._generate run=%s all %d attempts failed: %s",
                              run_id, _MAX_RETRIES, e)
                 raise
+    raise RuntimeError(f"_generate: all {_MAX_RETRIES} retries exhausted")
 
 
 def _parse_json_response(text: str) -> list | dict:

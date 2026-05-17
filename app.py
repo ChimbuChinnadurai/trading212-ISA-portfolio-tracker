@@ -26,9 +26,9 @@ import os
 import threading
 import time
 
-import config  # noqa: F401 — must be imported before any local module reads os.environ
+import config  # noqa: F401  # pylint: disable=unused-import,wrong-import-order
 
-from flask import Flask
+from flask import Flask  # pylint: disable=wrong-import-order
 
 from cache import (
     alert_mark_triggered, alerts_get_all, init_db, kv_get, kv_set,
@@ -36,7 +36,9 @@ from cache import (
 )
 from helpers import API_KEYS, fetch_and_cache_portfolio
 from routes import alerts_bp, ai_bp, market_bp, performance_bp, portfolio_bp
-from routes.market import fetch_and_cache_market_indicators, fetch_and_cache_news, yt_refresh_all_channels
+from routes.market import (
+    fetch_and_cache_market_indicators, fetch_and_cache_news, yt_refresh_all_channels,
+)
 import snowball_dividends as _sdiv
 
 # ── Flask app ─────────────────────────────────────────────────────────────────

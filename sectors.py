@@ -19,6 +19,7 @@ SECTORS = {
     "ATO":  "Information Technology",
     "KULR":  "Industrials",
     "APLD":  "Information Technology",
+    "MELI": "Consumer Cyclical",
 
     # Major Tech
     "AAPL":  "Information Technology",

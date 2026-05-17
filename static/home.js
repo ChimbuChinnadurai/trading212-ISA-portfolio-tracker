@@ -318,6 +318,31 @@ function updateCard(prefix, stats) {
     // Main value — count-up animation (from 0 on first load, from prev on refresh)
     _animateValue(valEl, stats.value, v => fmt.currency(v));
 
+    // Update dynamic emoji based on performance
+    const emojiEl = document.getElementById(`${prefix}-emoji`);
+    if (emojiEl) {
+        const isPos = stats.returns >= 0;
+        const gain = stats.returns_pct || 0;
+        if (prefix === 'c') { // Combined (Note: prefix is 'c' in code, but pc-emoji in ID. Let's fix that)
+            const pcEmoji = document.getElementById('pc-emoji');
+            if (pcEmoji) {
+                if (gain > 5) pcEmoji.textContent = '👨‍👩‍👧‍👦';
+                else if (gain > 1) pcEmoji.textContent = '👫';
+                else if (gain < -1) pcEmoji.textContent = '🧑‍🤝‍🧑';
+                else if (isPos) pcEmoji.textContent = '🏠';
+                else pcEmoji.textContent = '💍';
+            }
+        } else if (prefix === 'p1') { // Male
+            if (gain > 10) emojiEl.textContent = '🤴';
+            else if (isPos) emojiEl.textContent = '👨‍💼';
+            else emojiEl.textContent = '🧔';
+        } else if (prefix === 'p2') { // Female
+            if (gain > 10) emojiEl.textContent = '👸';
+            else if (isPos) emojiEl.textContent = '👩‍💼';
+            else emojiEl.textContent = '👩';
+        }
+    }
+
     if (retEl) {
         const isPos = stats.returns >= 0;
         retEl.className = `ov-returns ${isPos ? 'pos' : 'neg'}`;
@@ -5563,6 +5588,22 @@ async function openWatchlistStockPanel(ticker, country) {
 
     // News — always
     if (typeof window['loadStockNews'] === 'function') window['loadStockNews'](ticker);
+
+    // Price chart
+    if (typeof _spLoadChart === 'function') {
+        /* eslint-disable no-undef */
+        _spChartTicker = ticker;
+        _spChartCountry = country;
+        _spChartPeriod = '1w';
+        _spChartType = 'line';
+        _spChartData = null;
+        document.querySelectorAll('.sp-range-tab').forEach(b => b.classList.toggle('active', b.dataset.period === '1w'));
+        const candleBtn = document.getElementById('spChartTypeCandle');
+        const lineBtn = document.getElementById('spChartTypeLine');
+        if (candleBtn) candleBtn.classList.remove('active');
+        if (lineBtn) lineBtn.classList.add('active');
+        _spLoadChart();
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -6428,6 +6469,7 @@ function _initYTDChartHover(canvas) {
 // ── YouTube Videos ─────────────────────────────────────────────────────────
 
 let _ytVideos = [];
+let _ytActiveChannelFilter = null;
 
 function _ytFmtDuration(secs) {
     const h = Math.floor(secs / 3600);
@@ -6468,10 +6510,43 @@ async function _loadYtVideos() {
         const json = await res.json();
         if (json.status !== 'ok') throw new Error(json.message || 'Failed');
         _ytVideos = json.videos || [];
+        _ytActiveChannelFilter = null;
+        _renderYtChannelFilter(_ytVideos);
         _renderYtVideoList(_ytVideos);
     } catch (e) {
         list.innerHTML = `<p class="yt-load-err">Could not load videos: ${e.message}</p>`;
     }
+}
+
+function _renderYtChannelFilter(videos) {
+    const bar = document.getElementById('ytChannelFilter');
+    if (!bar) return;
+    const channels = [];
+    const seen = new Set();
+    for (const v of videos) {
+        if (v.channel_id && !seen.has(v.channel_id)) {
+            seen.add(v.channel_id);
+            channels.push({ id: v.channel_id, name: v.channel_name });
+        }
+    }
+    if (channels.length <= 1) {
+        bar.style.display = 'none';
+        return;
+    }
+    const esc = s => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    bar.style.display = 'flex';
+    bar.innerHTML = [
+        `<button class="yt-filter-pill${!_ytActiveChannelFilter ? ' active' : ''}" onclick="_ytSetChannelFilter(null)">All</button>`,
+        ...channels.map(ch =>
+            `<button class="yt-filter-pill${_ytActiveChannelFilter === ch.id ? ' active' : ''}" onclick="_ytSetChannelFilter('${esc(ch.id)}')">${esc(ch.name)}</button>`)
+    ].join('');
+}
+
+function _ytSetChannelFilter(channelId) {
+    _ytActiveChannelFilter = channelId;
+    _renderYtChannelFilter(_ytVideos);
+    const filtered = channelId ? _ytVideos.filter(v => v.channel_id === channelId) : _ytVideos;
+    _renderYtVideoList(filtered);
 }
 
 function _renderYtVideoList(videos) {
