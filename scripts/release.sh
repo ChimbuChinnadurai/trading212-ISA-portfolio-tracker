@@ -10,7 +10,7 @@
 # Usage:
 #   ./scripts/release.sh                         # commit → build → deploy → cleanup
 #   ./scripts/release.sh --no-commit             # skip git commit phase
-#   ./scripts/release.sh --no-cleanup            # skip cleanup phase
+#   ./scripts/release.sh --no-cleanup            # skip cleanup phase (local image, revisions, AR images)
 #   ./scripts/release.sh --keep-revisions 5      # keep 5 Cloud Run revisions (default 3)
 #   ./scripts/release.sh --keep-images 3         # keep 3 Artifact Registry images (default 5)
 #   ./scripts/release.sh --dry-run               # preview cleanup without deleting
@@ -215,6 +215,25 @@ fi  # end SKIP_DEPLOY check
 if [[ "$RUN_CLEANUP" -eq 1 ]]; then
     phase "PHASE 3 — Cleanup"
     [[ "$DRY_RUN" -eq 1 ]] && warn "DRY-RUN mode — nothing will be deleted"
+
+    # ── Local Docker image ───────────────────────────────────────────────────
+    if [[ -n "$FULL_IMAGE" ]]; then
+        echo -e "${BOLD}── Local Docker Image ──${RESET}"
+        if [[ "$DRY_RUN" -eq 1 ]]; then
+            warn "[dry-run] Would remove local image: $FULL_IMAGE"
+        else
+            if docker rmi "$FULL_IMAGE" 2>/dev/null; then
+                ok "Removed local image: $FULL_IMAGE"
+            else
+                warn "Could not remove local image (may be in use): $FULL_IMAGE"
+            fi
+            DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null || true)
+            if [[ -n "$DANGLING" ]]; then
+                docker image prune -f &>/dev/null && ok "Pruned dangling build layers."
+            fi
+        fi
+        echo
+    fi
 
     # ── Cloud Run revisions ──────────────────────────────────────────────────
     echo -e "${BOLD}── Cloud Run Revisions ──${RESET}"
