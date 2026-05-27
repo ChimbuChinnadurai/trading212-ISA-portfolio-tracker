@@ -117,7 +117,7 @@ The app needs at least a **Trading212 API key** to show portfolio data. All othe
 2. Go to **Settings → API (Beta)**
 3. Click **Generate** to create a new key
 4. Grant at minimum: **Equity → Read** and **History → Read**
-5. Copy the values and convert it to base64 encoded `echo -n "<T212_API_KEY>:<T212_API_SECRET>" `
+5. Copy the values and convert it to base64 encoded `echo -n "<T212_API_KEY>:<T212_API_SECRET>" | base64`
 6. Paste it into `.env` as `TRADING212_API_KEY_1`
 
 **To add more portfolios**, generate an API key for each account and add numbered entries:
