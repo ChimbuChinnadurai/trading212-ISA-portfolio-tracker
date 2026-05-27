@@ -32,13 +32,25 @@ step_end()   { local e=$(( $(date +%s) - STEP_START )); ok "Done in ${e}s"; }
 trap 'die "Failed at line $LINENO (exit code $?)."' ERR
 
 # ── GCP Configuration ──────────────────────────────────────────────────────────
-REPO="europe-west2-docker.pkg.dev/chimbuc-playground/t212/portfolio"
-CR_SERVICE="t212"
-CR_REGION="europe-west1"
-GCP_PROJECT="chimbuc-playground"
-AR_LOCATION="europe-west2"
-AR_REPOSITORY="t212"
-AR_PACKAGE="portfolio"
+# Set these to match your own GCP project before running for the first time.
+# You can also export them as environment variables before calling this script,
+# in which case the exported value takes precedence over the defaults below.
+#
+#   export GCP_PROJECT=my-project
+#   export CR_SERVICE=portfolio-tracker
+#   export CR_REGION=us-central1
+#   export AR_LOCATION=us-central1
+#   export AR_REPOSITORY=portfolio-tracker
+#   export AR_PACKAGE=app
+#   export GCP_SECRET_NAME=portfolio-tracker-config
+GCP_PROJECT="${GCP_PROJECT:-your-gcp-project-id}"
+CR_SERVICE="${CR_SERVICE:-portfolio-tracker}"
+CR_REGION="${CR_REGION:-us-central1}"
+AR_LOCATION="${AR_LOCATION:-us-central1}"
+AR_REPOSITORY="${AR_REPOSITORY:-portfolio-tracker}"
+AR_PACKAGE="${AR_PACKAGE:-app}"
+GCP_SECRET_NAME="${GCP_SECRET_NAME:-portfolio-tracker-config}"
+REPO="${AR_LOCATION}-docker.pkg.dev/${GCP_PROJECT}/${AR_REPOSITORY}/${AR_PACKAGE}"
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 RUN_COMMIT=1
@@ -77,7 +89,7 @@ cd "$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 
 RELEASE_START=$(date +%s)
 echo -e "\n${BOLD}╔══════════════════════════════════════════╗${RESET}"
-echo -e "${BOLD}║   Trading212 Portfolio Tracker Release   ║${RESET}"
+echo -e "${BOLD}║       Portfolio Tracker Release          ║${RESET}"
 echo -e "${BOLD}╚══════════════════════════════════════════╝${RESET}"
 log "Project  : $GCP_PROJECT"
 log "Service  : $CR_SERVICE  Region: $CR_REGION"
@@ -195,7 +207,7 @@ log "Deploying $CR_SERVICE @ $CR_REGION with $NEW_VERSION..."
 gcloud beta run deploy "$CR_SERVICE" \
     --image="$FULL_IMAGE" \
     --min-instances=0 \
-    --set-secrets=/tmp/config.json=t212:latest \
+    --set-secrets=/tmp/config.json="${GCP_SECRET_NAME}:latest" \
     --no-cpu-boost \
     --region="$CR_REGION" \
     --project="$GCP_PROJECT"

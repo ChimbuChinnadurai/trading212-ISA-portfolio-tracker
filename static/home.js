@@ -1330,7 +1330,7 @@ function _renderActivityTimeline(data) {
         return;
     }
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Portfolio 1', '2': 'Portfolio 2' };
 
     const items = data.map((order, i) => {
         const ticker = (order.ticker || '').split('_')[0];
@@ -1415,7 +1415,7 @@ function _renderDivHistoryTimeline(data) {
         el.innerHTML = '<div class="activity-empty">No dividend history found.</div>';
         return;
     }
-    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+    const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Portfolio 1', '2': 'Portfolio 2' };
 
     const items = data.map((div, i) => {
         const ticker = (div.ticker || '').split('_')[0];
@@ -3372,7 +3372,7 @@ function _renderHomeActivity(data) {
         const date = order.dateExecuted || order.dateCreated || '';
         const status = (order.status || '').toUpperCase();
         const pid = order._pid || '1';
-        const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+        const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Portfolio 1', '2': 'Portfolio 2' };
         const ownerName = names[pid] || pid;
         const isCancelled = status === 'CANCELLED' || status === 'REJECTED';
         const typeUpper = (order.type || '').toUpperCase();
@@ -3424,7 +3424,7 @@ function _renderHomeDividends(data) {
         const amount = fmt.currency(div.amount || 0);
         const date = div.paidOn || div.date || '—';
         const pid = div._pid || '1';
-        const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Chimbu', '2': 'Poornima' };
+        const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : { '1': 'Portfolio 1', '2': 'Portfolio 2' };
         const ownerName = names[pid] || pid;
         return `
             <div class="activity-item">

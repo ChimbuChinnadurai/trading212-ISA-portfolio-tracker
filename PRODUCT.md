@@ -2,7 +2,7 @@
 name: Portfolio Tracker
 description: A personal dual-theme financial portfolio tracker for Trading 212 positions.
 register: product
-users: Solo power user (Chimbu) — personal portfolio management, not public-facing.
+users: Individual investor — personal portfolio management and tracking.
 product_purpose: Track multi-portfolio equity positions with live P&L, sector analysis, dividends, and AI market digest. Desktop-first fixed-layout SPA.
 tone: Precise, information-dense, no decoration for its own sake.
 anti_references: Generic SaaS dashboards. Navy/cobalt "fintech" clichés. Neon crypto UIs.
