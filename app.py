@@ -28,14 +28,14 @@ import time
 
 import config  # noqa: F401  # pylint: disable=unused-import,wrong-import-order
 
-from flask import Flask  # pylint: disable=wrong-import-order
+from flask import Flask, session, request, redirect, render_template, jsonify  # pylint: disable=wrong-import-order
 
 from cache import (
     alert_mark_triggered, alerts_get_all, init_db, kv_get, kv_set,
     notification_add, rows_get, snapshot_add,
 )
 from helpers import API_KEYS, fetch_and_cache_portfolio
-from routes import alerts_bp, ai_bp, market_bp, performance_bp, portfolio_bp
+from routes import alerts_bp, ai_bp, market_bp, performance_bp, portfolio_bp, auth_bp
 from routes.market import (
     fetch_and_cache_market_indicators, fetch_and_cache_news, yt_refresh_all_channels,
 )
@@ -44,6 +44,7 @@ import snowball_dividends as _sdiv
 # ── Flask app ─────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "trading212-tracker-secret-key-fallback-9d3f1a")
 init_db()
 
 logging.basicConfig(
@@ -60,6 +61,36 @@ app.register_blueprint(market_bp)
 app.register_blueprint(performance_bp)
 app.register_blueprint(ai_bp)
 app.register_blueprint(alerts_bp)
+app.register_blueprint(auth_bp)
+
+
+# ── Route Protection Middleware ────────────────────────────────────────────────
+
+@app.before_request
+def check_authentication():
+    path = request.path
+    if (path.startswith("/static/") or 
+        path in ["/favicon.ico", "/health", "/api/auth/login", "/api/auth/status", "/api/auth/logout"] or
+        request.endpoint == "static"):
+        return None
+
+    logged_in = session.get("logged_in")
+    password_changed = session.get("password_changed")
+
+    if not logged_in:
+        if path.startswith("/api/"):
+            return jsonify({"status": "unauthorized", "message": "Login required"}), 401
+        return render_template("login.html")
+
+    if not password_changed:
+        if path == "/api/auth/change-password":
+            return None
+        if path.startswith("/api/"):
+            return jsonify({"status": "forbidden", "message": "Password change required"}), 403
+        return render_template("change_password.html")
+
+    return None
+
 
 
 # ── Price alert checker (called by portfolio refresh thread) ──────────────────
