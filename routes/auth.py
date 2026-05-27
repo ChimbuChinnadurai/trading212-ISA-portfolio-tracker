@@ -26,7 +26,7 @@ def login():
     session["logged_in"] = True
     session["password_changed"] = bool(user["password_changed"])
     
-    logger.info("User logged in successfully: %s (password_changed=%s)", username, session["password_changed"])
+    logger.info("User logged in successfully: %s", username)
     
     return jsonify({
         "status": "ok",
