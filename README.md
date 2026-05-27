@@ -97,6 +97,14 @@ make run
 
 Open **http://localhost:8080**
 
+### Default Credentials
+Upon first load, you will be prompted to log in. Use the following default credentials:
+- **Username**: `admin`
+- **Password**: `admin`
+
+> [!IMPORTANT]
+> You will be forced to change the default password during your first login to secure the dashboard.
+
 > **Without Make:**
 > ```bash
 > uv sync

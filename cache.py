@@ -76,10 +76,19 @@ def init_db() -> None:
         _init_pg()
     else:
         _init_sqlite()
+    _seed_default_user()
+
 
 
 def _init_sqlite() -> None:
     with _db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                username         TEXT PRIMARY KEY,
+                password_hash    TEXT NOT NULL,
+                password_changed INTEGER NOT NULL DEFAULT 0
+            )
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS portfolio_cache (
                 id         INTEGER PRIMARY KEY,
@@ -177,6 +186,13 @@ def _init_sqlite() -> None:
 
 def _init_pg() -> None:
     with _db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                username         TEXT PRIMARY KEY,
+                password_hash    TEXT NOT NULL,
+                password_changed INTEGER NOT NULL DEFAULT 0
+            )
+        """)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS portfolio_cache (
                 id         SERIAL PRIMARY KEY,
@@ -602,3 +618,38 @@ def yt_video_set_analysis(video_id: str, analysis: str) -> None:
             "UPDATE yt_videos SET gemini_analysis = ?, analyzed_at = ? WHERE video_id = ?",
             (analysis, time.time(), video_id),
         )
+
+
+# ── User Authentication Helpers ────────────────────────────────────────────────
+
+def _seed_default_user() -> None:
+    """Seed the default 'admin' user with password 'admin' if no users exist."""
+    with _db() as conn:
+        row = conn.execute("SELECT username FROM users WHERE username = ?", ("admin",)).fetchone()
+        if not row:
+            from werkzeug.security import generate_password_hash
+            h = generate_password_hash("admin")
+            conn.execute(
+                "INSERT INTO users (username, password_hash, password_changed) VALUES (?, ?, 0)",
+                ("admin", h),
+            )
+
+
+def user_get(username: str) -> dict | None:
+    """Return user dict if exists, else None."""
+    with _db() as conn:
+        row = conn.execute(
+            "SELECT username, password_hash, password_changed FROM users WHERE username = ?",
+            (username,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def user_update_password(username: str, password_hash: str) -> None:
+    """Update user's password hash and mark password_changed = 1."""
+    with _db() as conn:
+        conn.execute(
+            "UPDATE users SET password_hash = ?, password_changed = 1 WHERE username = ?",
+            (password_hash, username),
+        )
+
