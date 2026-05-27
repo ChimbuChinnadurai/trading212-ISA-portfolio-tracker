@@ -305,8 +305,8 @@
         </a>
 
         <div class="nav-group" id="navGroupPortfolio">
-          <a class="nav-group-header" data-route="portfolio/combined" data-tooltip="Portfolio"
-            onclick="navigate('portfolio/combined')">
+          <a class="nav-group-header" data-route="portfolio/{{ default_pid }}" data-tooltip="Portfolio"
+            onclick="navigate('portfolio/{{ default_pid }}')">
             <span class="material-symbols-outlined nav-icon">pie_chart</span>
             <span class="nav-label">Portfolio</span>
           </a>
@@ -314,8 +314,8 @@
 
         <!-- Stocks group -->
         <div class="nav-group" id="navGroupStocks">
-          <a class="nav-group-header" data-route="stocks/combined" data-tooltip="Holdings"
-            onclick="navigate('stocks/combined')">
+          <a class="nav-group-header" data-route="stocks/{{ default_pid }}" data-tooltip="Holdings"
+            onclick="navigate('stocks/{{ default_pid }}')">
             <span class="material-symbols-outlined nav-icon">candlestick_chart</span>
             <span class="nav-label">Holdings</span>
           </a>
@@ -381,7 +381,7 @@
         <span class="material-symbols-outlined mob-nav-icon">home</span>
         <span class="mob-nav-label">Home</span>
       </a>
-      <a class="mob-nav-item" data-mob-route="portfolio" onclick="navigate('portfolio/combined'); return false;"
+      <a class="mob-nav-item" data-mob-route="portfolio" onclick="navigate('portfolio/{{ default_pid }}'); return false;"
         href="#">
         <span class="material-symbols-outlined mob-nav-icon">pie_chart</span>
         <span class="mob-nav-label">Portfolio</span>
@@ -410,7 +410,7 @@
           <span class="material-symbols-outlined mob-sheet-icon">home</span>
           <span>Home</span>
         </a>
-        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#stocks/combined">
+        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#stocks/{{ default_pid }}">
           <span class="material-symbols-outlined mob-sheet-icon">candlestick_chart</span>
           <span>Holdings</span>
         </a>
@@ -463,10 +463,13 @@
           </div>
           <!-- Pid switcher — always visible -->
           <div class="pid-switcher" id="pidSwitcher">
+            {% if names | length > 1 %}
             <button class="pid-btn pid-btn-combined" id="pidBtnCombined"
               onclick="switchPid('combined')">Combined</button>
-            <button class="pid-btn" id="pidBtn1" onclick="switchPid('1')">{{ names['1'] }}</button>
-            <button class="pid-btn" id="pidBtn2" onclick="switchPid('2')">{{ names['2'] }}</button>
+            {% endif %}
+            {% for pid, name in names.items() %}
+            <button class="pid-btn" id="pidBtn{{ pid }}" onclick="switchPid('{{ pid }}')">{{ name }}</button>
+            {% endfor %}
           </div>
         </div>
         <div class="topbar-right">
@@ -571,94 +574,49 @@
             <!-- ── Left main column ───────────────────────────────────────── -->
             <div class="home-main">
 
-              <!-- Row 1: Portfolio cards -->
+              <!-- Row 1: Portfolio cards (generated for each configured portfolio) -->
               <div class="home-cards-row">
 
-                <!-- Portfolio 1 -->
-                <!-- impeccable-variants-start 25017b4f -->
-                <div data-impeccable-variants="25017b4f" data-impeccable-variant-count="3" style="display: contents">
-                  <!-- Original -->
-                  <div data-impeccable-variant="original">
-                    <div class="ov-card" id="ov1" onclick="navigate('portfolio/1')" style="cursor:pointer">
-                      <div class="ov-header">
-                        <span class="ov-label"><span class="material-symbols-outlined" style="margin-right:6px;font-size:18px;vertical-align:-3px;color:var(--accent);">person</span>{{
-                          names['1'] }}</span>
-                        <span class="ov-link">View Details →</span>
-                      </div>
-                      <div class="ov-body">
-                        <div class="ov-stats">
-                          <div class="ov-main-val skeleton skeleton-text" id="p1-value"></div>
-                          <div class="ov-subline">
-                            <span class="ov-returns skeleton skeleton-text" id="p1-returns"></span>
-                            <span class="ov-pct skeleton skeleton-text" id="p1-pct"></span>
-                          </div>
-                          <div class="ov-24h" id="p1-24h" style="display:none"></div>
-                        </div>
-                        <canvas class="ov-spark" id="p1-spark" width="320" height="128"></canvas>
-                      </div>
-                      <div class="ov-mini-stats">
-                        <div class="ov-mini-row">
-                          <span class="ov-mini-label">Invested</span>
-                          <span class="ov-mini-val" id="p1-invested">—</span>
-                        </div>
-                        <div class="ov-mini-row">
-                          <span class="ov-mini-label">Unrealized</span>
-                          <span class="ov-mini-val" id="p1-unrealized">—</span>
-                        </div>
-                        <div class="ov-mini-row">
-                          <span class="ov-mini-label">Realized</span>
-                          <span class="ov-mini-val" id="p1-realized">—</span>
-                        </div>
-                        <div class="ov-mini-row">
-                          <span class="ov-mini-label">Cash</span>
-                          <span class="ov-mini-val" id="p1-cash">—</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <!-- Variants: insert below this line -->
-                </div>
-                <!-- impeccable-variants-end 25017b4f -->
-
-                <!-- Portfolio 2 -->
-                <div class="ov-card" id="ov2" onclick="navigate('portfolio/2')" style="cursor:pointer">
+                {% for pid, name in names.items() %}
+                <div class="ov-card" id="ov{{ pid }}" onclick="navigate('portfolio/{{ pid }}')" style="cursor:pointer">
                   <div class="ov-header">
-                    <span class="ov-label"><span class="material-symbols-outlined" style="margin-right:6px;font-size:18px;vertical-align:-3px;color:var(--accent);">person</span>{{
-                      names['2'] }}</span>
+                    <span class="ov-label"><span class="material-symbols-outlined" style="margin-right:6px;font-size:18px;vertical-align:-3px;color:var(--accent);">person</span>{{ name }}</span>
                     <span class="ov-link">View Details →</span>
                   </div>
-                  <div class="ov-body" id="p2-body" style="filter: grayscale(1); opacity: 0.6;">
+                  <div class="ov-body">
                     <div class="ov-stats">
-                      <div class="ov-main-val skeleton skeleton-text" id="p2-value"></div>
+                      <div class="ov-main-val skeleton skeleton-text" id="p{{ pid }}-value"></div>
                       <div class="ov-subline">
-                        <span class="ov-returns skeleton skeleton-text" id="p2-returns"></span>
-                        <span class="ov-pct skeleton skeleton-text" id="p2-pct"></span>
+                        <span class="ov-returns skeleton skeleton-text" id="p{{ pid }}-returns"></span>
+                        <span class="ov-pct skeleton skeleton-text" id="p{{ pid }}-pct"></span>
                       </div>
-                      <div class="ov-24h" id="p2-24h" style="display:none"></div>
+                      <div class="ov-24h" id="p{{ pid }}-24h" style="display:none"></div>
                     </div>
-                    <canvas class="ov-spark" id="p2-spark" width="320" height="128"></canvas>
+                    <canvas class="ov-spark" id="p{{ pid }}-spark" width="320" height="128"></canvas>
                   </div>
-                  <div class="ov-mini-stats" id="p2-mini" style="opacity:0.5">
+                  <div class="ov-mini-stats">
                     <div class="ov-mini-row">
                       <span class="ov-mini-label">Invested</span>
-                      <span class="ov-mini-val" id="p2-invested">—</span>
+                      <span class="ov-mini-val" id="p{{ pid }}-invested">—</span>
                     </div>
                     <div class="ov-mini-row">
                       <span class="ov-mini-label">Unrealized</span>
-                      <span class="ov-mini-val" id="p2-unrealized">—</span>
+                      <span class="ov-mini-val" id="p{{ pid }}-unrealized">—</span>
                     </div>
                     <div class="ov-mini-row">
                       <span class="ov-mini-label">Realized</span>
-                      <span class="ov-mini-val" id="p2-realized">—</span>
+                      <span class="ov-mini-val" id="p{{ pid }}-realized">—</span>
                     </div>
                     <div class="ov-mini-row">
                       <span class="ov-mini-label">Cash</span>
-                      <span class="ov-mini-val" id="p2-cash">—</span>
+                      <span class="ov-mini-val" id="p{{ pid }}-cash">—</span>
                     </div>
                   </div>
                 </div>
+                {% endfor %}
 
-                <!-- Combined -->
+                {% if names | length > 1 %}
+                <!-- Combined — only shown when 2+ portfolios are configured -->
                 <div class="ov-card ov-card-combined" onclick="navigate('portfolio/combined')" style="cursor:pointer">
                   <div class="ov-header">
                     <span class="ov-label"><span class="material-symbols-outlined" style="margin-right:6px;font-size:18px;vertical-align:-3px;color:var(--accent);">group</span>Combined</span>
@@ -694,6 +652,7 @@
                     </div>
                   </div>
                 </div>
+                {% endif %}
 
               </div><!-- /home-cards-row -->
 
@@ -2154,7 +2113,7 @@
     (function () {
       var h = new Date().getHours();
       var greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-      var name = (typeof PORTFOLIO_NAMES !== 'undefined' && PORTFOLIO_NAMES['1']) || 'there';
+      var name = (typeof PORTFOLIO_NAMES !== 'undefined' && Object.values(PORTFOLIO_NAMES)[0]) || 'there';
       var el = document.getElementById('greetingText');
       if (el) el.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
     }());

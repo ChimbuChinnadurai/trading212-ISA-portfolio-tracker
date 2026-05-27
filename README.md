@@ -2,7 +2,7 @@
 
 ![Dashboard Screenshot](static/screenshots/dashboard.png)
 
-A self-hosted web dashboard for **Trading212 Shares ISA** accounts. Fetches your positions via the Trading212 API and displays them in a rich, interactive single-page app. Supports **two named portfolios** simultaneously plus an aggregated **Combined** view.
+A self-hosted web dashboard for **Trading212 Shares ISA** accounts. Fetches your positions via the Trading212 API and displays them in a rich, interactive single-page app. Supports **one or more portfolios** simultaneously — add a `TRADING212_API_KEY_<id>` for each account and the app discovers them automatically. When two or more portfolios are configured, an aggregated **Combined** view is shown.
 
 Built with Python/Flask (backend) and vanilla JS/HTML/CSS (frontend). No framework dependencies. Deployable to GCP Cloud Run in a single command.
 
@@ -124,8 +124,19 @@ The app needs at least a **Trading212 API key** to show portfolio data. All othe
 4. Grant at minimum: **Equity → Read** and **History → Read**
 5. Copy the key and paste it into `.env` as `TRADING212_API_KEY_1`
 
-> For a second portfolio, repeat and set `TRADING212_API_KEY_2`.
-> Set `PORTFOLIO_NAME_1` / `PORTFOLIO_NAME_2` to friendly display names.
+**To add more portfolios**, generate an API key for each account and add numbered entries:
+```json
+{
+  "TRADING212_API_KEY_1": "key-for-account-one",
+  "PORTFOLIO_NAME_1":     "ISA",
+  "TRADING212_API_KEY_2": "key-for-account-two",
+  "PORTFOLIO_NAME_2":     "SIPP",
+  "TRADING212_API_KEY_3": "key-for-account-three",
+  "PORTFOLIO_NAME_3":     "Junior ISA"
+}
+```
+
+The suffix (1, 2, 3 …) can be any string — numeric suffixes are sorted in ascending order, non-numeric suffixes follow alphabetically. There is no upper limit on the number of portfolios.
 
 > To use the **demo** account instead of live, set `TRADING212_BASE_URL` to `https://demo.trading212.com`.
 
@@ -164,10 +175,8 @@ All config is loaded from `.env` (local) or `/tmp/config.json` (Cloud Run Secret
 
 | Variable | Default | Required | Description |
 |---|---|---|---|
-| `TRADING212_API_KEY_1` | — | **Yes** | Trading212 API key for portfolio 1 |
-| `TRADING212_API_KEY_2` | — | No | Trading212 API key for portfolio 2 |
-| `PORTFOLIO_NAME_1` | `Portfolio 1` | No | Display name for portfolio 1 |
-| `PORTFOLIO_NAME_2` | `Portfolio 2` | No | Display name for portfolio 2 |
+| `TRADING212_API_KEY_<id>` | — | **Yes (at least one)** | Trading212 API key for portfolio `<id>`. Add as many as needed — the app discovers all matching env vars automatically. |
+| `PORTFOLIO_NAME_<id>` | `Portfolio <id>` | No | Display name for portfolio `<id>`. Must match the suffix of the corresponding API key. |
 | `TRADING212_BASE_URL` | `https://live.trading212.com` | No | Switch to `https://demo.trading212.com` for the demo account |
 | `FINNHUB_TOKEN` | — | No | Finnhub API key (earnings, stock metrics, news) |
 | `GEMINI_API_KEY` | — | No | Google Gemini API key (AI features + YouTube summaries) |

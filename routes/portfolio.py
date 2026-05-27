@@ -66,7 +66,9 @@ def favicon():
 def index():
     """SPA shell — all views are rendered client-side via hash routing."""
     show_ai = os.environ.get("SHOW_AI_FEATURES", "0") == "1"
-    return render_template("spa.html", names=PORTFOLIO_NAMES, show_ai=show_ai)
+    pids = list(PORTFOLIO_NAMES.keys())
+    default_pid = "combined" if len(pids) > 1 else (pids[0] if pids else "combined")
+    return render_template("spa.html", names=PORTFOLIO_NAMES, show_ai=show_ai, default_pid=default_pid)
 
 
 @portfolio_bp.route("/portfolio/<pid>")
@@ -165,7 +167,7 @@ def _home_data_inner(force: bool):
 def dividends_overview():
     """Consolidated dividend analytics. ?pid=combined|1|2 — default combined. Cached 15 min."""
     pid_param = request.args.get("pid", "combined").strip()
-    if pid_param in ("1", "2") and API_KEYS.get(pid_param):
+    if pid_param in API_KEYS and API_KEYS.get(pid_param):
         pids_to_use = {pid_param: API_KEYS[pid_param]}
     else:
         pids_to_use = {k: v for k, v in API_KEYS.items() if v}

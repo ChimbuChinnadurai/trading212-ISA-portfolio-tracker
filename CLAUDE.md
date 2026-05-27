@@ -41,8 +41,13 @@ curl -X POST http://localhost:8080/api/admin/clear-cache   # clear cache without
 ### Money is always GBP server-side
 All monetary values are stored and returned in GBP. USD conversion is display-only in `currency.js` via `fmt.currency()`. Never store USD server-side, never use `toFixed(2)` for display — always `fmt.currency(value)`.
 
+### N-portfolio support — dynamic discovery
+Portfolios are discovered at startup by `_load_portfolios()` in `helpers.py`. It scans `os.environ` for all `TRADING212_API_KEY_<id>` entries — the suffix becomes the pid. Adding `TRADING212_API_KEY_3=...` automatically creates a third portfolio with no code changes required.
+
+`API_KEYS` and `PORTFOLIO_NAMES` are module-level dicts populated at import time. All route handlers iterate `API_KEYS.items()` — never hardcode pid "1" or "2". The template receives `names` (all portfolios) and `default_pid` ("combined" if >1 portfolio, else the single pid).
+
 ### Combined portfolio pid
-The aggregated view uses pid string `"combined"` — handled specially in most endpoints and in `router.js`. Don't hardcode numeric pids.
+The aggregated view uses pid string `"combined"` — handled specially in most endpoints and in `router.js`. The combined card and switcher button are only rendered when 2+ portfolios are configured. Don't hardcode numeric pids.
 
 ### Cache is the source of truth
 Read pattern everywhere: check cache → return if fresh → fetch live → write cache → return. `cache.py` is the single place this logic lives.

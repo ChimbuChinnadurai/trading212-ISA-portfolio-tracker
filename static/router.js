@@ -85,22 +85,19 @@ function _updateBreadcrumb(route) {
     const iconEl = document.getElementById('topbarSectionIcon');
     const names = typeof PORTFOLIO_NAMES !== 'undefined' ? PORTFOLIO_NAMES : {};
     const sectionMap = {
-        'portfolio/1': { label: '', icon: 'pie_chart' },
-        'portfolio/2': { label: '', icon: 'pie_chart' },
-        'portfolio/combined': { label: '', icon: 'pie_chart' },
-        'stocks/1': { label: '', icon: 'table_chart' },
-        'stocks/2': { label: '', icon: 'table_chart' },
-        'stocks/combined': { label: '', icon: 'table_chart' },
         'news': { label: 'Market News', icon: 'newspaper' },
         'calendar': { label: 'Market Calendar', icon: 'event' },
         'activity': { label: 'Activity', icon: 'history' },
         'market': { label: 'Market', icon: 'candlestick_chart' },
         'metrics': { label: 'Metrics', icon: 'analytics' },
         'watchlist': { label: 'Watchlist', icon: 'bookmark' },
-        'dividends/combined': { label: '', icon: 'payments' },
-        'dividends/1': { label: '', icon: 'payments' },
-        'dividends/2': { label: '', icon: 'payments' },
     };
+    const _allPids = [...Object.keys(names), 'combined'];
+    for (const pid of _allPids) {
+        sectionMap[`portfolio/${pid}`] = { label: '', icon: 'pie_chart' };
+        sectionMap[`stocks/${pid}`]    = { label: '', icon: 'table_chart' };
+        sectionMap[`dividends/${pid}`] = { label: '', icon: 'payments' };
+    }
 
     if (route === 'home') {
         if (iconEl) iconEl.style.display = 'none';
@@ -111,7 +108,7 @@ function _updateBreadcrumb(route) {
         if (greetEl) {
             const h = new Date().getHours();
             const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-            const name = (typeof PORTFOLIO_NAMES !== 'undefined' && PORTFOLIO_NAMES['1']) || 'there';
+            const name = (typeof PORTFOLIO_NAMES !== 'undefined' && Object.values(PORTFOLIO_NAMES)[0]) || 'there';
             greetEl.textContent = greet + ', ' + name + ' \uD83D\uDC4B';
         }
     } else if (route.startsWith('portfolio/') || route.startsWith('stocks/') || route.startsWith('dividends/')) {
@@ -155,8 +152,7 @@ function _updatePidSwitcher(route) {
     if (isRelevant) {
         const pid = route.split('/')[1];
         const activeBtn = document.getElementById(
-            pid === 'combined' ? 'pidBtnCombined' :
-                pid === '1' ? 'pidBtn1' : 'pidBtn2'
+            pid === 'combined' ? 'pidBtnCombined' : `pidBtn${pid}`
         );
         if (activeBtn) activeBtn.classList.add('active');
     }

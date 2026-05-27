@@ -77,11 +77,9 @@ let _tradeSignalsData = null;
 
 /* ─── Overview card skeleton + count-up helpers ─────────────────────────── */
 function _homeShowSkeletons() {
-    const ids = [
-        'p1-value', 'p1-returns', 'p1-pct',
-        'p2-value', 'p2-returns', 'p2-pct',
-        'c-value', 'c-returns', 'c-pct',
-    ];
+    const pids = typeof PORTFOLIO_NAMES !== 'undefined' ? Object.keys(PORTFOLIO_NAMES) : [];
+    const ids = pids.flatMap(pid => [`p${pid}-value`, `p${pid}-returns`, `p${pid}-pct`]);
+    if (pids.length > 1) ids.push('c-value', 'c-returns', 'c-pct');
     ids.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -294,20 +292,11 @@ function _renderHomeTopUnder(top, under) {
 }
 
 function renderOverview(data) {
-    if (data["1"]) updateCard('p1', data["1"]);
-
-    if (data["2"]) {
-        const p2Body = document.getElementById('p2-body');
-        if (p2Body) { p2Body.style.filter = 'none'; p2Body.style.opacity = '1'; }
-        const p2Mini = document.getElementById('p2-mini');
-        if (p2Mini) p2Mini.style.opacity = '1';
-        updateCard('p2', data["2"]);
-    } else {
-        const p2Val = document.getElementById('p2-value');
-        if (p2Val) p2Val.innerText = "Not Configured";
+    const pids = typeof PORTFOLIO_NAMES !== 'undefined' ? Object.keys(PORTFOLIO_NAMES) : [];
+    for (const pid of pids) {
+        if (data[pid]) updateCard(`p${pid}`, data[pid]);
     }
-
-    if (data["combined"]) updateCard('c', data["combined"]);
+    if (data['combined'] && pids.length > 1) updateCard('c', data['combined']);
 }
 
 function updateCard(prefix, stats) {
@@ -374,11 +363,9 @@ function onHomeCurrencyChange() {
     }
 
     // 24h change labels on sparkline cards
-    const sparkConfigs = [
-        { canvasId: 'p1-spark', elId: 'p1-24h' },
-        { canvasId: 'p2-spark', elId: 'p2-24h' },
-        { canvasId: 'pc-spark', elId: 'c-24h' },
-    ];
+    const _spPids = typeof PORTFOLIO_NAMES !== 'undefined' ? Object.keys(PORTFOLIO_NAMES) : [];
+    const sparkConfigs = _spPids.map(pid => ({ canvasId: `p${pid}-spark`, elId: `p${pid}-24h` }));
+    if (_spPids.length > 1) sparkConfigs.push({ canvasId: 'pc-spark', elId: 'c-24h' });
     for (const { canvasId, elId } of sparkConfigs) {
         const d = _sparkData[canvasId];
         if (d && d.points) _render24hChange(elId, d.points);
@@ -787,29 +774,38 @@ function initHeatmapResizeObserver() {
 }
 
 /* ─── Sparkline charts ───────────────────────────────────────────────────── */
-const SPARK_COLORS = {
-    '1': { line: '#3b82f6', fill: 'rgba(59,130,246,0.18)' },
-    '2': { line: '#8b5cf6', fill: 'rgba(139,92,246,0.18)' },
-    'combined': { line: '#14b8a6', fill: 'rgba(20,184,166,0.18)' },
-};
+const _SPARK_PALETTE = [
+    { line: '#3b82f6', fill: 'rgba(59,130,246,0.18)' },
+    { line: '#8b5cf6', fill: 'rgba(139,92,246,0.18)' },
+    { line: '#f59e0b', fill: 'rgba(245,158,11,0.18)' },
+    { line: '#ec4899', fill: 'rgba(236,72,153,0.18)' },
+    { line: '#06b6d4', fill: 'rgba(6,182,212,0.18)' },
+];
+const _SPARK_COMBINED = { line: '#14b8a6', fill: 'rgba(20,184,166,0.18)' };
+
+function _sparkColor(pid) {
+    if (pid === 'combined') return _SPARK_COMBINED;
+    const pids = typeof PORTFOLIO_NAMES !== 'undefined' ? Object.keys(PORTFOLIO_NAMES) : [];
+    const idx = pids.indexOf(pid);
+    return _SPARK_PALETTE[(idx >= 0 ? idx : 0) % _SPARK_PALETTE.length];
+}
 
 // Cached sparkline data so theme changes can redraw without re-fetching
 const _sparkData = {};
 
 async function loadSparklines() {
-    const configs = [
-        { pid: '1', canvasId: 'p1-spark', elId: 'p1-24h' },
-        { pid: '2', canvasId: 'p2-spark', elId: 'p2-24h' },
-        { pid: 'combined', canvasId: 'pc-spark', elId: 'c-24h' },
-    ];
+    const pids = typeof PORTFOLIO_NAMES !== 'undefined' ? Object.keys(PORTFOLIO_NAMES) : [];
+    const configs = pids.map(pid => ({ pid, canvasId: `p${pid}-spark`, elId: `p${pid}-24h` }));
+    if (pids.length > 1) configs.push({ pid: 'combined', canvasId: 'pc-spark', elId: 'c-24h' });
     await Promise.all(configs.map(async ({ pid, canvasId, elId }) => {
         try {
             const res = await fetch(`/api/p${pid}/history`);
             const json = await res.json();
             if (json.status === 'ok' && json.data.length >= 2) {
-                _sparkData[canvasId] = { points: json.data, colors: SPARK_COLORS[pid] };
+                const color = _sparkColor(pid);
+                _sparkData[canvasId] = { points: json.data, colors: color };
                 requestAnimationFrame(() => {
-                    drawSparkline(canvasId, json.data, SPARK_COLORS[pid]);
+                    drawSparkline(canvasId, json.data, color);
                     _attachSparkHover(canvasId);
                 });
                 _render24hChange(elId, json.data);

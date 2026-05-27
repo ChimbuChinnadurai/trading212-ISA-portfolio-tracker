@@ -17,6 +17,7 @@ Public API
 
 import logging
 import os
+import re
 
 from cache import TTL_DIV, kv_age, kv_get, kv_set, rows_get, rows_set, snapshot_add
 from fx import get_gbpusd_rate
@@ -28,15 +29,33 @@ logger = logging.getLogger("helpers")
 
 # ── Multi-portfolio config ─────────────────────────────────────────────────────
 
-API_KEYS: dict = {
-    "1": os.environ.get("TRADING212_API_KEY_1"),
-    "2": os.environ.get("TRADING212_API_KEY_2"),
-}
+def _load_portfolios() -> tuple[dict, dict]:
+    """Discover all configured portfolios from environment variables.
 
-PORTFOLIO_NAMES: dict = {
-    "1": os.environ.get("PORTFOLIO_NAME_1", "Portfolio 1"),
-    "2": os.environ.get("PORTFOLIO_NAME_2", "Portfolio 2"),
-}
+    Scans os.environ for TRADING212_API_KEY_<id> entries.  The suffix becomes
+    the portfolio pid (e.g. "1", "2", "alice").  Display names are read from
+    PORTFOLIO_NAME_<id> and default to "Portfolio <id>".
+
+    Portfolios are ordered: numeric suffixes first (ascending), then
+    non-numeric suffixes alphabetically.
+    """
+    found: list[str] = []
+    for env_key, env_val in os.environ.items():
+        m = re.match(r"^TRADING212_API_KEY_(.+)$", env_key)
+        if m and env_val and env_val.strip():
+            found.append(m.group(1))
+
+    found.sort(key=lambda p: (0, int(p)) if p.isdigit() else (1, p))
+
+    keys: dict[str, str] = {}
+    names: dict[str, str] = {}
+    for pid in found:
+        keys[pid] = os.environ[f"TRADING212_API_KEY_{pid}"].strip()
+        names[pid] = os.environ.get(f"PORTFOLIO_NAME_{pid}", f"Portfolio {pid}")
+    return keys, names
+
+
+API_KEYS, PORTFOLIO_NAMES = _load_portfolios()
 
 
 # ── Core fetch pipeline ────────────────────────────────────────────────────────
@@ -173,11 +192,12 @@ def _build_overview_data(force: bool = False) -> tuple:
         "unrealized_pnl": round(total_returns, 2),
     }
 
+    _sample_pid = next(iter(API_KEYS), None)
     metadata = {
         "names": PORTFOLIO_NAMES,
         "freshness": {
-            "prices":    kv_age("1:rows") or 0,
-            "dividends": kv_age("total_dividends", pid="1") or 0,
+            "prices":    (kv_age(f"{_sample_pid}:rows") if _sample_pid else None) or 0,
+            "dividends": (kv_age("total_dividends", pid=_sample_pid) if _sample_pid else None) or 0,
             "fx":        kv_age("gbpusd") or 0,
         },
     }
