@@ -30,7 +30,7 @@ from flask import Blueprint, jsonify, request
 
 import gemini_utils as _gemini
 from cache import (
-    TTL_NEWS, get_excluded_tickers, kv_get, kv_set, rows_get,
+    get_excluded_tickers, kv_get, kv_set, rows_get,
     set_ticker_excluded, trump_sentiment_get, trump_sentiment_set,
 )
 from helpers import API_KEYS
@@ -383,50 +383,4 @@ def trump_posts_sentiment():
         return jsonify({"status": "ok", "data": by_id, "new": len(newly_analysed), "cached": len(stored)})
     except Exception as e:
         logger.warning("trump_posts_sentiment error: %s", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-# ── Gemini AI endpoints ───────────────────────────────────────────────────────
-
-@ai_bp.route("/api/ai/market-digest")
-def ai_market_digest():
-    """Daily automated market digest using Gemini."""
-    try:
-        news_data = kv_get("general_market_news", TTL_NEWS) or []
-        digest    = _gemini.generate_market_summary(news_data)
-        return jsonify({"status": "ok", "digest": digest})
-    except Exception as e:
-        logger.error("AI Market Digest failed: %s", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@ai_bp.route("/api/ai/trade-signals")
-def ai_trade_signals():
-    """AI-driven trade signals based on portfolio holdings using Gemini."""
-    try:
-        all_rows = []
-        for pid in API_KEYS:
-            rows, _ = rows_get(pid)
-            if rows:
-                all_rows.extend(rows)
-        signals = _gemini.generate_trade_signals(all_rows)
-        return jsonify({"status": "ok", "signals": signals})
-    except Exception as e:
-        logger.error("AI Trade Signals failed: %s", e)
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@ai_bp.route("/api/ai/chat", methods=["POST"])
-def ai_chat():
-    """Interactive portfolio chat with Gemini."""
-    try:
-        body    = request.get_json()
-        message = body.get("message")
-        history = body.get("history", [])
-        if not message:
-            return jsonify({"status": "error", "message": "Message required"}), 400
-        response = _gemini.chat_with_gemini(message, history)
-        return jsonify({"status": "ok", "response": response})
-    except Exception as e:
-        logger.error("AI Chat failed: %s", e)
         return jsonify({"status": "error", "message": str(e)}), 500

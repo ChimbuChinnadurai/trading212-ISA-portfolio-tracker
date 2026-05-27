@@ -352,15 +352,6 @@
           <span class="nav-label">News</span>
         </a>
 
-        <!-- AI Intelligence -->
-        {% if show_ai %}
-        <a class="nav-item" data-route="ai-intelligence" data-tooltip="AI Intelligence"
-          onclick="navigate('ai-intelligence')">
-          <span class="material-symbols-outlined nav-icon">psychology</span>
-          <span class="nav-label">AI Intelligence</span>
-        </a>
-        {% endif %}
-
       </nav><!-- /sidebar-nav -->
 
       <div class="sidebar-footer">
@@ -426,12 +417,6 @@
           <span class="material-symbols-outlined mob-sheet-icon">show_chart</span>
           <span>Market</span>
         </a>
-        {% if show_ai %}
-        <a class="mob-sheet-item" onclick="closeMobileSheet();" href="#ai-intelligence">
-          <span class="material-symbols-outlined mob-sheet-icon">psychology</span>
-          <span>AI Intelligence</span>
-        </a>
-        {% endif %}
         <a class="mob-sheet-item" href="https://app.trading212.com/" target="_blank" rel="noopener noreferrer">
           <span class="material-symbols-outlined mob-sheet-icon">open_in_new</span>
           <span>Open Trading212</span>
@@ -1725,69 +1710,6 @@
           </div><!-- /view-main -->
         </div><!-- /view-watchlist -->
 
-        <!-- ═══ VIEW: AI Intelligence ═══ -->
-        <div id="view-ai-intelligence" class="spa-view" style="display:none">
-          <div class="ai-view-body">
-            <div class="ai-grid">
-
-              <!-- Column 1: Market Digest -->
-              <div class="ai-col">
-                <div class="card ai-card">
-                  <div class="ai-card-header">
-
-                    <h3><span class="material-symbols-outlined" style="margin-right:6px;font-size:20px;vertical-align:-4px;color:var(--accent);">smart_toy</span>Market Digest</h3>
-                    <button class="ai-refresh-btn" id="aiRefreshDigest" onclick="loadAiDigest(true)">
-                      <span class="material-symbols-outlined">refresh</span>
-                    </button>
-                  </div>
-                  <div class="ai-card-content" id="aiDigestContent">
-                    <div class="ai-loading">Generating summary...</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Column 2: Trade Signals -->
-              <div class="ai-col">
-                <div class="card ai-card">
-                  <div class="ai-card-header">
-
-                    <h3><span class="material-symbols-outlined" style="margin-right:6px;font-size:20px;vertical-align:-4px;color:var(--accent);">radar</span>Trade Signals</h3>
-                    <button class="ai-refresh-btn" id="aiRefreshSignals" onclick="loadAiSignals(true)">
-                      <span class="material-symbols-outlined">refresh</span>
-                    </button>
-                  </div>
-                  <div class="ai-card-content" id="aiSignalsContent">
-                    <div class="ai-loading">Analyzing portfolio...</div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Column 3: AI Chat -->
-              <div class="ai-col">
-                <div class="card ai-card ai-chat-card">
-                  <div class="ai-card-header">
-
-                    <h3><span class="material-symbols-outlined" style="margin-right:6px;font-size:20px;vertical-align:-4px;color:var(--accent);">psychology</span>AI Assistant</h3>
-                  </div>
-                  <div class="ai-chat-content" id="aiChatContent">
-                    <div class="ai-msg ai-msg-bot">
-                      Hello! I'm your Gemini-powered portfolio assistant. How can I help you today?
-                    </div>
-                  </div>
-                  <div class="ai-chat-input-row">
-                    <input type="text" id="aiChatInput" placeholder="Ask me anything..."
-                      onkeyup="if(event.key==='Enter') sendAiChatMessage()">
-                    <button onclick="sendAiChatMessage()">
-                      <span class="material-symbols-outlined">send</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
-
       </div><!-- /view-container -->
 
       <!-- Stock drill-down side panel — global, accessible from any view -->
@@ -2108,7 +2030,6 @@
   <script src="/static/router.js"></script>
   <script src="/static/home.js"></script>
   <script src="/static/app.js"></script>
-  <script src="/static/ai_intelligence.js"></script>
   <script>
     (function () {
       var h = new Date().getHours();

@@ -191,9 +191,6 @@ function _updateRefreshBtn(view) {
         btn.onclick = () => loadWatchlistView();
     } else if (view === 'dividends') {
         btn.onclick = () => loadDividendsView(true, window.DIVIDENDS_PID || 'combined');
-    } else if (view === 'ai-intelligence') {
-        // AI view has its own refresh buttons per section
-        btn.style.display = 'none';
     }
 
 }

@@ -62,11 +62,6 @@ Built with Python/Flask (backend) and vanilla JS/HTML/CSS (frontend). No framewo
 - Videos fetched and optionally AI-summarised via Gemini on add
 - Background refresh keeps the feed current
 
-### AI Features *(optional — requires `SHOW_AI_FEATURES=1`)*
-- AI Trade Signals: TradingView technical analysis + Gemini interpretation
-- AI Market Digest via Finviz (no extra API key required)
-- Interactive Gemini chat panel
-
 ---
 
 ## Prerequisites
@@ -150,12 +145,11 @@ The suffix (1, 2, 3 …) can be any string — numeric suffixes are sorted in as
 
 ---
 
-### Google Gemini API Key (optional — AI features and YouTube summaries)
+### Google Gemini API Key (optional — YouTube video summaries)
 
 1. Go to [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. Click **Create API key**
 3. Set `GEMINI_API_KEY` in `.env`
-4. Set `SHOW_AI_FEATURES=1` to enable the AI tab in the UI
 
 ---
 
@@ -179,11 +173,9 @@ All config is loaded from `.env` (local) or `/tmp/config.json` (Cloud Run Secret
 | `PORTFOLIO_NAME_<id>` | `Portfolio <id>` | No | Display name for portfolio `<id>`. Must match the suffix of the corresponding API key. |
 | `TRADING212_BASE_URL` | `https://live.trading212.com` | No | Switch to `https://demo.trading212.com` for the demo account |
 | `FINNHUB_TOKEN` | — | No | Finnhub API key (earnings, stock metrics, news) |
-| `GEMINI_API_KEY` | — | No | Google Gemini API key (AI features + YouTube summaries) |
+| `GEMINI_API_KEY` | — | No | Google Gemini API key (YouTube video summaries) |
 | `GOOGLE_API_KEY` | — | No | Alias for `GEMINI_API_KEY` |
 | `YOUTUBE_API_KEY` | — | No | YouTube Data API v3 key |
-| `SHOW_AI_FEATURES` | `0` | No | Set to `1` to show the AI tab |
-| `ENABLE_ANIMATIONS` | `0` | No | Set to `1` to enable UI animations |
 | `PORT` | `8080` | No | HTTP port (Cloud Run sets this automatically) |
 | `DB_PATH` | `portfolio_cache.db` | No | SQLite database file path |
 | `DATABASE_URL` | — | No | PostgreSQL DSN — overrides SQLite when set. Required for persistent storage on Cloud Run |

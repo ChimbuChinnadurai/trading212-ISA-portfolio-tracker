@@ -31,7 +31,6 @@ Routes
 """
 
 import logging
-import os
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -65,10 +64,9 @@ def favicon():
 @portfolio_bp.route("/")
 def index():
     """SPA shell — all views are rendered client-side via hash routing."""
-    show_ai = os.environ.get("SHOW_AI_FEATURES", "0") == "1"
     pids = list(PORTFOLIO_NAMES.keys())
     default_pid = "combined" if len(pids) > 1 else (pids[0] if pids else "combined")
-    return render_template("spa.html", names=PORTFOLIO_NAMES, show_ai=show_ai, default_pid=default_pid)
+    return render_template("spa.html", names=PORTFOLIO_NAMES, default_pid=default_pid)
 
 
 @portfolio_bp.route("/portfolio/<pid>")
