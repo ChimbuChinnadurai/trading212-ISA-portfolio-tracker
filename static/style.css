@@ -7129,6 +7129,17 @@ html[data-theme="dark"] .nav-item.active {
   white-space: nowrap;
 }
 
+.nav-top-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: justify;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
 .nav-group {
   display: flex;
   flex-direction: column;

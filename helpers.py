@@ -52,10 +52,16 @@ def _load_portfolios() -> tuple[dict, dict]:
     for pid in found:
         keys[pid] = os.environ[f"TRADING212_API_KEY_{pid}"].strip()
         names[pid] = os.environ.get(f"PORTFOLIO_NAME_{pid}", f"Portfolio {pid}")
+
+    if not keys:
+        keys["demo"] = "DEMO_KEY"
+        names["demo"] = "Demo Portfolio"
+
     return keys, names
 
 
 API_KEYS, PORTFOLIO_NAMES = _load_portfolios()
+
 
 
 # ── Core fetch pipeline ────────────────────────────────────────────────────────
