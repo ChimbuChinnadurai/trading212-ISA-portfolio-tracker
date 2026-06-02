@@ -4811,18 +4811,27 @@ async function loadWatchlistView() {
     if (_wlActiveTab === '__heatmap__') _wlSwitchTab('__heatmap__');
 }
 
+function _sanitizeWatchlistTicker(raw) {
+    const v = String(raw || '').trim().toUpperCase();
+    // Allow only characters valid for supported ticker styles.
+    // Blocks HTML/meta characters to prevent DOM XSS via innerHTML/attributes.
+    return /^[A-Z0-9._-]+$/.test(v) ? v : '';
+}
+
 async function addWatchlistTicker() {
     const input = document.getElementById('watchlistTickerInput');
     const select = document.getElementById('watchlistCountrySelect');
     if (!input) return;
 
-    let ticker = input.value.trim().toUpperCase();
+    let ticker = _sanitizeWatchlistTicker(input.value);
     const cat = _wlCategories.find(c => c.id === _wlAddType) || {};
     const country = cat.noCountry ? 'US' : (select ? select.value : 'US');
     if (!ticker) return;
 
     // Normalise crypto-style: BTC → BTC-USD, ETH-USD stays as-is
     if (cat.autoCryptoSuffix && !ticker.includes('-')) ticker = ticker + '-USD';
+    ticker = _sanitizeWatchlistTicker(ticker);
+    if (!ticker) return;
 
     const list = await _wlLoad();
     if (list.some(r => r.ticker === ticker)) {
